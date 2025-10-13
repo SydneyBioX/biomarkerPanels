@@ -1,6 +1,15 @@
-# biomarkerPanels
+<table>
+  <tr>
+    <td>
+      <h1 style="margin-bottom:0;">biomarkerPanels</h1>
+    </td>
+    <td style="vertical-align:middle; padding-left:16px;">
+      <img src="src/moo_hexsticker.png" alt="biomarkerPanels hex sticker" height="90">
+    </td>
+  </tr>
+</table>
 
-![biomarkerPanels hex sticker](src/moo_hexsticker.png)
+<hr style="border:0;border-top:1px solid #ccc;margin-top:8px;margin-bottom:24px;" />
 
 Multi-objective optimization workflows for discovering small biomarker panels
 with constrained performance targets. The package is designed for integration
