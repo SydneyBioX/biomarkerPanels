@@ -1,5 +1,7 @@
 # biomarkerPanels
 
+![biomarkerPanels hex sticker](src/moo_hexsticker.png)
+
 Multi-objective optimization workflows for discovering small biomarker panels
 with constrained performance targets. The package is designed for integration
 with Bioconductor ecosystems and supports datasets where the number of features
