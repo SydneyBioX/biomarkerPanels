@@ -20,7 +20,8 @@ Imports:
     utils,
     Matrix,
     SummarizedExperiment,
-    S4Vectors
+    S4Vectors,
+    mco
 Suggests:
     testthat (>= 3.0.0),
     covr,

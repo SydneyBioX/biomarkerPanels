@@ -12,12 +12,12 @@ evaluate_panel <- function(panel, x, y,
                            objectives = define_objectives()) {
   stopifnot(inherits(panel, "BiomarkerPanelResult"))
 
-  pred <- sample(c(TRUE, FALSE), length(y), replace = TRUE)
+  truth <- ensure_binary_response(y)
+  scores <- stats::runif(length(truth))
 
-  truth <- y == "Yes"
-
+  selected <- panel@features
   objective_values <- vapply(objectives, function(obj) {
-    obj$fun(truth, pred)
+    obj$fun(truth, scores, selected = selected)
   }, numeric(1))
 
   list(

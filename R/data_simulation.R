@@ -40,7 +40,8 @@ simulate_expression_data <- function(p = 5000L, n = 100L, k = 4L, seed = NULL,
     sweep(scaled, 2, mean_vec, `+`)
   }
 
-  informative_idx <- sample(p, 60L)
+  informative_count <- min(60L, p)
+  informative_idx <- sample(p, informative_count)
   beta <- stats::rnorm(length(informative_idx), mean = 0, sd = 0.25)
 
   generate_labels <- function(x_matrix) {

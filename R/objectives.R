@@ -1,47 +1,36 @@
-#' Define Optimization Objectives
+#' Define optimization objectives.
 #'
-#' Create a standardized list of objectives used by the optimization routine.
-#' Each objective includes a label, the direction (`"maximize"`/`"minimize"`),
-#' and an evaluation function that consumes predictions and true labels.
+#' Assemble a list of objective descriptors ready for consumption by the
+#' optimization engine. Built-in losses are pulled from the registry created in
+#' [`build_objectives()`]; custom entries may be appended for experimental goals.
 #'
-#' @param objectives Named list or character vector of built-in objectives.
-#' @param custom Named list of user-supplied functions returning scalar scores.
-#' @return A list of objective descriptors consumed by `optimize_panel()`.
+#' @param losses Character vector of registered loss names (default:
+#'   `c("sensitivity", "specificity")`).
+#' @param custom Optional named list of objective descriptors with elements
+#'   `label`, `direction`, and `fun`.
+#' @param params Named list of additional argument lists for specific losses.
+#' @param directions Optional named vector overriding loss directions.
+#' @return Named list of objective descriptors.
 #' @export
-define_objectives <- function(objectives = c("sensitivity", "specificity"),
-                              custom = NULL) {
-  base <- list()
-
-  if ("sensitivity" %in% objectives) {
-    base$sensitivity <- list(
-      label = "Sensitivity",
-      direction = "maximize",
-      fun = function(truth, estimate) {
-        tp <- sum(truth & estimate)
-        fn <- sum(truth & !estimate)
-        if ((tp + fn) == 0) return(NA_real_)
-        tp / (tp + fn)
-      }
-    )
-  }
-
-  if ("specificity" %in% objectives) {
-    base$specificity <- list(
-      label = "Specificity",
-      direction = "maximize",
-      fun = function(truth, estimate) {
-        tn <- sum(!truth & !estimate)
-        fp <- sum(!truth & estimate)
-        if ((tn + fp) == 0) return(NA_real_)
-        tn / (tn + fp)
-      }
-    )
-  }
+define_objectives <- function(losses = c("sensitivity", "specificity"),
+                              custom = NULL,
+                              params = list(),
+                              directions = NULL) {
+  objectives <- build_objectives(losses, params = params, directions = directions)
 
   if (!is.null(custom)) {
     stopifnot(is.list(custom))
-    base <- c(base, custom)
+    valid_custom <- vapply(custom, function(entry) {
+      is.list(entry) &&
+        !is.null(entry$label) &&
+        !is.null(entry$direction) &&
+        is.function(entry$fun)
+    }, logical(1))
+    if (!all(valid_custom)) {
+      stop("All custom objectives must supply label, direction, and fun.", call. = FALSE)
+    }
+    objectives <- c(objectives, custom)
   }
 
-  base
+  objectives
 }
