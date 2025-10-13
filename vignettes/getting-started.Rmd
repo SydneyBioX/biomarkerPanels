@@ -1,0 +1,40 @@
+---
+title: "Getting Started with biomarkerPanels"
+author: "Package Authors"
+output:
+  BiocStyle::html_document:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Getting Started with biomarkerPanels}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(biomarkerPanels)
+```
+
+## Overview
+
+This vignette illustrates a minimal workflow for constructing compact biomarker
+panels while targeting sensitivity and specificity trade-offs.
+
+## Simulated Example
+
+```{r simulate}
+example_data <- simulate_expression_data(p = 200, n = 40, k = 2, seed = 42)
+str(example_data$x_list[[1]][seq_len(3), 1:5])
+```
+
+## Next Steps
+
+The optimization functionality is under active development. Placeholder calls
+below illustrate the intended API.
+
+```{r placeholder, eval=FALSE}
+objectives <- define_objectives()
+result <- optimize_panel(example_data$x_list[[1]], example_data$y_list[[1]],
+                         objectives = objectives, max_features = 5)
+plot_pareto_front(result@objectives)
+```

@@ -1,0 +1,9 @@
+^.*\.Rproj$
+^\.Rhistory$
+^\.RData$
+^\.gitignore$
+^data-raw$
+^NEWS\.md$
+^README\.md$
+^tests/data$
+^simulated_gene_expression\.Rds$

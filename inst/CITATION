@@ -1,0 +1,10 @@
+citHeader("To cite biomarkerPanels in publications, please use:")
+
+citEntry(
+  entry = "Manual",
+  title = "{biomarkerPanels}: Multi-objective Optimization for Compact Biomarker Panels",
+  author = "First Last",
+  year = "2024",
+  note = "R package version 0.0.0.9000",
+  url = "https://github.com/your-org/biomarkerPanels"
+)
