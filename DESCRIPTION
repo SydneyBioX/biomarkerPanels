@@ -21,7 +21,9 @@ Imports:
     Matrix,
     SummarizedExperiment,
     S4Vectors,
-    mco
+    mco,
+    limma,
+    glmnet
 Suggests:
     testthat (>= 3.0.0),
     covr,
