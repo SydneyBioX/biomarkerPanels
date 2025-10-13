@@ -38,3 +38,56 @@ test_that("register_loss_function adds new entries", {
   objs <- build_objectives(name)
   expect_equal(objs[[name]]$fun(NULL, NULL, NULL), 42)
 })
+
+test_that("cohort-aware losses compute transfer metrics", {
+  truth <- factor(
+    c("No", "Yes", "Yes", "No", "Yes", "No"),
+    levels = c("No", "Yes")
+  )
+  scores <- c(0.1, 0.9, 0.8, 0.2, 0.6, 0.4)
+  cohort <- factor(c("A", "A", "B", "B", "B", "A"))
+  expect_equal(
+    loss_min_cohort_sensitivity(truth, scores, cohort = cohort),
+    min(
+      loss_sensitivity(truth[cohort == "A"], scores[cohort == "A"]),
+      loss_sensitivity(truth[cohort == "B"], scores[cohort == "B"])
+    )
+  )
+  expect_equal(
+    loss_min_cohort_specificity(truth, scores, cohort = cohort),
+    min(
+      loss_specificity(truth[cohort == "A"], scores[cohort == "A"]),
+      loss_specificity(truth[cohort == "B"], scores[cohort == "B"])
+    )
+  )
+  gap <- loss_cohort_sensitivity_gap(truth, scores, cohort = cohort)
+  expect_gte(gap, 0)
+  expect_equal(gap, max(
+    loss_sensitivity(truth[cohort == "A"], scores[cohort == "A"]),
+    loss_sensitivity(truth[cohort == "B"], scores[cohort == "B"])
+  ) - min(
+    loss_sensitivity(truth[cohort == "A"], scores[cohort == "A"]),
+    loss_sensitivity(truth[cohort == "B"], scores[cohort == "B"])
+  ))
+
+  brier <- loss_max_cohort_brier(truth, scores, cohort = cohort)
+  expect_gte(brier, 0)
+
+  x <- matrix(
+    c(1, 2, 3, 4, 5, 6,
+      2, 3, 4, 5, 6, 7),
+    nrow = 6, ncol = 2, byrow = FALSE
+  )
+  shift <- loss_max_cohort_mean_shift(truth, scores, cohort = cohort, x = x)
+  expect_gte(shift, 0)
+
+  objs <- build_objectives(c("min_cohort_sensitivity", "max_cohort_mean_shift"))
+  expect_equal(
+    objs$min_cohort_sensitivity$fun(truth, scores, cohort = cohort),
+    loss_min_cohort_sensitivity(truth, scores, cohort = cohort)
+  )
+  expect_equal(
+    objs$max_cohort_mean_shift$fun(truth, scores, cohort = cohort, x = x),
+    loss_max_cohort_mean_shift(truth, scores, cohort = cohort, x = x)
+  )
+})

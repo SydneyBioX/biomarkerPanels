@@ -43,6 +43,7 @@ simulate_expression_data <- function(p = 5000L, n = 100L, k = 4L, seed = NULL,
   informative_count <- min(60L, p)
   informative_idx <- sample(p, informative_count)
   beta <- stats::rnorm(length(informative_idx), mean = 0, sd = 0.25)
+  signal_shift <- rep(c(2.0, -2.0), length.out = length(informative_idx))
 
   generate_labels <- function(x_matrix) {
     eta <- as.numeric(x_matrix[, informative_idx, drop = FALSE] %*% beta)
@@ -61,8 +62,23 @@ simulate_expression_data <- function(p = 5000L, n = 100L, k = 4L, seed = NULL,
     x_mat <- generate_dataset(mean_vec)
     colnames(x_mat) <- gene_names
     rownames(x_mat) <- sprintf("sample_%03d", seq_len(n))
+    y_vec <- generate_labels(x_mat)
+    yes_idx <- y_vec == "Yes"
+    no_idx <- y_vec == "No"
+    if (any(yes_idx)) {
+      x_mat[yes_idx, informative_idx] <- sweep(
+        x_mat[yes_idx, informative_idx, drop = FALSE],
+        2, signal_shift, `+`
+      )
+    }
+    if (any(no_idx)) {
+      x_mat[no_idx, informative_idx] <- sweep(
+        x_mat[no_idx, informative_idx, drop = FALSE],
+        2, -signal_shift, `+`
+      )
+    }
     x_list[[i]] <- x_mat
-    y_list[[i]] <- generate_labels(x_mat)
+    y_list[[i]] <- y_vec
   }
 
   names(x_list) <- sprintf("x%d", dataset_ids)
@@ -76,6 +92,8 @@ simulate_expression_data <- function(p = 5000L, n = 100L, k = 4L, seed = NULL,
       n_samples = n,
       n_features = p,
       informative_genes = gene_names[informative_idx],
+      signal_coefficients = stats::setNames(beta, gene_names[informative_idx]),
+      signal_shift = stats::setNames(signal_shift, gene_names[informative_idx]),
       global_shift = global_shift
     )
   )

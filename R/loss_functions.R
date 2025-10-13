@@ -116,6 +116,202 @@ loss_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
   (sens + spec) / 2
 }
 
+#' Minimum Cohort Sensitivity
+#'
+#' Computes sensitivity within each cohort and returns the minimum value to
+#' capture worst-case performance.
+#'
+#' @inheritParams loss_sensitivity
+#' @param cohort Factor indicating cohort membership.
+#' @return Sensitivity of the weakest cohort.
+#' @export
+loss_min_cohort_sensitivity <- function(truth, scores = NULL, selected = NULL,
+                                        threshold = 0.5, positive = "Yes",
+                                        cohort = NULL) {
+  truth <- ensure_binary_response(truth)
+  if (is.null(scores)) {
+    stop("`scores` must be supplied to compute sensitivity.", call. = FALSE)
+  }
+  if (is.null(cohort)) {
+    return(loss_sensitivity(truth, scores, selected,
+                            threshold = threshold, positive = positive))
+  }
+  cohort <- factor(cohort)
+  if (length(cohort) != length(truth)) {
+    stop("Length of `cohort` must match `truth`.", call. = FALSE)
+  }
+  values <- vapply(levels(cohort), function(level) {
+    idx <- !is.na(cohort) & cohort == level
+    if (!any(idx)) {
+      return(NA_real_)
+    }
+    loss_sensitivity(
+      truth[idx],
+      scores[idx],
+      selected = selected,
+      threshold = threshold,
+      positive = positive
+    )
+  }, numeric(1))
+  if (all(is.na(values))) {
+    return(NA_real_)
+  }
+  min(values, na.rm = TRUE)
+}
+
+#' Minimum Cohort Specificity
+#'
+#' Computes specificity within each cohort and returns the minimum value.
+#'
+#' @inheritParams loss_min_cohort_sensitivity
+#' @return Specificity of the weakest cohort.
+#' @export
+loss_min_cohort_specificity <- function(truth, scores = NULL, selected = NULL,
+                                        threshold = 0.5, positive = "Yes",
+                                        cohort = NULL) {
+  truth <- ensure_binary_response(truth)
+  if (is.null(scores)) {
+    stop("`scores` must be supplied to compute specificity.", call. = FALSE)
+  }
+  if (is.null(cohort)) {
+    return(loss_specificity(truth, scores, selected,
+                            threshold = threshold, positive = positive))
+  }
+  cohort <- factor(cohort)
+  if (length(cohort) != length(truth)) {
+    stop("Length of `cohort` must match `truth`.", call. = FALSE)
+  }
+  values <- vapply(levels(cohort), function(level) {
+    idx <- !is.na(cohort) & cohort == level
+    if (!any(idx)) {
+      return(NA_real_)
+    }
+    loss_specificity(
+      truth[idx],
+      scores[idx],
+      selected = selected,
+      threshold = threshold,
+      positive = positive
+    )
+  }, numeric(1))
+  if (all(is.na(values))) {
+    return(NA_real_)
+  }
+  min(values, na.rm = TRUE)
+}
+
+#' Cohort Sensitivity Range
+#'
+#' Difference between maximum and minimum cohort sensitivities. Smaller values
+#' indicate more uniform transfer across cohorts.
+#'
+#' @inheritParams loss_min_cohort_sensitivity
+#' @return Sensitivity range across cohorts.
+#' @export
+loss_cohort_sensitivity_gap <- function(truth, scores = NULL, selected = NULL,
+                                        threshold = 0.5, positive = "Yes",
+                                        cohort = NULL) {
+  truth <- ensure_binary_response(truth)
+  if (is.null(scores)) {
+    stop("`scores` must be supplied to compute sensitivity.", call. = FALSE)
+  }
+  if (is.null(cohort)) {
+    sens <- loss_sensitivity(truth, scores, selected,
+                             threshold = threshold, positive = positive)
+    return(0 * sens)
+  }
+  cohort <- factor(cohort)
+  if (length(cohort) != length(truth)) {
+    stop("Length of `cohort` must match `truth`.", call. = FALSE)
+  }
+  values <- vapply(levels(cohort), function(level) {
+    idx <- !is.na(cohort) & cohort == level
+    if (!any(idx)) {
+      return(NA_real_)
+    }
+    loss_sensitivity(
+      truth[idx],
+      scores[idx],
+      selected = selected,
+      threshold = threshold,
+      positive = positive
+    )
+  }, numeric(1))
+  if (all(is.na(values))) {
+    return(NA_real_)
+  }
+  max(values, na.rm = TRUE) - min(values, na.rm = TRUE)
+}
+
+#' Maximum Cohort Brier Score
+#'
+#' Computes the Brier score (mean squared error on probabilities) within each
+#' cohort and returns the maximum, highlighting the worst calibrated cohort.
+#'
+#' @inheritParams loss_min_cohort_sensitivity
+#' @return Maximum Brier score across cohorts.
+#' @export
+loss_max_cohort_brier <- function(truth, scores = NULL, selected = NULL,
+                                  positive = "Yes", cohort = NULL) {
+  truth <- ensure_binary_response(truth)
+  if (is.null(scores)) {
+    stop("`scores` must be supplied to compute the Brier score.", call. = FALSE)
+  }
+  target <- as.numeric(truth == positive)
+  cohort_vec <- factor(if (is.null(cohort)) rep("cohort_01", length(truth)) else cohort)
+  if (length(cohort_vec) != length(truth)) {
+    stop("Length of `cohort` must match `truth`.", call. = FALSE)
+  }
+  values <- vapply(levels(cohort_vec), function(level) {
+    idx <- !is.na(cohort_vec) & cohort_vec == level
+    if (!any(idx)) {
+      return(NA_real_)
+    }
+    mean((scores[idx] - target[idx])^2)
+  }, numeric(1))
+  max(values, na.rm = TRUE)
+}
+
+#' Maximum Mean Shift Across Cohorts
+#'
+#' Computes pairwise distances between cohort-specific mean expression vectors
+#' for the selected features and returns the maximum distance. Encourages panels
+#' whose selected biomarkers exhibit similar distributions across cohorts.
+#'
+#' @inheritParams loss_min_cohort_sensitivity
+#' @param x Matrix of selected feature values (samples x features).
+#' @return Maximum pairwise distance between cohort means.
+#' @export
+loss_max_cohort_mean_shift <- function(truth, scores = NULL, selected = NULL,
+                                       cohort = NULL, x = NULL) {
+  if (is.null(cohort) || is.null(x) || ncol(x) == 0L) {
+    return(0)
+  }
+  cohort <- factor(cohort)
+  if (length(cohort) != nrow(x)) {
+    stop("Length of `cohort` must match the number of rows in `x`.", call. = FALSE)
+  }
+  if (nlevels(cohort) <= 1L) {
+    return(0)
+  }
+  means <- lapply(levels(cohort), function(level) {
+    idx <- !is.na(cohort) & cohort == level
+    if (!any(idx)) {
+      return(NULL)
+    }
+    colMeans(x[idx, , drop = FALSE])
+  })
+  means <- Filter(Negate(is.null), means)
+  if (length(means) <= 1L) {
+    return(0)
+  }
+  mean_matrix <- do.call(rbind, means)
+  if (nrow(mean_matrix) <= 1L) {
+    return(0)
+  }
+  max(stats::dist(mean_matrix))
+}
+
 .loss_registry <- new.env(parent = emptyenv())
 
 .register_default_loss <- function(name, fun, direction, label) {
@@ -137,6 +333,26 @@ loss_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
 )
 .register_default_loss(
   "balanced_accuracy", loss_balanced_accuracy, "maximize", "Balanced Accuracy"
+)
+.register_default_loss(
+  "min_cohort_sensitivity", loss_min_cohort_sensitivity, "maximize",
+  "Minimum Cohort Sensitivity"
+)
+.register_default_loss(
+  "min_cohort_specificity", loss_min_cohort_specificity, "maximize",
+  "Minimum Cohort Specificity"
+)
+.register_default_loss(
+  "cohort_sensitivity_gap", loss_cohort_sensitivity_gap, "minimize",
+  "Cohort Sensitivity Gap"
+)
+.register_default_loss(
+  "max_cohort_brier", loss_max_cohort_brier, "minimize",
+  "Maximum Cohort Brier Score"
+)
+.register_default_loss(
+  "max_cohort_mean_shift", loss_max_cohort_mean_shift, "minimize",
+  "Maximum Cohort Mean Shift"
 )
 
 #' Register a loss function.
@@ -211,10 +427,23 @@ build_objectives <- function(losses,
       direction <- match.arg(directions[[name]], c("maximize", "minimize"))
     }
     fun <- entry$fun
-    wrapper <- function(truth, estimate, selected = NULL) {
+    fun_formals <- names(formals(fun))
+    has_dots <- any(fun_formals == "...")
+    wrapper <- function(truth, estimate, selected = NULL, ...) {
+      dots <- list(...)
+      extras_filtered <- extras
+      if (!has_dots) {
+        if (length(extras_filtered)) {
+          extras_filtered <- extras_filtered[names(extras_filtered) %in% fun_formals]
+        }
+        if (length(dots)) {
+          dots <- dots[names(dots) %in% fun_formals]
+        }
+      }
       args <- c(
         list(truth = truth, scores = estimate, selected = selected),
-        extras
+        extras_filtered,
+        dots
       )
       do.call(fun, args)
     }

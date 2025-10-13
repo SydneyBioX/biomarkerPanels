@@ -1,14 +1,16 @@
-# biomarkerPanels <img src="src/moo_hexsticker.png" alt="biomarkerPanels hex sticker" align="right" width="120"/>
+# biomarkerPanels <img src="src/moo_hexsticker.png" alt="biomarkerPanels hex sticker" align="right" width="150"/>
 
-Multi-objective optimization workflows for discovering small biomarker panels
-with constrained performance targets. The package is designed for integration
-with Bioconductor ecosystems and supports datasets where the number of features
-greatly exceeds the sample size.
+Multi-objective optimization (moo) for discovering biomarker panels
+with constrained performance targets. This package is designed for integration
+with Bioconductor ecosystems (s4 classes) and supports high-dimensional datasets.
 
 ## Key Features (planned)
 - Multi-objective search balancing sensitivity, specificity, and custom costs.
 - Support for gene-expression inputs via `SummarizedExperiment`.
 - Panel evaluation utilities including ROC curves and calibration diagnostics.
+- Transferability diagnostics baked into the loss registry (minimum cohort
+  sensitivity/specificity, cohort gaps, calibration, and distribution-shift
+  penalties).
 - Extensible architecture compatible with Rcpp acceleration.
 
 ## Repository Guide

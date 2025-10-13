@@ -11,30 +11,190 @@ vignette: >
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+if (!requireNamespace("biomarkerPanels", quietly = TRUE)) {
+  if (requireNamespace("pkgload", quietly = TRUE)) {
+    pkgload::load_all("..", quiet = TRUE)
+  } else {
+    stop(
+      "`biomarkerPanels` is not installed. Install the package or run this vignette ",
+      "from within the source tree with pkgload available.",
+      call. = FALSE
+    )
+  }
+}
 library(biomarkerPanels)
 ```
 
-## Overview
+## Introduction
 
-This vignette illustrates a minimal workflow for constructing compact biomarker
-panels while targeting sensitivity and specificity trade-offs.
+`biomarkerPanels` helps researchers build compact biomarker signatures when
+multiple cohorts are available and the number of measured features greatly
+exceeds the number of samples. The package delegates the heavy lift of
+multi-objective search to the `mco::nsga2()` algorithm while exposing a friendly
+interface for selecting loss functions, restricting the feature pool, and
+summarising the resulting Pareto front.
 
-## Simulated Example
+This vignette walks through three steps:
 
-```{r simulate}
-example_data <- simulate_expression_data(p = 200, n = 40, k = 2, seed = 42)
-str(example_data$x_list[[1]][seq_len(3), 1:5])
+1. Prepare multi-cohort expression data.
+2. Assemble objectives from the loss-function registry.
+3. Run `optimize_panel()` to discover candidate panels and inspect the results.
+
+## 1. Load a Multi-cohort Dataset
+
+For demonstration we ship a small synthetic dataset in the test fixtures. In a
+package build, these files would live in `inst/extdata/`; here we reuse the
+fixture directly.
+
+```{r load-fixture}
+# fixture_path <- system.file("test-data", "fake_gene_expression.Rds", package = "biomarkerPanels")
+# if (fixture_path == "") {
+#   fixture_path <- file.path("./tests", "data", "fake_gene_expression.Rds")
+# }
+# stopifnot(file.exists(fixture_path)) # didn't exist for some reason. 
+cohorts <- readRDS("/dskh/nobackup/harryr/moo/tests/data/fake_gene_expression.Rds")
+
+lapply(cohorts$x_list, dim)
+colnames(cohorts$x_list[[1]])[1:6]
+```
+
+Each element of `x_list` is a log-scale expression matrix with the same feature
+ordering across cohorts. The matching `y_list` contains binary outcome labels
+stored as factors with levels `"No"` and `"Yes"`.
+
+## 2. Configure Objectives
+
+Loss functions are registered in an extensible registry. You can inspect the
+available metrics with `loss_registry()`.
+
+```{r registry}
+names(loss_registry())
+```
+
+To emphasise clinical utility we combine sensitivity, specificity, and a panel
+size penalty. We also tighten the classification threshold for sensitivity.
+
+```{r objectives}
+objectives <- define_objectives(
+  losses = c("sensitivity", "specificity", "num_features"),
+  params = list(sensitivity = list(threshold = 0.6))
+)
+objectives[["sensitivity"]]$direction
+```
+
+When multiple cohorts are available you can layer on transfer-oriented
+objectives that operate on cohort-level sensitivities, calibration, and feature
+shifts. These metrics automatically receive cohort labels during optimisation.
+
+```{r transfer-objectives, eval=FALSE}
+transfer_objectives <- define_objectives(
+  losses = c(
+    "min_cohort_sensitivity",
+    "min_cohort_specificity",
+    "cohort_sensitivity_gap",
+    "max_cohort_brier",
+    "max_cohort_mean_shift"
+  )
+)
+```
+
+## 3. Run NSGA-II Optimisation
+
+`optimize_panel()` accepts single matrices or lists of cohorts. We restrict the
+feature pool to keep the search lightweight for this vignette.
+
+```{r optimise, eval=FALSE}
+set.seed(9001)
+result <- optimize_panel(
+  x = cohorts$x_list,
+  y = cohorts$y_list,
+  objectives = objectives,
+  max_features = 5,
+  feature_pool = colnames(cohorts$x_list[[1]])[1:50],
+  nsga_control = list(popsize = 64, generations = 60)
+)
+```
+
+The result is a `BiomarkerPanelResult` object that stores the selected features,
+objective scores, and metadata about the optimisation run.
+
+```{r result-structure, eval=FALSE}
+slotNames(result)
+result@features
+result@metrics
+head(result@objectives)
+```
+
+### Visualise Trade-offs
+
+We can visualise Pareto-efficient solutions with `plot_pareto_front()`. Pick any
+pair of objectives and extract the corresponding columns.
+
+```{r pareto, eval=FALSE}
+library(ggplot2)
+pareto_df <- subset(result@objectives, objective %in% c("sensitivity", "specificity"))
+pareto_df <- reshape(
+  pareto_df,
+  idvar = "solution_id",
+  timevar = "objective",
+  direction = "wide"
+)
+plot_pareto_front(
+  data.frame(
+    objective_x = pareto_df$value.sensitivity,
+    objective_y = pareto_df$value.specificity,
+    label = paste0("Solution ", pareto_df$solution_id)
+  ),
+  xlab = "Sensitivity",
+  ylab = "Specificity"
+)
+```
+
+### Inspect Cohort-level Scores
+
+The default scoring function averages selected features per sample. Users can
+provide richer models through the `scoring_fn` argument to incorporate
+cohort-specific classifiers.
+
+```{r custom-scoring, eval=FALSE}
+logit_scoring <- function(x_selected, selected_features, truth, cohort, ...) {
+  cohort_levels <- levels(cohort)
+  scores <- numeric(nrow(x_selected))
+  for (lvl in cohort_levels) {
+    idx <- cohort == lvl
+    if (sum(idx) < 5L || ncol(x_selected) == 0L) {
+      next
+    }
+    df <- as.data.frame(x_selected[idx, , drop = FALSE])
+    df$y <- truth[idx]
+    fit <- stats::glm(y ~ ., data = df, family = binomial())
+    scores[idx] <- stats::predict(fit, newdata = df, type = "response")
+  }
+  scores
+}
+
+result_glm <- optimize_panel(
+  x = cohorts$x_list,
+  y = cohorts$y_list,
+  objectives = objectives,
+  max_features = 5,
+  feature_pool = colnames(cohorts$x_list[[1]])[1:50],
+  scoring_fn = logit_scoring,
+  nsga_control = list(popsize = 32, generations = 40)
+)
 ```
 
 ## Next Steps
 
-The optimization functionality is under active development. Placeholder calls
-below illustrate the intended API.
-
-```{r placeholder, eval=FALSE}
-objectives <- define_objectives()
-result <- optimize_panel(example_data$x_list[[1]], example_data$y_list[[1]],
-                         objectives = objectives, max_features = 5)
-plot_pareto_front(result@objectives)
-```
+- Explore additional loss functions by registering custom metrics with
+  `register_loss_function()`.
+- Integrate domain-specific scoring via `scoring_fn` to reflect laboratory or
+  clinical decision rules.
+- Run `BiocCheck::BiocCheck()` and `R CMD check` before submitting to
+  Bioconductor.

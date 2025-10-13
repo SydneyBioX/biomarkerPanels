@@ -31,13 +31,21 @@ generate_dataset <- function(mean_vector) {
   sweep(scaled, 2, mean_vector, `+`)
 }
 
-informative_idx <- sample(n_features, 60L)
-beta <- rnorm(length(informative_idx), mean = 0, sd = 0.25)
+signal_gene_count <- 12L
+informative_idx <- seq_len(signal_gene_count)
+informative_genes <- gene_names[informative_idx]
+beta <- rep(c(1.5, -1.5), length.out = length(informative_idx))
+signal_shift <- rep(c(2.0, -2.0), length.out = length(informative_idx))
 
 generate_labels <- function(x_matrix) {
-  eta <- as.numeric(x_matrix[, informative_idx, drop = FALSE] %*% beta)
+  signal_block <- scale(x_matrix[, informative_idx, drop = FALSE], center = TRUE, scale = TRUE)
+  eta <- as.numeric(signal_block %*% beta)
   eta <- eta - mean(eta)
-  eta <- eta + rnorm(length(eta), sd = 0.3)
+  eta_sd <- sd(eta)
+  if (eta_sd > 1e-08) {
+    eta <- eta / eta_sd
+  }
+  eta <- eta + rnorm(length(eta), sd = 0.25)
   prob <- plogis(eta)
   labels <- ifelse(runif(length(prob)) < prob, "Yes", "No")
   factor(labels, levels = c("No", "Yes"))
@@ -51,8 +59,23 @@ for (i in dataset_ids) {
   x_mat <- generate_dataset(mean_vec)
   colnames(x_mat) <- gene_names
   rownames(x_mat) <- sprintf("sample_%03d", seq_len(n_samples))
+  y_vec <- generate_labels(x_mat)
+  yes_idx <- y_vec == "Yes"
+  no_idx <- y_vec == "No"
+  if (any(yes_idx)) {
+    x_mat[yes_idx, informative_idx] <- sweep(
+      x_mat[yes_idx, informative_idx, drop = FALSE],
+      2, signal_shift, `+`
+    )
+  }
+  if (any(no_idx)) {
+    x_mat[no_idx, informative_idx] <- sweep(
+      x_mat[no_idx, informative_idx, drop = FALSE],
+      2, -signal_shift, `+`
+    )
+  }
   x_list[[i]] <- x_mat
-  y_list[[i]] <- generate_labels(x_mat)
+  y_list[[i]] <- y_vec
 }
 
 names(x_list) <- sprintf("x%d", dataset_ids)
@@ -63,7 +86,9 @@ output <- list(
     seed = 20240220,
     n_samples = n_samples,
     n_features = n_features,
-    informative_genes = gene_names[informative_idx],
+    informative_genes = informative_genes,
+    signal_coefficients = stats::setNames(beta, informative_genes),
+    signal_shift = stats::setNames(signal_shift, informative_genes),
     global_shift = global_shift
   ),
   x_list = x_list,

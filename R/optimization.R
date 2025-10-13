@@ -118,7 +118,13 @@ optimize_panel <- function(x, y,
            call. = FALSE)
     }
     metrics <- vapply(objectives, function(obj) {
-      obj$fun(truth, scores, selected = selected_features)
+      obj$fun(
+        truth,
+        scores,
+        selected = selected_features,
+        cohort = cohort,
+        x = x_selected
+      )
     }, numeric(1))
     list(
       features = selected_features,
@@ -220,13 +226,35 @@ optimize_panel <- function(x, y,
 
 .default_scoring_fn <- function(x_selected, selected_features, truth,
                                 cohort = NULL, ...) {
+  n <- length(truth)
   if (is.null(x_selected) || ncol(x_selected) == 0L) {
-    return(rep(0, length(truth)))
+    return(rep(0.5, n))
   }
+
+  center_cols <- function(mat) {
+    sweep(mat, 2, colMeans(mat), "-")
+  }
+  scale_cols <- function(mat) {
+    sds <- apply(mat, 2, stats::sd)
+    sds[sds == 0] <- 1
+    sweep(mat, 2, sds, "/")
+  }
+
   if (ncol(x_selected) == 1L) {
-    return(as.numeric(x_selected[, 1]))
+    centered <- x_selected[, 1] - mean(x_selected[, 1])
+    sd_val <- stats::sd(x_selected[, 1])
+    if (isTRUE(all.equal(sd_val, 0))) {
+      centered[] <- 0
+    } else {
+      centered <- centered / sd_val
+    }
+    return(stats::plogis(centered))
   }
-  rowMeans(x_selected)
+
+  centered <- center_cols(x_selected)
+  scaled <- scale_cols(centered)
+  aggregated <- rowMeans(scaled)
+  stats::plogis(aggregated)
 }
 
 .prepare_cohort_inputs <- function(x, y, assay = NULL) {
