@@ -78,12 +78,12 @@ names(loss_registry())
 ```
 
 To emphasise clinical utility we combine sensitivity, specificity, and a panel
-size penalty. We also tighten the classification threshold for sensitivity.
+size penalty. We also tighten the classification probability cutoff for sensitivity.
 
 ```{r objectives}
 objectives <- define_objectives(
   losses = c("sensitivity", "specificity", "num_features"),
-  params = list(sensitivity = list(threshold = 0.6))
+  params = list(sensitivity = list(cutoff_prob = 0.6))
 )
 objectives[["sensitivity"]]$direction
 ```
@@ -115,7 +115,7 @@ constraint.
 ```{r constraints, eval=FALSE}
 constraints <- list(
   min_metric_constraint("sensitivity", threshold = 0.9,
-                        params = list(threshold = 0.6))
+                        params = list(cutoff_prob = 0.6))
 )
 
 result <- optimize_panel(

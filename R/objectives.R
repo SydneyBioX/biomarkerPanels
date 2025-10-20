@@ -8,7 +8,8 @@
 #'   `c("sensitivity", "specificity")`).
 #' @param custom Optional named list of objective descriptors with elements
 #'   `label`, `direction`, and `fun`.
-#' @param params Named list of additional argument lists for specific losses.
+#' @param params Named list of additional argument lists for specific losses
+#'   (e.g., custom cutoff probabilities for sensitivity).
 #' @param directions Optional named vector overriding loss directions.
 #' @return Named list of objective descriptors.
 #' @export
@@ -45,7 +46,7 @@ define_objectives <- function(losses = c("sensitivity", "specificity"),
 #' @param loss Character scalar naming a registered loss function.
 #' @param threshold Numeric scalar describing the required metric level.
 #' @param params Optional named list of additional parameters forwarded to the
-#'   loss function (e.g., thresholds for sensitivity).
+#'   loss function (e.g., cutoff probabilities for sensitivity).
 #' @param label Optional human-readable label for the constraint; defaults to
 #'   `paste0("min_", loss, "_", threshold)`.
 #' @return A constraint descriptor (list) with elements `label`, `fun`,

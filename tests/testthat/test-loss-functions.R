@@ -20,7 +20,7 @@ test_that("loss_num_features counts correctly", {
 
 test_that("build_objectives wraps registered losses", {
   objs <- build_objectives(c("sensitivity", "num_features"),
-                           params = list(sensitivity = list(threshold = 0.7)))
+                           params = list(sensitivity = list(cutoff_prob = 0.7)))
   truth <- factor(c("No", "Yes", "Yes", "No"), levels = c("No", "Yes"))
   scores <- c(0.1, 0.9, 0.6, 0.3)
   selected <- c("a", "b", "c")

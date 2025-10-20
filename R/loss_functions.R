@@ -6,7 +6,7 @@
 #'
 #' Each loss accepts a binary response (`truth`), numeric prediction scores
 #' (`scores`), and optionally the currently selected feature set (`selected`).
-#' Additional parameters (for example, classification thresholds) can be supplied
+#' Additional parameters (for example, classification cutoffs) can be supplied
 #' via [`build_objectives()`].
 #'
 #' @name loss_functions
@@ -17,18 +17,18 @@ NULL
 #' @param truth Binary outcome; coerced with [ensure_binary_response()].
 #' @param scores Numeric scores or probabilities.
 #' @param selected Ignored; kept for signature compatibility.
-#' @param threshold Classification threshold applied to `scores`.
+#' @param cutoff_prob Classification probability cutoff applied to `scores`.
 #' @param positive Label treated as the positive ("event") class.
 #' @return Sensitivity between 0 and 1, or `NA_real_` if undefined.
 #' @export
 loss_sensitivity <- function(truth, scores = NULL, selected = NULL,
-                             threshold = 0.5, positive = "Yes") {
+                             cutoff_prob = 0.5, positive = "Yes") {
   truth <- ensure_binary_response(truth)
   if (is.null(scores)) {
     stop("`scores` must be supplied to compute sensitivity.", call. = FALSE)
   }
   positives <- truth == positive
-  predicted <- scores >= threshold
+  predicted <- scores >= cutoff_prob
   tp <- sum(positives & predicted)
   fn <- sum(positives & !predicted)
   if ((tp + fn) == 0) {
@@ -43,13 +43,13 @@ loss_sensitivity <- function(truth, scores = NULL, selected = NULL,
 #' @return Specificity between 0 and 1, or `NA_real_` if undefined.
 #' @export
 loss_specificity <- function(truth, scores = NULL, selected = NULL,
-                             threshold = 0.5, positive = "Yes") {
+                             cutoff_prob = 0.5, positive = "Yes") {
   truth <- ensure_binary_response(truth)
   if (is.null(scores)) {
     stop("`scores` must be supplied to compute specificity.", call. = FALSE)
   }
   negatives <- truth != positive
-  predicted <- scores >= threshold
+  predicted <- scores >= cutoff_prob
   tn <- sum(negatives & !predicted)
   fp <- sum(negatives & predicted)
   if ((tn + fp) == 0) {
@@ -107,9 +107,9 @@ loss_num_features <- function(truth = NULL, scores = NULL, selected = NULL, ...)
 #' @return Mean of sensitivity and specificity.
 #' @export
 loss_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
-                                   threshold = 0.5, positive = "Yes") {
-  sens <- loss_sensitivity(truth, scores, selected, threshold = threshold, positive = positive)
-  spec <- loss_specificity(truth, scores, selected, threshold = threshold, positive = positive)
+                                   cutoff_prob = 0.5, positive = "Yes") {
+  sens <- loss_sensitivity(truth, scores, selected, cutoff_prob = cutoff_prob, positive = positive)
+  spec <- loss_specificity(truth, scores, selected, cutoff_prob = cutoff_prob, positive = positive)
   if (is.na(sens) || is.na(spec)) {
     return(NA_real_)
   }
@@ -126,7 +126,7 @@ loss_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
 #' @return Sensitivity of the weakest cohort.
 #' @export
 loss_min_cohort_sensitivity <- function(truth, scores = NULL, selected = NULL,
-                                        threshold = 0.5, positive = "Yes",
+                                        cutoff_prob = 0.5, positive = "Yes",
                                         cohort = NULL) {
   truth <- ensure_binary_response(truth)
   if (is.null(scores)) {
@@ -134,7 +134,7 @@ loss_min_cohort_sensitivity <- function(truth, scores = NULL, selected = NULL,
   }
   if (is.null(cohort)) {
     return(loss_sensitivity(truth, scores, selected,
-                            threshold = threshold, positive = positive))
+                            cutoff_prob = cutoff_prob, positive = positive))
   }
   cohort <- factor(cohort)
   if (length(cohort) != length(truth)) {
@@ -149,7 +149,7 @@ loss_min_cohort_sensitivity <- function(truth, scores = NULL, selected = NULL,
       truth[idx],
       scores[idx],
       selected = selected,
-      threshold = threshold,
+      cutoff_prob = cutoff_prob,
       positive = positive
     )
   }, numeric(1))
@@ -167,7 +167,7 @@ loss_min_cohort_sensitivity <- function(truth, scores = NULL, selected = NULL,
 #' @return Specificity of the weakest cohort.
 #' @export
 loss_min_cohort_specificity <- function(truth, scores = NULL, selected = NULL,
-                                        threshold = 0.5, positive = "Yes",
+                                        cutoff_prob = 0.5, positive = "Yes",
                                         cohort = NULL) {
   truth <- ensure_binary_response(truth)
   if (is.null(scores)) {
@@ -175,7 +175,7 @@ loss_min_cohort_specificity <- function(truth, scores = NULL, selected = NULL,
   }
   if (is.null(cohort)) {
     return(loss_specificity(truth, scores, selected,
-                            threshold = threshold, positive = positive))
+                            cutoff_prob = cutoff_prob, positive = positive))
   }
   cohort <- factor(cohort)
   if (length(cohort) != length(truth)) {
@@ -190,7 +190,7 @@ loss_min_cohort_specificity <- function(truth, scores = NULL, selected = NULL,
       truth[idx],
       scores[idx],
       selected = selected,
-      threshold = threshold,
+      cutoff_prob = cutoff_prob,
       positive = positive
     )
   }, numeric(1))
@@ -209,7 +209,7 @@ loss_min_cohort_specificity <- function(truth, scores = NULL, selected = NULL,
 #' @return Sensitivity range across cohorts.
 #' @export
 loss_cohort_sensitivity_gap <- function(truth, scores = NULL, selected = NULL,
-                                        threshold = 0.5, positive = "Yes",
+                                        cutoff_prob = 0.5, positive = "Yes",
                                         cohort = NULL) {
   truth <- ensure_binary_response(truth)
   if (is.null(scores)) {
@@ -217,7 +217,7 @@ loss_cohort_sensitivity_gap <- function(truth, scores = NULL, selected = NULL,
   }
   if (is.null(cohort)) {
     sens <- loss_sensitivity(truth, scores, selected,
-                             threshold = threshold, positive = positive)
+                             cutoff_prob = cutoff_prob, positive = positive)
     return(0 * sens)
   }
   cohort <- factor(cohort)
@@ -233,7 +233,7 @@ loss_cohort_sensitivity_gap <- function(truth, scores = NULL, selected = NULL,
       truth[idx],
       scores[idx],
       selected = selected,
-      threshold = threshold,
+      cutoff_prob = cutoff_prob,
       positive = positive
     )
   }, numeric(1))
@@ -395,7 +395,7 @@ loss_registry <- function() {
 #' Creates a list compatible with [define_objectives()] where each entry contains
 #' the loss label, optimization direction, and an evaluation function with the
 #' signature `(truth, estimate, selected = NULL)`. Additional parameters may be
-#' supplied per loss via the `params` list (e.g., custom thresholds).
+#' supplied per loss via the `params` list (e.g., custom cutoffs).
 #'
 #' @param losses Character vector of registered loss names.
 #' @param params Named list mapping loss names to argument lists.
