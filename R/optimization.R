@@ -274,30 +274,45 @@ optimize_panel <- function(x, y,
     return(rep(0.5, n))
   }
 
-  center_cols <- function(mat) {
-    sweep(mat, 2, colMeans(mat), "-")
-  }
-  scale_cols <- function(mat) {
-    sds <- apply(mat, 2, stats::sd)
-    sds[sds == 0] <- 1
-    sweep(mat, 2, sds, "/")
-  }
-
-  if (ncol(x_selected) == 1L) {
-    centered <- x_selected[, 1] - mean(x_selected[, 1])
-    sd_val <- stats::sd(x_selected[, 1])
-    if (isTRUE(all.equal(sd_val, 0))) {
-      centered[] <- 0
-    } else {
-      centered <- centered / sd_val
+  fallback_scores <- function(mat) {
+    if (ncol(mat) == 1L) {
+      centered <- mat[, 1] - mean(mat[, 1])
+      sd_val <- stats::sd(mat[, 1])
+      if (isTRUE(all.equal(sd_val, 0))) {
+        centered[] <- 0
+      } else {
+        centered <- centered / sd_val
+      }
+      return(stats::plogis(centered))
     }
-    return(stats::plogis(centered))
+    centered <- sweep(mat, 2, colMeans(mat), "-")
+    sds <- apply(centered, 2, stats::sd)
+    sds[sds == 0] <- 1
+    scaled <- sweep(centered, 2, sds, "/")
+    stats::plogis(rowMeans(scaled))
   }
 
-  centered <- center_cols(x_selected)
-  scaled <- scale_cols(centered)
-  aggregated <- rowMeans(scaled)
-  stats::plogis(aggregated)
+  logistic_scores <- tryCatch({
+    df <- data.frame(
+      .response = as.integer(truth) - 1L,
+      as.data.frame(x_selected, check.names = TRUE)
+    )
+    fit <- suppressWarnings(stats::glm(.response ~ ., data = df, family = stats::binomial()))
+    preds <- stats::predict(fit, type = "response")
+    if (length(preds) != nrow(x_selected) || anyNA(preds)) {
+      stop("Invalid logistic predictions.")
+    }
+    preds
+  }, error = function(e) {
+    warning(
+      "Falling back to heuristic scoring because logistic regression failed: ",
+      conditionMessage(e),
+      call. = FALSE
+    )
+    fallback_scores(x_selected)
+  })
+
+  logistic_scores
 }
 
 .prepare_cohort_inputs <- function(x, y, assay = NULL) {

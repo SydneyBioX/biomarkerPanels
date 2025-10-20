@@ -117,16 +117,6 @@ constraints <- list(
   min_metric_constraint("sensitivity", threshold = 0.9,
                         params = list(cutoff_prob = 0.6))
 )
-
-result <- optimize_panel(
-  x = cohorts$x_list,
-  y = cohorts$y_list,
-  objectives = define_objectives(losses = c("specificity", "num_features")),
-  constraints = constraints,
-  max_features = 5,
-  feature_pool = colnames(cohorts$x_list[[1]])[1:50],
-  nsga_control = list(popsize = 64, generations = 60)
-)
 ```
 
 ## 3. Run NSGA-II Optimisation
