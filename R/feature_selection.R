@@ -131,6 +131,10 @@ select_features_for_ratios <- function(x_list,
 #' @return A list containing the selected feature identifiers, per-feature
 #'   scoring metadata, coefficient matrix, and the lambda value used for each
 #'   cohort.
+#' @details Features are currently aligned across cohorts via a simple
+#'   intersection of shared column names. Future versions will add more flexible
+#'   harmonisation strategies (e.g., imputation or reference-based mapping). 
+#'   I promise I'll get to this lol #TODO
 #' @export
 #'
 #' @importFrom glmnet cv.glmnet glmnet
@@ -557,22 +561,27 @@ select_transferable_features <- function(x_list,
     responses[[i]] <- as.integer(y_vec) - 1L
   }
 
-  base_features <- colnames(matrices[[1]])
-  matrices <- lapply(seq_along(matrices), function(i) {
-    mat <- matrices[[i]]
-    missing <- setdiff(base_features, colnames(mat))
-    if (length(missing)) {
-      stop("Feature(s) missing in cohort ", shQuote(cohort_names[[i]]), ": ",
-           paste(missing, collapse = ", "), call. = FALSE)
-    }
-    mat[, base_features, drop = FALSE]
+  feature_sets <- lapply(matrices, colnames)
+  # TODO(#transferability): replace simple intersection alignment with robust harmonisation.
+  common_features <- Reduce(intersect, feature_sets)
+  if (is.null(common_features) || !length(common_features)) {
+    stop(
+      "No shared features were found across cohorts. Provide data with ",
+      "overlapping feature identifiers (future releases will support more ",
+      "flexible alignment).",
+      call. = FALSE
+    )
+  }
+  ordered_features <- feature_sets[[1]][feature_sets[[1]] %in% common_features]
+  matrices <- lapply(matrices, function(mat) {
+    mat[, ordered_features, drop = FALSE]
   })
 
   list(
     matrices = matrices,
     responses = responses,
     cohort_names = cohort_names,
-    feature_names = base_features
+    feature_names = ordered_features
   )
 }
 

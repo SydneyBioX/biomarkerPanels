@@ -4,13 +4,15 @@ Multi-objective optimization (moo) for discovering biomarker panels
 with constrained performance targets. This package is designed for integration
 with Bioconductor ecosystems (s4 classes) and supports high-dimensional datasets.
 
-## Key Features (planned)
+## Key Features
 - Multi-objective search balancing sensitivity, specificity, and custom costs.
 - Support for gene-expression inputs via `SummarizedExperiment`.
 - Panel evaluation utilities including ROC curves and calibration diagnostics.
 - Transferability diagnostics baked into the loss registry (minimum cohort
   sensitivity/specificity, cohort gaps, calibration, and distribution-shift
   penalties).
+- Hard constraints on optimisation via metric thresholds (e.g., enforce minimum
+  sensitivity before maximising specificity).
 - Extensible architecture compatible with Rcpp acceleration.
 
 ## Repository Guide
@@ -25,8 +27,8 @@ with Bioconductor ecosystems (s4 classes) and supports high-dimensional datasets
 Development installation will use:
 
 ```r
-# install.packages("BiocManager")
-BiocManager::install("your-org/biomarkerPanels")
+# install.packages("remotes")
+remotes::install_github("SydneyBioX/moo")
 ```
 
 ## Contributing

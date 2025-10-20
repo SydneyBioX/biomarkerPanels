@@ -6,6 +6,10 @@
 #' define a panel whose performance is evaluated via the selected losses.
 #' Inputs may be a single cohort (`matrix`, `data.frame`, or
 #' `SummarizedExperiment`) or multiple cohorts supplied as lists of such objects.
+#' Feature alignment across cohorts currently relies on the simple intersection
+#' of shared column names; future releases will add more flexible harmonisation.
+#' Optimisation should be run on training data only—use [evaluate_panel()] for
+#' held-out validation.
 #'
 #' @param x Matrix-like object, `SummarizedExperiment`, or list of matrices /
 #'   experiments representing one or more cohorts.
@@ -16,6 +20,9 @@
 #' @param max_features Maximum number of biomarkers permitted in a panel.
 #' @param feature_pool Optional subset of feature identifiers (names or integer
 #'   indices) considered during optimization. Defaults to all features.
+#' @param constraints Optional list of constraint descriptors (e.g.,
+#'   from [min_metric_constraint()]) that must evaluate to `TRUE` for a candidate
+#'   solution to be considered feasible.
 #' @param scoring_fn Function producing per-sample scores from the selected
 #'   features. Signature:
 #'   `function(x_selected, selected_features, truth, cohort = NULL, ...)`.
@@ -32,6 +39,7 @@ optimize_panel <- function(x, y,
                            ),
                            max_features = 5L,
                            feature_pool = NULL,
+                           constraints = list(),
                            scoring_fn = NULL,
                            nsga_control = list(),
                            assay = NULL) {
@@ -88,6 +96,8 @@ optimize_panel <- function(x, y,
   objective_directions <- vapply(objectives, `[[`, character(1), "direction")
   names(objective_directions) <- names(objectives)
 
+  constraint_specs <- .normalize_constraints(constraints)
+
   nsga_defaults <- list(
     popsize = 64,
     generations = 60,
@@ -117,6 +127,21 @@ optimize_panel <- function(x, y,
       stop("`scoring_fn` must return a numeric vector matching the number of samples.",
            call. = FALSE)
     }
+    constraint_results <- if (length(constraint_specs)) {
+      setNames(vapply(seq_along(constraint_specs), function(j) {
+        res <- constraint_specs[[j]]$fun(
+          truth = truth,
+          scores = scores,
+          selected = selected_features,
+          cohort = cohort,
+          x = x_selected
+        )
+        isTRUE(res)
+      }, logical(1)), vapply(constraint_specs, `[[`, character(1), "label"))
+    } else {
+      logical(0)
+    }
+    feasible <- if (length(constraint_results)) all(constraint_results) else TRUE
     metrics <- vapply(objectives, function(obj) {
       obj$fun(
         truth,
@@ -129,12 +154,17 @@ optimize_panel <- function(x, y,
     list(
       features = selected_features,
       scores = scores,
-      metrics = metrics
+      metrics = metrics,
+      constraint_results = constraint_results,
+      feasible = feasible
     )
   }
 
   objective_wrapper <- function(decision_vec) {
     evaluated <- evaluate_candidate(decision_vec)
+    if (length(constraint_specs) && !evaluated$feasible) {
+      return(rep(Inf, length(objectives)))
+    }
     metrics <- evaluated$metrics
     converted <- mapply(function(val, dir) {
       if (is.na(val)) {
@@ -170,6 +200,13 @@ optimize_panel <- function(x, y,
     evaluate_candidate(decision_vec)
   })
 
+  feasible_vec <- vapply(solutions, `[[`, logical(1), "feasible")
+  if (!any(feasible_vec)) {
+    stop("No solutions satisfied the supplied constraints. Consider relaxing them.",
+         call. = FALSE)
+  }
+
+  solutions <- solutions[feasible_vec]
   metric_matrix <- do.call(rbind, lapply(solutions, `[[`, "metrics"))
   colnames(metric_matrix) <- names(objectives)
 
@@ -195,6 +232,7 @@ optimize_panel <- function(x, y,
       value = solutions[[i]]$metrics,
       direction = objective_directions,
       features = I(rep(list(solutions[[i]]$features), length(objectives))),
+      constraints = I(rep(list(solutions[[i]]$constraint_results), length(objectives))),
       stringsAsFactors = FALSE
     )
   }))
@@ -208,7 +246,12 @@ optimize_panel <- function(x, y,
       max_features = max_features,
       feature_pool = feature_pool,
       nsga2 = nsga_args,
-      scoring_function = deparse(substitute(scoring_fn))
+      scoring_function = deparse(substitute(scoring_fn)),
+      constraints = if (length(constraint_specs)) {
+        vapply(constraint_specs, `[[`, character(1), "label")
+      } else {
+        character()
+      }
     ),
     training_data = list(
       n = nrow(x_mat),
@@ -274,23 +317,26 @@ optimize_panel <- function(x, y,
       .extract_feature_matrix(x[[i]], assay = assay)
     })
 
-    base_features <- colnames(matrices[[1]])
-    if (is.null(base_features)) {
-      base_features <- sprintf("feature_%04d", seq_len(ncol(matrices[[1]])))
-      colnames(matrices[[1]]) <- base_features
+    for (i in seq_along(matrices)) {
+      if (is.null(colnames(matrices[[i]]))) {
+        colnames(matrices[[i]]) <- sprintf("feature_%04d", seq_len(ncol(matrices[[i]])))
+      }
     }
 
-    matrices <- lapply(seq_along(matrices), function(i) {
-      mat <- matrices[[i]]
-      if (is.null(colnames(mat))) {
-        colnames(mat) <- base_features
-      }
-      missing <- setdiff(base_features, colnames(mat))
-      if (length(missing)) {
-        stop("Feature(s) missing in cohort ", shQuote(cohort_names[[i]]), ": ",
-             paste(missing, collapse = ", "), call. = FALSE)
-      }
-      mat[, base_features, drop = FALSE]
+    feature_sets <- lapply(matrices, colnames)
+    # TODO(#transferability): support more flexible feature alignment strategies.
+    common_features <- Reduce(intersect, feature_sets)
+    if (is.null(common_features) || !length(common_features)) {
+      stop(
+        "No shared features were found across cohorts. Provide data with ",
+        "overlapping feature identifiers (future releases will support more ",
+        "flexible alignment).",
+        call. = FALSE
+      )
+    }
+    ordered_features <- feature_sets[[1]][feature_sets[[1]] %in% common_features]
+    matrices <- lapply(matrices, function(mat) {
+      mat[, ordered_features, drop = FALSE]
     })
 
     counts <- vapply(matrices, nrow, integer(1))
@@ -362,4 +408,37 @@ optimize_panel <- function(x, y,
          paste(missing, collapse = ", "), call. = FALSE)
   }
   unique(pool)
+}
+
+.normalize_constraints <- function(constraints) {
+  if (!length(constraints)) {
+    return(list())
+  }
+  if (!is.list(constraints)) {
+    stop("`constraints` must be supplied as a list.", call. = FALSE)
+  }
+  lapply(seq_along(constraints), function(i) {
+    entry <- constraints[[i]]
+    label <- names(constraints)[i]
+    if (is.function(entry)) {
+      fun <- entry
+    } else if (is.list(entry) && !is.null(entry$fun) && is.function(entry$fun)) {
+      fun <- entry$fun
+      if (!is.null(entry$label) && nzchar(entry$label)) {
+        label <- entry$label
+      }
+    } else {
+      stop(
+        "`constraints` entries must be functions or lists containing a `fun` element.",
+        call. = FALSE
+      )
+    }
+    if (is.null(label) || !nzchar(label)) {
+      label <- sprintf("constraint_%02d", i)
+    }
+    list(
+      fun = fun,
+      label = label
+    )
+  })
 }

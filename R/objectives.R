@@ -34,3 +34,73 @@ define_objectives <- function(losses = c("sensitivity", "specificity"),
 
   objectives
 }
+
+#' Minimum metric constraint constructor.
+#'
+#' Create a boolean constraint that requires a registered loss to meet or exceed
+#' (or undercut, for minimised losses) a specified threshold during optimisation.
+#' These constraints can be supplied to [optimize_panel()] via its `constraints`
+#' argument.
+#'
+#' @param loss Character scalar naming a registered loss function.
+#' @param threshold Numeric scalar describing the required metric level.
+#' @param params Optional named list of additional parameters forwarded to the
+#'   loss function (e.g., thresholds for sensitivity).
+#' @param label Optional human-readable label for the constraint; defaults to
+#'   `paste0("min_", loss, "_", threshold)`.
+#' @return A constraint descriptor (list) with elements `label`, `fun`,
+#'   `threshold`, `loss`, and `direction`.
+#' @export
+min_metric_constraint <- function(loss,
+                                  threshold,
+                                  params = list(),
+                                  label = NULL) {
+  stopifnot(is.character(loss), length(loss) == 1L, nzchar(loss))
+  if (!is.numeric(threshold) || length(threshold) != 1L || !is.finite(threshold)) {
+    stop("`threshold` must be a finite numeric scalar.", call. = FALSE)
+  }
+  if (!is.list(params)) {
+    params <- as.list(params)
+  }
+  param_list <- list()
+  if (length(params)) {
+    param_list[[loss]] <- params
+  }
+  entry <- build_objectives(losses = loss, params = param_list)[[loss]]
+  direction <- entry$direction
+
+  if (is.null(label) || !nzchar(label)) {
+    label <- sprintf(
+      "min_%s_%s",
+      loss,
+      format(threshold, trim = TRUE, scientific = FALSE)
+    )
+  }
+
+  fun <- function(truth, scores, selected = NULL, cohort = NULL, x = NULL, ...) {
+    value <- entry$fun(
+      truth = truth,
+      estimate = scores,
+      selected = selected,
+      cohort = cohort,
+      x = x,
+      ...
+    )
+    if (is.na(value)) {
+      return(FALSE)
+    }
+    if (direction == "maximize") {
+      value >= threshold
+    } else {
+      value <= threshold
+    }
+  }
+
+  list(
+    label = label,
+    fun = fun,
+    threshold = threshold,
+    loss = loss,
+    direction = direction
+  )
+}

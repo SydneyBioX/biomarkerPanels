@@ -122,3 +122,33 @@ test_that("select_transferable_features prioritises consistent ridge coefficient
     "`x_list` and `y_list` must have the same length"
   )
 })
+
+test_that("select_transferable_features intersects cohort feature sets", {
+  make_dataset <- function(seed, cols) {
+    set.seed(seed)
+    n <- 60L
+    x <- matrix(rnorm(n * length(cols)), nrow = n, ncol = length(cols))
+    colnames(x) <- cols
+    linear <- 1.2 * x[, "gene_common1"] - 0.8 * x[, "gene_common2"]
+    prob <- stats::plogis(linear)
+    y <- factor(ifelse(runif(n) < prob, "Yes", "No"), levels = c("No", "Yes"))
+    list(x = x, y = y)
+  }
+
+  ds1 <- make_dataset(111, c("gene_common1", "gene_common2", "gene_unique1"))
+  ds2 <- make_dataset(222, c("gene_unique2", "gene_common2", "gene_common1"))
+
+  result <- select_transferable_features(
+    list(ds1$x, ds2$x),
+    list(ds1$y, ds2$y),
+    n_features = 2,
+    lambda = 0.1,
+    min_coefficient = 0.01,
+    standardize = FALSE
+  )
+
+  expect_true(length(result$features) <= 2)
+  expect_true(all(result$features %in% c("gene_common1", "gene_common2")))
+  expect_equal(colnames(result$coefficients), c("cohort_01", "cohort_02"))
+  expect_true(all(rownames(result$coefficients) %in% c("gene_common1", "gene_common2")))
+})

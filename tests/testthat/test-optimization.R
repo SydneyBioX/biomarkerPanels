@@ -40,3 +40,84 @@ test_that("optimize_panel handles multiple cohorts", {
   expect_equal(res@training_data$num_cohorts, length(fixture$x_list))
   expect_true(all(names(res@training_data$cohort_counts) %in% names(fixture$x_list)))
 })
+
+test_that("optimize_panel intersects feature sets across cohorts", {
+  make_cohort <- function(seed, cols) {
+    set.seed(seed)
+    n <- 40L
+    x <- matrix(rnorm(n * length(cols)), nrow = n, ncol = length(cols))
+    colnames(x) <- cols
+    linear <- 0.9 * x[, "gene_common1"] - 0.7 * x[, "gene_common2"]
+    prob <- stats::plogis(linear)
+    y <- factor(ifelse(runif(n) < prob, "Yes", "No"), levels = c("No", "Yes"))
+    list(x = x, y = y)
+  }
+
+  c1 <- make_cohort(1, c("gene_common1", "gene_common2", "gene_unique1"))
+  c2 <- make_cohort(2, c("gene_common2", "gene_common1", "gene_unique2"))
+
+  res <- optimize_panel(
+    x = list(c1$x, c2$x),
+    y = list(c1$y, c2$y),
+    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    max_features = 2,
+    nsga_control = list(popsize = 12, generations = 8)
+  )
+
+  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_true(all(res@features %in% c("gene_common1", "gene_common2")))
+})
+
+test_that("min_metric_constraint builds feasible constraint", {
+  constraint <- min_metric_constraint("sensitivity", threshold = 0.9)
+  expect_type(constraint$label, "character")
+  expect_true(is.function(constraint$fun))
+  expect_equal(constraint$loss, "sensitivity")
+  expect_equal(constraint$direction, "maximize")
+})
+
+test_that("optimize_panel enforces minimum metric constraints", {
+  set.seed(5001)
+  n <- 60L
+  x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
+  colnames(x) <- c("gene_common1", "gene_common2")
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+  x[y == "Yes", "gene_common1"] <- x[y == "Yes", "gene_common1"] + 3
+  x[y == "No", "gene_common1"] <- x[y == "No", "gene_common1"] - 3
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("specificity")),
+    max_features = 1,
+    feature_pool = colnames(x),
+    constraints = list(min_metric_constraint("sensitivity", threshold = 0.9)),
+    nsga_control = list(popsize = 16, generations = 15)
+  )
+
+  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_true("min_sensitivity_0.9" %in% res@control$constraints)
+  eval_res <- evaluate_panel(res, x, y)
+  expect_gte(eval_res$metrics["sensitivity"], 0.9)
+})
+
+test_that("optimize_panel errors when constraints infeasible", {
+  set.seed(5002)
+  n <- 40L
+  x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
+  colnames(x) <- c("gene_common1", "gene_common2")
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+
+  expect_error(
+    optimize_panel(
+      x = x,
+      y = y,
+      objectives = define_objectives(losses = c("specificity")),
+      max_features = 1,
+      feature_pool = colnames(x),
+      constraints = list(min_metric_constraint("sensitivity", threshold = 1.01)),
+      nsga_control = list(popsize = 12, generations = 10)
+    ),
+    "No solutions satisfied the supplied constraints"
+  )
+})

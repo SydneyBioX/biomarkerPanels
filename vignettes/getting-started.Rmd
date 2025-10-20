@@ -104,6 +104,31 @@ transfer_objectives <- define_objectives(
 )
 ```
 
+### Enforce Minimum Standards
+
+Some clinical settings demand a hard floor on performance before optimising
+another objective. Supply constraint descriptors—such as
+`min_metric_constraint()`—via the `constraints` argument to
+`optimize_panel()`. The optimiser will discard any candidate failing the
+constraint.
+
+```{r constraints, eval=FALSE}
+constraints <- list(
+  min_metric_constraint("sensitivity", threshold = 0.9,
+                        params = list(threshold = 0.6))
+)
+
+result <- optimize_panel(
+  x = cohorts$x_list,
+  y = cohorts$y_list,
+  objectives = define_objectives(losses = c("specificity", "num_features")),
+  constraints = constraints,
+  max_features = 5,
+  feature_pool = colnames(cohorts$x_list[[1]])[1:50],
+  nsga_control = list(popsize = 64, generations = 60)
+)
+```
+
 ## 3. Run NSGA-II Optimisation
 
 `optimize_panel()` accepts single matrices or lists of cohorts. We restrict the
