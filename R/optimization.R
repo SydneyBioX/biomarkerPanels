@@ -20,6 +20,12 @@
 #' @param max_features Maximum number of biomarkers permitted in a panel.
 #' @param feature_pool Optional subset of feature identifiers (names or integer
 #'   indices) considered during optimization. Defaults to all features.
+#' @param cohort_aggregator Transformation applied to cohort feature matrices
+#'   prior to alignment. Defaults to `"pairwise_ratios"`, which generates
+#'   pairwise within-cohort contrasts via [`pairwise_col_diff()`] to dampen
+#'   distributional shifts across sites. Future work: support additional
+#'   harmonisation strategies (e.g., empirical Bayes, domain adversarial
+#'   mappings).
 #' @param constraints Optional list of constraint descriptors (e.g.,
 #'   from [min_metric_constraint()]) that must evaluate to `TRUE` for a candidate
 #'   solution to be considered feasible.
@@ -39,6 +45,7 @@ optimize_panel <- function(x, y,
                            ),
                            max_features = 5L,
                            feature_pool = NULL,
+                           cohort_aggregator = c("pairwise_ratios", "none"),
                            constraints = list(),
                            scoring_fn = NULL,
                            nsga_control = list(),
@@ -48,7 +55,13 @@ optimize_panel <- function(x, y,
          call. = FALSE)
   }
 
-  inputs <- .prepare_cohort_inputs(x, y, assay = assay)
+  if (is.character(cohort_aggregator)) {
+    cohort_aggregator <- match.arg(cohort_aggregator)
+  } else {
+    stop("`cohort_aggregator` must be one of 'pairwise_ratios' or 'none'.", call. = FALSE)
+  }
+
+  inputs <- .prepare_cohort_inputs(x, y, assay = assay, aggregator = cohort_aggregator)
   x_mat <- inputs$x
   truth <- inputs$truth
   cohort <- inputs$cohort
@@ -247,6 +260,7 @@ optimize_panel <- function(x, y,
       feature_pool = feature_pool,
       nsga2 = nsga_args,
       scoring_function = deparse(substitute(scoring_fn)),
+      cohort_aggregator = cohort_aggregator,
       constraints = if (length(constraint_specs)) {
         vapply(constraint_specs, `[[`, character(1), "label")
       } else {
@@ -315,7 +329,7 @@ optimize_panel <- function(x, y,
   logistic_scores
 }
 
-.prepare_cohort_inputs <- function(x, y, assay = NULL) {
+.prepare_cohort_inputs <- function(x, y, assay = NULL, aggregator = "none") {
   if (is.list(x)) {
     if (!is.list(y)) {
       stop("When `x` is a list, `y` must also be a list.", call. = FALSE)
@@ -337,6 +351,8 @@ optimize_panel <- function(x, y,
         colnames(matrices[[i]]) <- sprintf("feature_%04d", seq_len(ncol(matrices[[i]])))
       }
     }
+
+    matrices <- .apply_cohort_aggregator(matrices, aggregator)
 
     feature_sets <- lapply(matrices, colnames)
     # TODO(#transferability): support more flexible feature alignment strategies.
@@ -384,6 +400,10 @@ optimize_panel <- function(x, y,
     if (nrow(x_mat) != length(truth)) {
       stop("`x` and `y` must have matching sample sizes.", call. = FALSE)
     }
+    if (is.null(colnames(x_mat))) {
+      colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
+    }
+    x_mat <- .apply_cohort_aggregator(list(x_mat), aggregator)[[1]]
     cohort_names <- "cohort_01"
     list(
       x = x_mat,
@@ -423,6 +443,30 @@ optimize_panel <- function(x, y,
          paste(missing, collapse = ", "), call. = FALSE)
   }
   unique(pool)
+}
+
+.apply_cohort_aggregator <- function(matrices, aggregator) {
+  if (!length(matrices)) {
+    return(matrices)
+  }
+  if (identical(aggregator, "none")) {
+    return(matrices)
+  }
+  if (!aggregator %in% c("pairwise_ratios")) {
+    stop("Unsupported cohort aggregator: ", aggregator, call. = FALSE)
+  }
+  lapply(matrices, function(mat) {
+    if (ncol(mat) < 2L) {
+      warning(
+        "Aggregator '", aggregator,
+        "' requires at least two features; returning original matrix.",
+        call. = FALSE
+      )
+      return(mat)
+    }
+    # TODO(#transferability): explore ratio-based or domain-adaptive aggregators.
+    pairwise_col_diff(mat)
+  })
 }
 
 .normalize_constraints <- function(constraints) {

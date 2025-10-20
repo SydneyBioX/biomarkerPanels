@@ -12,7 +12,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 
 // pairwise_col_diff_cpp
 NumericMatrix pairwise_col_diff_cpp(NumericMatrix x, CharacterVector col_names);
-RcppExport SEXP _CPOP_pairwise_col_diff_cpp(SEXP xSEXP, SEXP col_namesSEXP) {
+RcppExport SEXP _biomarkerPanels_pairwise_col_diff_cpp(SEXP xSEXP, SEXP col_namesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -24,7 +24,7 @@ END_RCPP
 }
 // pairwise_ratios_cpp
 NumericMatrix pairwise_ratios_cpp(NumericMatrix x, NumericVector feature_col, String feature_name, CharacterVector other_names);
-RcppExport SEXP _CPOP_pairwise_ratios_cpp(SEXP xSEXP, SEXP feature_colSEXP, SEXP feature_nameSEXP, SEXP other_namesSEXP) {
+RcppExport SEXP _biomarkerPanels_pairwise_ratios_cpp(SEXP xSEXP, SEXP feature_colSEXP, SEXP feature_nameSEXP, SEXP other_namesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -38,12 +38,12 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_CPOP_pairwise_col_diff_cpp", (DL_FUNC) &_CPOP_pairwise_col_diff_cpp, 2},
-    {"_CPOP_pairwise_ratios_cpp", (DL_FUNC) &_CPOP_pairwise_ratios_cpp, 4},
+    {"_biomarkerPanels_pairwise_col_diff_cpp", (DL_FUNC) &_biomarkerPanels_pairwise_col_diff_cpp, 2},
+    {"_biomarkerPanels_pairwise_ratios_cpp", (DL_FUNC) &_biomarkerPanels_pairwise_ratios_cpp, 4},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_CPOP(DllInfo *dll) {
+RcppExport void R_init_biomarkerPanels(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }

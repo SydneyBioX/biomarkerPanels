@@ -67,6 +67,6 @@ test_that("evaluate_panel requires column names for single-cohort data", {
 
   expect_error(
     evaluate_panel(panel, x, y),
-    "must have column names"
+    "Selected feature\\(s\\) not found"
   )
 })

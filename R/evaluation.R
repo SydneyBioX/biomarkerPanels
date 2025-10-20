@@ -2,8 +2,9 @@
 #'
 #' Compute objective values and additional summary statistics for a fitted panel
 #' on validation data. This function extracts the selected features from the
-#' validation set and computes predictions using the default scoring function
-#' (row means of selected features).
+#' validation set and computes predictions using the default scoring function:
+#' a logistic regression fit on the selected features (with a centred/standardised
+#' fallback if the model fails to converge).
 #' When evaluating multiple cohorts, feature alignment is performed via the
 #' simple intersection of shared column names; future releases will offer more
 #' flexible strategies.
@@ -21,6 +22,10 @@
 #' @param scoring_fn Optional custom scoring function. If `NULL`, uses the
 #'   default row-mean aggregation. Must have signature
 #'   `function(x_selected, selected_features, truth, ...)`.
+#' @param cohort_aggregator Optional transformation applied to `x` before
+#'   evaluation. Defaults to the aggregator stored in the fitted panel
+#'   (currently `"pairwise_ratios"`), keeping training and validation pipelines
+#'   aligned. Future work: expose richer harmonisation options.
 #' @return A list with `metrics` (named numeric vector) and `objectives`
 #'   (data.frame with columns objective, value, direction).
 #' @export
@@ -30,15 +35,23 @@ evaluate_panel <- function(panel, x, y,
                            ),
                            cohort = NULL,
                            assay = NULL,
-                           scoring_fn = NULL) {
+                           scoring_fn = NULL,
+                           cohort_aggregator = NULL) {
   stopifnot(inherits(panel, "BiomarkerPanelResult"))
+
+  stored_aggregator <- panel@control$cohort_aggregator
+  if (is.null(cohort_aggregator)) {
+    cohort_aggregator <- if (is.null(stored_aggregator)) "none" else stored_aggregator
+  } else {
+    cohort_aggregator <- match.arg(cohort_aggregator, c("pairwise_ratios", "none"))
+  }
 
   if (is.list(x)) {
     if (!is.null(cohort)) {
       warning("`cohort` argument is ignored when `x` is supplied as a list of cohorts.",
               call. = FALSE)
     }
-    prepared <- .prepare_cohort_inputs(x, y, assay = assay)
+    prepared <- .prepare_cohort_inputs(x, y, assay = assay, aggregator = cohort_aggregator)
     x_mat <- prepared$x
     truth <- prepared$truth
     cohort_vec <- prepared$cohort
@@ -48,6 +61,10 @@ evaluate_panel <- function(panel, x, y,
     if (nrow(x_mat) != length(truth)) {
       stop("`x` and `y` must have matching sample sizes.", call. = FALSE)
     }
+    if (is.null(colnames(x_mat))) {
+      colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
+    }
+    x_mat <- .apply_cohort_aggregator(list(x_mat), cohort_aggregator)[[1]]
     if (is.null(colnames(x_mat))) {
       stop("`x` must have column names in order to align with panel features.",
            call. = FALSE)

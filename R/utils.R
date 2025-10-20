@@ -1,3 +1,4 @@
+#' @useDynLib biomarkerPanels, .registration = TRUE
 #' @importFrom Rcpp sourceCpp
 NULL
 

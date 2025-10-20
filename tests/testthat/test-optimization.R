@@ -10,6 +10,7 @@ test_that("optimize_panel returns a BiomarkerPanelResult", {
     objectives = define_objectives(losses = c("sensitivity", "specificity", "num_features")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
+    cohort_aggregator = "none",
     nsga_control = list(popsize = 20, generations = 20)
   )
 
@@ -32,6 +33,7 @@ test_that("optimize_panel handles multiple cohorts", {
     objectives = define_objectives(losses = c("sensitivity", "specificity", "num_features")),
     max_features = 4,
     feature_pool = colnames(fixture$x_list[[1]])[seq_len(12)],
+    cohort_aggregator = "none",
     nsga_control = list(popsize = 16, generations = 15)
   )
 
@@ -61,6 +63,7 @@ test_that("optimize_panel intersects feature sets across cohorts", {
     y = list(c1$y, c2$y),
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
+    cohort_aggregator = "none",
     nsga_control = list(popsize = 12, generations = 8)
   )
 
@@ -92,6 +95,7 @@ test_that("optimize_panel enforces minimum metric constraints", {
     max_features = 1,
     feature_pool = colnames(x),
     constraints = list(min_metric_constraint("sensitivity", threshold = 0.9)),
+    cohort_aggregator = "none",
     nsga_control = list(popsize = 16, generations = 15)
   )
 
@@ -116,8 +120,34 @@ test_that("optimize_panel errors when constraints infeasible", {
       max_features = 1,
       feature_pool = colnames(x),
       constraints = list(min_metric_constraint("sensitivity", threshold = 1.01)),
+      cohort_aggregator = "none",
       nsga_control = list(popsize = 12, generations = 10)
     ),
     "No solutions satisfied the supplied constraints"
   )
+})
+
+test_that("pairwise cohort aggregator produces contrast features", {
+  set.seed(1234)
+  make_mat <- function(seed) {
+    set.seed(seed)
+    m <- matrix(rnorm(30), nrow = 10, ncol = 3)
+    colnames(m) <- c("A", "B", "C")
+    m
+  }
+  x_list <- list(make_mat(1), make_mat(2))
+  y_list <- lapply(1:2, function(i) factor(rep(c("No", "Yes"), length.out = 10), levels = c("No", "Yes")))
+
+  res <- optimize_panel(
+    x = x_list,
+    y = y_list,
+    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    max_features = 2,
+    cohort_aggregator = "pairwise_ratios",
+    nsga_control = list(popsize = 12, generations = 8)
+  )
+
+  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_equal(res@control$cohort_aggregator, "pairwise_ratios")
+  expect_true(all(grepl("--", res@control$feature_pool)))
 })
