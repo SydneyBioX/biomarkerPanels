@@ -103,19 +103,26 @@ compute_inclusion_frequencies <- function(panels) {
     ))
   }
 
-  feature_sets <- lapply(panels, function(p) {
+  collected <- lapply(panels, function(p) {
     if (inherits(p, "BiomarkerPanelResult")) {
-      unlist(.extract_solution_features(p), use.names = FALSE)
+      sol <- .extract_solution_features(p)
+      sol <- lapply(sol, unique)
+      list(
+        features = unlist(sol, use.names = FALSE),
+        solutions = length(sol)
+      )
     } else if (is.character(p)) {
-      p
+      list(
+        features = unique(p),
+        solutions = 1L
+      )
     } else {
       stop("Unsupported panel entry: must be character vector or BiomarkerPanelResult.",
            call. = FALSE)
     }
   })
 
-  feature_sets <- lapply(feature_sets, unique)
-  flattened <- unlist(feature_sets, use.names = FALSE)
+  flattened <- unlist(lapply(collected, `[[`, "features"), use.names = FALSE)
 
   if (!length(flattened)) {
     return(data.frame(
@@ -127,12 +134,13 @@ compute_inclusion_frequencies <- function(panels) {
   }
 
   freq_table <- sort(table(flattened), decreasing = TRUE)
+  total_solutions <- sum(vapply(collected, `[[`, integer(1), "solutions"))
   df <- data.frame(
     feature = names(freq_table),
     count = as.integer(freq_table),
     stringsAsFactors = FALSE
   )
-  df$proportion <- df$count / sum(lengths(feature_sets))
+  df$proportion <- df$count / total_solutions
   df
 }
 

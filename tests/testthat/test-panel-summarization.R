@@ -36,12 +36,12 @@ test_that("compute_inclusion_frequencies aggregates across panels", {
   )
 
   freq <- compute_inclusion_frequencies(list(panel, c("C", "D", "E")))
-  expect_equal(freq$feature, c("C", "D", "A", "B", "E"))
-  expect_equal(freq$count, c(2L, 2L, 1L, 1L, 1L))
-  expect_equal(freq$proportion, freq$count / 7)
+  expect_equal(freq$feature, c("B", "C", "D", "A", "E"))
+  expect_equal(freq$count, c(2L, 2L, 2L, 1L, 1L))
+  expect_equal(freq$proportion, c(2/3, 2/3, 2/3, 1/3, 1/3))
 
   panel_features <- select_panel_inclusion_frequency(freq, panel_size = 4)
-  expect_equal(panel_features, c("C", "D", "A", "B"))
+  expect_equal(panel_features, c("B", "C", "D", "A"))
 })
 
 test_that("select_panel_by_pathway integrates pathway knowledge", {
