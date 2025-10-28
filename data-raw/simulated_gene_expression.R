@@ -7,7 +7,7 @@
 
 set.seed(20240220)
 
-n_features <- 5000L
+n_features <- 500L
 n_samples <- 100L
 n_datasets <- 4L
 dataset_ids <- seq_len(n_datasets)
