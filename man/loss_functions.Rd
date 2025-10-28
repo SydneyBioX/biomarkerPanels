@@ -11,6 +11,6 @@ package can compose them into multi-objective optimization routines.
 \details{
 Each loss accepts a binary response (\code{truth}), numeric prediction scores
 (\code{scores}), and optionally the currently selected feature set (\code{selected}).
-Additional parameters (for example, classification thresholds) can be supplied
+Additional parameters (for example, classification cutoffs) can be supplied
 via \code{\link[=build_objectives]{build_objectives()}}.
 }

@@ -11,6 +11,8 @@ optimize_panel(
     "num_features")),
   max_features = 5L,
   feature_pool = NULL,
+  cohort_aggregator = c("pairwise_ratios", "none"),
+  constraints = list(),
   scoring_fn = NULL,
   nsga_control = list(),
   assay = NULL
@@ -30,6 +32,17 @@ experiments representing one or more cohorts.}
 
 \item{feature_pool}{Optional subset of feature identifiers (names or integer
 indices) considered during optimization. Defaults to all features.}
+
+\item{cohort_aggregator}{Transformation applied to cohort feature matrices
+prior to alignment. Defaults to \code{"pairwise_ratios"}, which generates
+pairwise within-cohort contrasts via \code{\link[=pairwise_col_diff]{pairwise_col_diff()}} to dampen
+distributional shifts across sites. Future work: support additional
+harmonisation strategies (e.g., empirical Bayes, domain adversarial
+mappings).}
+
+\item{constraints}{Optional list of constraint descriptors (e.g.,
+from \code{\link[=min_metric_constraint]{min_metric_constraint()}}) that must evaluate to \code{TRUE} for a candidate
+solution to be considered feasible.}
 
 \item{scoring_fn}{Function producing per-sample scores from the selected
 features. Signature:
@@ -51,4 +64,8 @@ represented as weights over a feature pool; the top \code{max_features} features
 define a panel whose performance is evaluated via the selected losses.
 Inputs may be a single cohort (\code{matrix}, \code{data.frame}, or
 \code{SummarizedExperiment}) or multiple cohorts supplied as lists of such objects.
+Feature alignment across cohorts currently relies on the simple intersection
+of shared column names; future releases will add more flexible harmonisation.
+Optimisation should be run on training data only—use \code{\link[=evaluate_panel]{evaluate_panel()}} for
+held-out validation.
 }

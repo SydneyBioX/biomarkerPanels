@@ -6,3 +6,5 @@
 inst/doc
 *.Rcheck/
 analysis/
+*.o
+*.so

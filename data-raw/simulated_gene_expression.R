@@ -1,3 +1,5 @@
+## code to prepare `simulated_gene_expression` dataset goes here
+
 #!/usr/bin/env Rscript
 
 # Simulate four log-scale gene expression datasets with dataset-specific shifts
@@ -95,6 +97,6 @@ output <- list(
   y_list = y_list
 )
 
-saveRDS(output, file = "simulated_gene_expression.Rds")
-
 cat("Simulation complete. Saved to simulated_gene_expression.Rds\n")
+
+usethis::use_data(simulated_gene_expression, overwrite = TRUE)
