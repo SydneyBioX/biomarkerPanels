@@ -215,6 +215,7 @@ select_transferable_features <- function(x_list,
   })
 
   coefficient_matrix <- do.call(cbind, lapply(ridge_results, `[[`, "coefficients"))
+  rownames(coefficient_matrix) <- feature_names
   colnames(coefficient_matrix) <- cohort_names
 
   lambda_used <- vapply(ridge_results, `[[`, numeric(1), "lambda")
@@ -241,14 +242,19 @@ select_transferable_features <- function(x_list,
     ))
   }
 
-  ranked <- order(combined_scores$score, decreasing = TRUE)
-  top_indices <- head(ranked, n = min(n_features, length(ranked)))
-  selected_features <- rownames(combined_scores)[top_indices]
+  top_n <- min(n_features, nrow(combined_scores))
+  top_indices <- seq_len(top_n)
+  selected_scores <- combined_scores[top_indices, , drop = FALSE]
+  selected_features <- selected_scores$feature
+  selected_row_index <- selected_scores$row_index
+  coefficients_subset <- coefficient_matrix[selected_row_index, , drop = FALSE]
+  rownames(coefficients_subset) <- selected_features
+  selected_scores$row_index <- NULL
 
   list(
     features = selected_features,
-    scores = combined_scores[selected_features, , drop = FALSE],
-    coefficients = coefficient_matrix[selected_features, , drop = FALSE],
+    scores = selected_scores,
+    coefficients = coefficients_subset,
     lambda = lambda_used,
     settings = list(
       lambda_choice = if (is.null(lambda_vec)) lambda_choice else "fixed",
@@ -615,6 +621,9 @@ select_transferable_features <- function(x_list,
     return(data.frame())
   }
 
+  feature_names <- rownames(coefficient_matrix)
+  row_index <- seq_len(nrow(coefficient_matrix))  # keep position for duplicate feature names
+
   abs_coeff <- abs(coefficient_matrix)
   mean_abs <- rowMeans(abs_coeff)
   sd_coeff <- apply(coefficient_matrix, 1, stats::sd)
@@ -636,6 +645,8 @@ select_transferable_features <- function(x_list,
   }
 
   score_df <- data.frame(
+    feature = feature_names,
+    row_index = row_index,
     mean_abs = mean_abs,
     sd = sd_coeff,
     min_abs = min_abs,
@@ -645,5 +656,7 @@ select_transferable_features <- function(x_list,
   )
 
   score_df <- score_df[keep, , drop = FALSE]
-  score_df[order(score_df$score, decreasing = TRUE), , drop = FALSE]
+  score_df <- score_df[order(score_df$score, decreasing = TRUE), , drop = FALSE]
+  rownames(score_df) <- NULL
+  score_df
 }

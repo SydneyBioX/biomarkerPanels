@@ -19,7 +19,10 @@
 #'   [define_objectives()].
 #' @param max_features Maximum number of biomarkers permitted in a panel.
 #' @param feature_pool Optional subset of feature identifiers (names or integer
-#'   indices) considered during optimization. Defaults to all features.
+#'   indices) considered during optimization. When a cohort aggregator is used,
+#'   specify the underlying (pre-aggregation) feature names; aggregated labels
+#'   such as `"A--B"` are also accepted and will be mapped back to their
+#'   constituents. Defaults to all features.
 #' @param cohort_aggregator Transformation applied to cohort feature matrices
 #'   prior to alignment. Defaults to `"pairwise_ratios"`, which generates
 #'   pairwise within-cohort contrasts via [`pairwise_col_diff()`] to dampen
@@ -61,7 +64,59 @@ optimize_panel <- function(x, y,
     stop("`cohort_aggregator` must be one of 'pairwise_ratios' or 'none'.", call. = FALSE)
   }
 
-  inputs <- .prepare_cohort_inputs(x, y, assay = assay, aggregator = cohort_aggregator)
+  inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, aggregator = "none")
+  raw_x_mat <- inputs_raw$x
+  raw_feature_names <- colnames(raw_x_mat)
+  if (is.null(raw_feature_names)) {
+    raw_feature_names <- sprintf("feature_%04d", seq_len(ncol(raw_x_mat)))
+    colnames(raw_x_mat) <- raw_feature_names
+  }
+
+  feature_pool_arg <- feature_pool
+  feature_pool_base <- raw_feature_names
+  feature_pool_final <- NULL
+
+  if (!is.null(feature_pool_arg)) {
+    if (is.numeric(feature_pool_arg)) {
+      feature_pool_base <- .resolve_feature_pool(feature_pool_arg, raw_feature_names)
+    } else {
+      feature_pool_arg <- unique(feature_pool_arg)
+      missing_raw <- setdiff(feature_pool_arg, raw_feature_names)
+      if (!length(missing_raw)) {
+        feature_pool_base <- feature_pool_arg
+      } else if (
+        cohort_aggregator != "none" &&
+        all(grepl("--", feature_pool_arg, fixed = TRUE))
+      ) {
+        components <- unique(unlist(strsplit(feature_pool_arg, "--", fixed = TRUE)))
+        missing_components <- setdiff(components, raw_feature_names)
+        if (length(missing_components)) {
+          stop(
+            "Feature(s) referenced in `feature_pool` not found in training data: ",
+            paste(missing_components, collapse = ", "),
+            call. = FALSE
+          )
+        }
+        feature_pool_base <- components
+        feature_pool_final <- feature_pool_arg
+      } else {
+        missing <- setdiff(feature_pool_arg, raw_feature_names)
+        stop(
+          "Feature(s) not found in `x`: ",
+          paste(missing, collapse = ", "),
+          call. = FALSE
+        )
+      }
+    }
+  }
+
+  inputs <- .prepare_cohort_inputs(
+    x,
+    y,
+    assay = assay,
+    aggregator = cohort_aggregator,
+    feature_subset = feature_pool_base
+  )
   x_mat <- inputs$x
   truth <- inputs$truth
   cohort <- inputs$cohort
@@ -72,10 +127,10 @@ optimize_panel <- function(x, y,
     colnames(x_mat) <- feature_names
   }
 
-  if (is.null(feature_pool)) {
+  if (is.null(feature_pool_final)) {
     feature_pool <- feature_names
   } else {
-    feature_pool <- .resolve_feature_pool(feature_pool, feature_names)
+    feature_pool <- .resolve_feature_pool(feature_pool_final, feature_names)
   }
 
   if (!length(feature_pool)) {
@@ -258,6 +313,7 @@ optimize_panel <- function(x, y,
     control = list(
       max_features = max_features,
       feature_pool = feature_pool,
+      base_feature_pool = feature_pool_base,
       nsga2 = nsga_args,
       scoring_function = deparse(substitute(scoring_fn)),
       cohort_aggregator = cohort_aggregator,
@@ -272,6 +328,7 @@ optimize_panel <- function(x, y,
       p = ncol(x_mat),
       class_balance = table(truth),
       feature_pool_size = length(feature_pool),
+      base_feature_pool_size = length(feature_pool_base),
       num_cohorts = length(inputs$cohort_names),
       cohort_labels = inputs$cohort_names,
       cohort_counts = inputs$cohort_counts
@@ -329,7 +386,9 @@ optimize_panel <- function(x, y,
   logistic_scores
 }
 
-.prepare_cohort_inputs <- function(x, y, assay = NULL, aggregator = "none") {
+.prepare_cohort_inputs <- function(x, y, assay = NULL,
+                                   aggregator = "none",
+                                   feature_subset = NULL) {
   if (is.list(x)) {
     if (!is.list(y)) {
       stop("When `x` is a list, `y` must also be a list.", call. = FALSE)
@@ -352,8 +411,6 @@ optimize_panel <- function(x, y,
       }
     }
 
-    matrices <- .apply_cohort_aggregator(matrices, aggregator)
-
     feature_sets <- lapply(matrices, colnames)
     # TODO(#transferability): support more flexible feature alignment strategies.
     common_features <- Reduce(intersect, feature_sets)
@@ -362,6 +419,38 @@ optimize_panel <- function(x, y,
         "No shared features were found across cohorts. Provide data with ",
         "overlapping feature identifiers (future releases will support more ",
         "flexible alignment).",
+        call. = FALSE
+      )
+    }
+    ordered_features <- feature_sets[[1]][feature_sets[[1]] %in% common_features]
+    matrices <- lapply(matrices, function(mat) {
+      mat[, ordered_features, drop = FALSE]
+    })
+
+    if (!is.null(feature_subset)) {
+      missing <- setdiff(feature_subset, ordered_features)
+      if (length(missing)) {
+        stop(
+          "Feature(s) not found across all cohorts: ",
+          paste(missing, collapse = ", "),
+          call. = FALSE
+        )
+      }
+      matrices <- lapply(matrices, function(mat) {
+        mat[, feature_subset, drop = FALSE]
+      })
+    }
+
+    matrices <- .apply_cohort_aggregator(matrices, aggregator)
+
+    feature_sets <- lapply(matrices, colnames)
+    if (any(vapply(feature_sets, is.null, logical(1)))) {
+      stop("Aggregator produced matrices without column names.", call. = FALSE)
+    }
+    common_features <- Reduce(intersect, feature_sets)
+    if (is.null(common_features) || !length(common_features)) {
+      stop(
+        "No shared features were found across cohorts after aggregation.",
         call. = FALSE
       )
     }
@@ -403,7 +492,24 @@ optimize_panel <- function(x, y,
     if (is.null(colnames(x_mat))) {
       colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
     }
+
+    if (!is.null(feature_subset)) {
+      missing <- setdiff(feature_subset, colnames(x_mat))
+      if (length(missing)) {
+        stop(
+          "Feature(s) not found in `x`: ",
+          paste(missing, collapse = ", "),
+          call. = FALSE
+        )
+      }
+      x_mat <- x_mat[, feature_subset, drop = FALSE]
+    }
+
     x_mat <- .apply_cohort_aggregator(list(x_mat), aggregator)[[1]]
+    if (is.null(colnames(x_mat))) {
+      stop("`x` must have column names in order to align with panel features.",
+           call. = FALSE)
+    }
     cohort_names <- "cohort_01"
     list(
       x = x_mat,

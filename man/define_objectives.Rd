@@ -18,7 +18,8 @@ define_objectives(
 \item{custom}{Optional named list of objective descriptors with elements
 \code{label}, \code{direction}, and \code{fun}.}
 
-\item{params}{Named list of additional argument lists for specific losses.}
+\item{params}{Named list of additional argument lists for specific losses
+(e.g., custom cutoff probabilities for sensitivity).}
 
 \item{directions}{Optional named vector overriding loss directions.}
 }

@@ -11,34 +11,57 @@ evaluate_panel(
   objectives = define_objectives(losses = c("sensitivity", "specificity", "c_index")),
   cohort = NULL,
   assay = NULL,
-  scoring_fn = NULL
+  scoring_fn = NULL,
+  cohort_aggregator = NULL,
+  cutoff_prob = 0.5,
+  positive = "Yes"
 )
 }
 \arguments{
 \item{panel}{A \code{BiomarkerPanelResult}.}
 
-\item{x}{Validation feature matrix, \code{data.frame}, or \code{SummarizedExperiment}.}
+\item{x}{Validation feature matrix, \code{data.frame}, \code{SummarizedExperiment}, or a
+list of such objects for multi-cohort evaluation.}
 
-\item{y}{Validation binary response factor.}
+\item{y}{Validation binary response factor (or list of factors when \code{x} is a
+list).}
 
 \item{objectives}{Optional override for objectives. Defaults to sensitivity,
 specificity, and c_index.}
 
-\item{cohort}{Optional factor identifying cohort membership for each sample.}
+\item{cohort}{Optional factor identifying cohort membership for each sample
+when \code{x} represents a single cohort. Ignored when \code{x} is provided as a list.}
 
 \item{assay}{For \code{SummarizedExperiment} inputs, assay name or index to use.}
 
 \item{scoring_fn}{Optional custom scoring function. If \code{NULL}, uses the
 default row-mean aggregation. Must have signature
 \verb{function(x_selected, selected_features, truth, ...)}.}
+
+\item{cohort_aggregator}{Optional transformation applied to \code{x} before
+evaluation. Defaults to the aggregator stored in the fitted panel
+(currently \code{"pairwise_ratios"}), keeping training and validation pipelines
+aligned. Future work: expose richer harmonisation options.}
+
+\item{cutoff_prob}{Classification probability threshold used for confusion
+matrix summaries and highlight point on the ROC curve. Defaults to \code{0.5}.}
+
+\item{positive}{Label treated as the positive class when computing confusion
+matrices; defaults to \code{"Yes"}.}
 }
 \value{
-A list with \code{metrics} (named numeric vector) and \code{objectives}
-(data.frame with columns objective, value, direction).
+A list with \code{metrics} (named numeric vector), \code{objectives}
+(data.frame with columns objective, value, direction), \code{confusion}
+(2x2 matrix of counts), and \code{roc} (list containing a \code{curve} data.frame,
+\code{highlight} point, optional \code{plot}, and \code{evalm} helper data).
 }
 \description{
 Compute objective values and additional summary statistics for a fitted panel
 on validation data. This function extracts the selected features from the
-validation set and computes predictions using the default scoring function
-(row means of selected features).
+validation set and computes predictions using the default scoring function:
+a logistic regression fit on the selected features (with a centred/standardised
+fallback if the model fails to converge).
+When evaluating multiple cohorts, feature alignment is performed via the
+simple intersection of shared column names; future releases will offer more
+flexible strategies.
 }

@@ -21,5 +21,5 @@ Named list of objective descriptors.
 Creates a list compatible with \code{\link[=define_objectives]{define_objectives()}} where each entry contains
 the loss label, optimization direction, and an evaluation function with the
 signature \verb{(truth, estimate, selected = NULL)}. Additional parameters may be
-supplied per loss via the \code{params} list (e.g., custom thresholds).
+supplied per loss via the \code{params} list (e.g., custom cutoffs).
 }

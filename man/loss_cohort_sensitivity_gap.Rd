@@ -8,7 +8,7 @@ loss_cohort_sensitivity_gap(
   truth,
   scores = NULL,
   selected = NULL,
-  threshold = 0.5,
+  cutoff_prob = 0.5,
   positive = "Yes",
   cohort = NULL
 )
@@ -20,7 +20,7 @@ loss_cohort_sensitivity_gap(
 
 \item{selected}{Ignored; kept for signature compatibility.}
 
-\item{threshold}{Classification threshold applied to \code{scores}.}
+\item{cutoff_prob}{Classification probability cutoff applied to \code{scores}.}
 
 \item{positive}{Label treated as the positive ("event") class.}
 

@@ -60,3 +60,9 @@ Fits ridge-penalised logistic regression models for each cohort and selects
 features whose coefficients are both large in magnitude and consistent across
 cohorts. This emphasises biomarkers that deliver transferable signal.
 }
+\details{
+Features are currently aligned across cohorts via a simple
+intersection of shared column names. Future versions will add more flexible
+harmonisation strategies (e.g., imputation or reference-based mapping).
+I promise I'll get to this lol #TODO
+}
