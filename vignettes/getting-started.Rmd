@@ -53,12 +53,28 @@ package build, these files would live in `inst/extdata/`; here we reuse the
 fixture directly.
 
 ```{r load-fixture}
-# fixture_path <- system.file("test-data", "fake_gene_expression.Rds", package = "biomarkerPanels")
-# if (fixture_path == "") {
-#   fixture_path <- file.path("./tests", "data", "fake_gene_expression.Rds")
-# }
-# stopifnot(file.exists(fixture_path)) # didn't exist for some reason. 
-cohorts <- readRDS("/dskh/nobackup/harryr/moo/tests/data/fake_gene_expression.Rds")
+fixture_candidates <- c(
+  system.file("extdata", "fake_gene_expression.Rds", package = "biomarkerPanels"),
+  system.file("test-data", "fake_gene_expression.Rds", package = "biomarkerPanels"),
+  file.path("..", "tests", "data", "fake_gene_expression.Rds"),
+  file.path("..", "..", "tests", "data", "fake_gene_expression.Rds")
+)
+fixture_candidates <- fixture_candidates[nzchar(fixture_candidates)]
+fixture_path <- NULL
+for (candidate in fixture_candidates) {
+  if (file.exists(candidate)) {
+    fixture_path <- candidate
+    break
+  }
+}
+if (is.null(fixture_path)) {
+  stop(
+    "Unable to locate `fake_gene_expression.Rds`. ",
+    "Regenerate it via `data-raw/simulate_gene_expression.R` if needed.",
+    call. = FALSE
+  )
+}
+cohorts <- readRDS(fixture_path)
 
 lapply(cohorts$x_list, dim)
 colnames(cohorts$x_list[[1]])[1:6]
