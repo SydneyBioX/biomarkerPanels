@@ -1,5 +1,9 @@
 # biomarkerPanels <img src="src/moo_hexsticker.png" alt="biomarkerPanels hex sticker" align="right" width="150"/>
 
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/SydneyBioX/moo/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/SydneyBioX/moo/actions/workflows/R-CMD-check.yaml)
+<!-- badges: end -->
+
 Multi-objective optimization (moo) for discovering biomarker panels
 with constrained performance targets. This package is designed for integration
 with Bioconductor ecosystems (s4 classes) and supports high-dimensional datasets.

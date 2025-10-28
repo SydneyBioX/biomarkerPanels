@@ -83,7 +83,7 @@ for (i in dataset_ids) {
 names(x_list) <- sprintf("x%d", dataset_ids)
 names(y_list) <- sprintf("y%d", dataset_ids)
 
-output <- list(
+simulated_gene_expression <- list(
   metadata = list(
     seed = 20240220,
     n_samples = n_samples,
@@ -98,5 +98,4 @@ output <- list(
 )
 
 cat("Simulation complete. Saved to simulated_gene_expression.Rds\n")
-
-usethis::use_data(simulated_gene_expression, overwrite = TRUE)
+usethis::use_data(simulated_gene_expression, compress = "xz")

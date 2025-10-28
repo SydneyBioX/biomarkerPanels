@@ -8,3 +8,4 @@
 ^tests/data$
 ^simulated_gene_expression\.Rds$
 ^\.Rproj\.user$
+^\.github$

@@ -58,8 +58,9 @@ fixture directly.
 #   fixture_path <- file.path("./tests", "data", "fake_gene_expression.Rds")
 # }
 # stopifnot(file.exists(fixture_path)) # didn't exist for some reason. 
-cohorts <- readRDS("/dskh/nobackup/harryr/moo/tests/data/fake_gene_expression.Rds")
-
+# cohorts <- readRDS("/dskh/nobackup/harryr/moo/tests/data/fake_gene_expression.Rds")
+data(simulated_gene_expression, package = "biomarkerPanels")
+cohorts = simulated_gene_expression
 lapply(cohorts$x_list, dim)
 colnames(cohorts$x_list[[1]])[1:6]
 ```
