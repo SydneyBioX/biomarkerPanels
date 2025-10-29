@@ -1,12 +1,8 @@
 # biomarkerPanels <img src="src/moo_hexsticker.png" alt="biomarkerPanels hex sticker" align="right" width="150"/>
 
-<!-- badges: start -->
-[![R-CMD-check](https://github.com/SydneyBioX/moo/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/SydneyBioX/moo/actions/workflows/R-CMD-check.yaml)
-<!-- badges: end -->
-
-Multi-objective optimization (moo) for discovering biomarker panels
+Multi-objective optimization for discovering biomarker panels
 with constrained performance targets. This package is designed for integration
-with Bioconductor ecosystems (s4 classes) and supports high-dimensional datasets.
+with Bioconductor ecosystems and supports high-dimensional datasets.
 
 ## Key Features
 - Multi-objective search balancing sensitivity, specificity, and custom costs.
@@ -25,7 +21,7 @@ with Bioconductor ecosystems (s4 classes) and supports high-dimensional datasets
 - `inst/extdata/`: example datasets bundled with the package.
 - `tests/`: testthat suite and reusable fixtures.
 - `vignettes/`: R Markdown tutorials for end-to-end workflows.
-- `src/`: optional C++ code for high-performance components.
+- `src/`: C++ code for certain components.
 
 ## Getting Started
 Development installation will use:
@@ -34,7 +30,3 @@ Development installation will use:
 # install.packages("remotes")
 remotes::install_github("SydneyBioX/moo")
 ```
-
-## Contributing
-We welcome contributions. Please open an issue to discuss new objectives,
-optimizers, or dataset support before submitting pull requests.

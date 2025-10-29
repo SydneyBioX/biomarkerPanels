@@ -151,3 +151,26 @@ test_that("pairwise cohort aggregator produces contrast features", {
   expect_equal(res@control$cohort_aggregator, "pairwise_ratios")
   expect_true(all(grepl("--", res@control$feature_pool)))
 })
+
+test_that("feature_pool accepts base features with pairwise aggregator", {
+  set.seed(777)
+  x <- matrix(rnorm(60), nrow = 20, ncol = 3)
+  colnames(x) <- c("GeneA", "GeneB", "GeneC")
+  y <- factor(sample(c("No", "Yes"), 20, replace = TRUE), levels = c("No", "Yes"))
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    max_features = 1,
+    feature_pool = c("GeneA", "GeneC"),
+    cohort_aggregator = "pairwise_ratios",
+    nsga_control = list(popsize = 12, generations = 5)
+  )
+
+  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_equal(sort(res@control$base_feature_pool), sort(c("GeneA", "GeneC")))
+  expect_true(all(grepl("--", res@features, fixed = TRUE)))
+  components <- unique(unlist(strsplit(res@features, "--", fixed = TRUE)))
+  expect_true(all(components %in% c("GeneA", "GeneC")))
+})

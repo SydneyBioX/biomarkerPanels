@@ -12,7 +12,9 @@ evaluate_panel(
   cohort = NULL,
   assay = NULL,
   scoring_fn = NULL,
-  cohort_aggregator = NULL
+  cohort_aggregator = NULL,
+  cutoff_prob = 0.5,
+  positive = "Yes"
 )
 }
 \arguments{
@@ -40,10 +42,18 @@ default row-mean aggregation. Must have signature
 evaluation. Defaults to the aggregator stored in the fitted panel
 (currently \code{"pairwise_ratios"}), keeping training and validation pipelines
 aligned. Future work: expose richer harmonisation options.}
+
+\item{cutoff_prob}{Classification probability threshold used for confusion
+matrix summaries and highlight point on the ROC curve. Defaults to \code{0.5}.}
+
+\item{positive}{Label treated as the positive class when computing confusion
+matrices; defaults to \code{"Yes"}.}
 }
 \value{
-A list with \code{metrics} (named numeric vector) and \code{objectives}
-(data.frame with columns objective, value, direction).
+A list with \code{metrics} (named numeric vector), \code{objectives}
+(data.frame with columns objective, value, direction), \code{confusion}
+(2x2 matrix of counts), and \code{roc} (list containing a \code{curve} data.frame,
+\code{highlight} point, optional \code{plot}, and \code{evalm} helper data).
 }
 \description{
 Compute objective values and additional summary statistics for a fitted panel

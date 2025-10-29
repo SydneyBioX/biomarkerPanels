@@ -4,6 +4,9 @@
 .DS_Store
 .Rproj.user
 inst/doc
+src/*.o
+src/*.so
+src/*.dll
 *.Rcheck/
 analysis/
 *.o
