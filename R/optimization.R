@@ -305,6 +305,11 @@ optimize_panel <- function(x, y,
     )
   }))
 
+  # Fit the final model on the selected features for storage
+  selected_features <- primary_solution$features
+  x_selected <- x_pool[, selected_features, drop = FALSE]
+  final_model <- .fit_final_model(x_selected, truth, cohort)
+
   panel <- new(
     "BiomarkerPanelResult",
     features = primary_solution$features,
@@ -332,7 +337,8 @@ optimize_panel <- function(x, y,
       num_cohorts = length(inputs$cohort_names),
       cohort_labels = inputs$cohort_names,
       cohort_counts = inputs$cohort_counts
-    )
+    ),
+    model = final_model
   )
 
   panel
@@ -368,6 +374,10 @@ optimize_panel <- function(x, y,
       .response = as.integer(truth) - 1L,
       as.data.frame(x_selected, check.names = TRUE)
     )
+    # Add cohort as a covariate if provided and has multiple levels
+    if (!is.null(cohort) && length(unique(cohort)) > 1L) {
+      df$.cohort <- factor(cohort)
+    }
     fit <- suppressWarnings(stats::glm(.response ~ ., data = df, family = stats::binomial()))
     preds <- stats::predict(fit, type = "response")
     if (length(preds) != nrow(x_selected) || anyNA(preds)) {
@@ -384,6 +394,33 @@ optimize_panel <- function(x, y,
   })
 
   logistic_scores
+}
+
+# Fit and return the final model for storage in BiomarkerPanelResult
+.fit_final_model <- function(x_selected, truth, cohort = NULL) {
+  if (is.null(x_selected) || ncol(x_selected) == 0L) {
+    return(NULL)
+  }
+
+  tryCatch({
+    df <- data.frame(
+      .response = as.integer(truth) - 1L,
+      as.data.frame(x_selected, check.names = TRUE)
+    )
+    # Add cohort as a covariate if provided and has multiple levels
+    if (!is.null(cohort) && length(unique(cohort)) > 1L) {
+      df$.cohort <- factor(cohort)
+    }
+    fit <- suppressWarnings(stats::glm(.response ~ ., data = df, family = stats::binomial()))
+    fit
+  }, error = function(e) {
+    warning(
+      "Failed to fit final model: ",
+      conditionMessage(e),
+      call. = FALSE
+    )
+    NULL
+  })
 }
 
 .prepare_cohort_inputs <- function(x, y, assay = NULL,

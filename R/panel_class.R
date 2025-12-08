@@ -8,6 +8,7 @@
 #' @slot objectives Data frame describing objective values per candidate solution.
 #' @slot control List of optimization control parameters.
 #' @slot training_data Signature of the training dataset (e.g., sample and assay info).
+#' @slot model Fitted model object (e.g., glm) trained on the selected features.
 #' @export
 setClass(
   "BiomarkerPanelResult",
@@ -16,7 +17,8 @@ setClass(
     metrics = "numeric",
     objectives = "data.frame",
     control = "list",
-    training_data = "list"
+    training_data = "list",
+    model = "ANY"
   )
 )
 
@@ -36,5 +38,24 @@ setMethod(
   signature = "BiomarkerPanelResult",
   definition = function(object) {
     object@metrics
+  }
+)
+
+#' Panel Model Accessor
+#'
+#' Retrieve the fitted model from a `BiomarkerPanelResult` object.
+#'
+#' @param object A `BiomarkerPanelResult`.
+#' @return The fitted model object (e.g., glm).
+#' @export
+setGeneric("panel_model", function(object) standardGeneric("panel_model"))
+
+#' @describeIn panel_model Return the fitted model.
+#' @export
+setMethod(
+  "panel_model",
+  signature = "BiomarkerPanelResult",
+  definition = function(object) {
+    object@model
   }
 )

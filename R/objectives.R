@@ -105,3 +105,69 @@ min_metric_constraint <- function(loss,
     direction = direction
   )
 }
+
+#' Define Objectives with Neyman-Pearson Sensitivity Constraint
+#'
+#' Convenience wrapper for "rule-out" diagnostic optimization. Instead of
+#' treating sensitivity as an objective to be traded off, it becomes a hard
+#' constraint: solutions with sensitivity below `sens_constraint` are excluded
+#' from the Pareto front. This focuses optimization on clinically valid
+#' rule-out solutions only.
+#'
+#' @param losses Character vector of loss names to optimize. Should typically
+#'   exclude `"sensitivity"` when using constraint mode; if included, it will
+#'   be removed with a warning.
+#' @param sens_constraint Minimum sensitivity threshold. Solutions below this
+#'   value receive infinite objective penalties and are excluded. Set to `NULL`
+#'   to disable constraint mode.
+#' @param sens_cutoff Classification probability cutoff for sensitivity
+#'
+#'   calculation (default 0.5).
+#' @param params Named list of additional parameters passed to
+#'   [define_objectives()] (e.g., `list(pauc = list(sens_floor = 0.90))`).
+#' @param ... Additional arguments passed to [define_objectives()].
+#' @return A list with two elements:
+#'   \describe{
+#'     \item{objectives}{Named list of objective descriptors for [optimize_panel()].}
+#'     \item{constraints}{List of constraint descriptors for [optimize_panel()].}
+#'   }
+#' @examples
+#' # Optimize panel size and pAUC, requiring sensitivity >= 0.95
+#' config <- define_ruleout_objectives(
+#'   losses = c("num_features", "pauc"),
+#'   sens_constraint = 0.95,
+#'   params = list(pauc = list(sens_floor = 0.90))
+#' )
+#'
+#' # Use with optimize_panel:
+#' # panel <- optimize_panel(x, y,
+#' #   objectives = config$objectives,
+#' #   constraints = config$constraints
+#' # )
+#' @export
+define_ruleout_objectives <- function(losses = c("num_features", "specificity"),
+                                      sens_constraint = 0.90,
+                                      sens_cutoff = 0.5,
+                                      params = list(),
+                                      ...) {
+  if ("sensitivity" %in% losses && !is.null(sens_constraint)) {
+    warning("Removing 'sensitivity' from objectives since sens_constraint is set.",
+            call. = FALSE)
+    losses <- setdiff(losses, "sensitivity")
+  }
+
+  objectives <- define_objectives(losses = losses, params = params, ...)
+
+  constraints <- if (!is.null(sens_constraint)) {
+    list(min_metric_constraint(
+      "sensitivity",
+      threshold = sens_constraint,
+      params = list(cutoff_prob = sens_cutoff),
+      label = sprintf("sens >= %.2f", sens_constraint)
+    ))
+  } else {
+    list()
+  }
+
+  list(objectives = objectives, constraints = constraints)
+}

@@ -272,6 +272,63 @@ loss_max_cohort_brier <- function(truth, scores = NULL, selected = NULL,
   max(values, na.rm = TRUE)
 }
 
+#' Partial AUC in a Sensitivity-Focused Region
+#'
+#' Computes the partial area under the ROC curve restricted to sensitivity
+#' values at or above a specified floor. Useful for "rule-out" diagnostic
+#' contexts where high sensitivity is mandatory. Uses [pROC::auc()] with
+#' `partial.auc.focus = "sens"`.
+#'
+#' @inheritParams loss_sensitivity
+#' @param sens_floor Minimum sensitivity threshold defining the pAUC region
+#'   (default 0.90). The partial AUC is computed only where sensitivity >= this
+#'   value.
+#' @param partial_auc_correct Logical; apply McClish correction to normalize
+#'   partial AUC to 0-1 scale (default TRUE).
+#' @return Partial AUC value, or `NA_real_` if computation fails.
+#' @export
+loss_pauc <- function(truth, scores = NULL, selected = NULL,
+                      positive = "Yes", sens_floor = 0.90,
+                      partial_auc_correct = TRUE) {
+  if (!requireNamespace("pROC", quietly = TRUE)) {
+    stop("The 'pROC' package is required for partial AUC. ",
+         "Install it via install.packages('pROC').", call. = FALSE)
+  }
+  truth <- ensure_binary_response(truth)
+  if (is.null(scores)) {
+    stop("`scores` must be supplied to compute partial AUC.", call. = FALSE)
+  }
+
+  if (sens_floor < 0 || sens_floor > 1) {
+    stop("`sens_floor` must be between 0 and 1.", call. = FALSE)
+  }
+
+  tryCatch({
+    # pROC expects: response = truth, predictor = scores
+    # partial.auc = c(sens_floor, 1) means sensitivity range [sens_floor, 1]
+    # partial.auc.focus = "sens" focuses on sensitivity axis
+    roc_obj <- pROC::roc(
+      response = truth,
+      predictor = scores,
+      levels = c(setdiff(levels(truth), positive), positive),
+      direction = "<",
+      quiet = TRUE
+    )
+
+    pauc <- pROC::auc(
+      roc_obj,
+      partial.auc = c(sens_floor, 1),
+      partial.auc.focus = "sens",
+      partial.auc.correct = partial_auc_correct
+    )
+
+    as.numeric(pauc)
+  }, error = function(e) {
+    warning("Partial AUC computation failed: ", conditionMessage(e), call. = FALSE)
+    NA_real_
+  })
+}
+
 #' Maximum Mean Shift Across Cohorts
 #'
 #' Computes pairwise distances between cohort-specific mean expression vectors
@@ -353,6 +410,9 @@ loss_max_cohort_mean_shift <- function(truth, scores = NULL, selected = NULL,
 .register_default_loss(
   "max_cohort_mean_shift", loss_max_cohort_mean_shift, "minimize",
   "Maximum Cohort Mean Shift"
+)
+.register_default_loss(
+  "pauc", loss_pauc, "maximize", "Partial AUC (High Sensitivity)"
 )
 
 #' Register a loss function.

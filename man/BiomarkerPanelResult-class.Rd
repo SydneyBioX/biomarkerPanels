@@ -20,5 +20,7 @@ performance summaries, and optimization metadata.
 \item{\code{control}}{List of optimization control parameters.}
 
 \item{\code{training_data}}{Signature of the training dataset (e.g., sample and assay info).}
+
+\item{\code{model}}{Fitted model object (e.g., glm) trained on the selected features.}
 }}
 

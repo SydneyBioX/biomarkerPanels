@@ -100,21 +100,70 @@ evaluate_panel <- function(panel, x, y,
 
   x_selected <- x_mat[, selected, drop = FALSE]
 
-  if (is.null(scoring_fn)) {
+  # Check if panel has a stored model - use it for prediction if available
+  stored_model <- panel@model
+  if (!is.null(stored_model) && is.null(scoring_fn)) {
+    # Use the stored model for prediction (true out-of-sample evaluation)
+    scores <- tryCatch({
+      newdata <- as.data.frame(x_selected, check.names = TRUE)
+
+      # Get expected column names from the model (excluding .response and .cohort)
+      model_cols <- names(stored_model$model)
+      feature_cols <- setdiff(model_cols, c(".response", ".cohort"))
+
+      # Ensure newdata column names match model's expected names
+      # The model was fit with check.names=TRUE, so feature names may differ
+      if (length(feature_cols) == ncol(x_selected)) {
+        names(newdata) <- feature_cols
+      }
+
+      # Add cohort if the model was trained with cohort
+      if (".cohort" %in% names(stored_model$model)) {
+        if (length(unique(cohort_vec)) > 1L) {
+          newdata$.cohort <- factor(cohort_vec)
+        } else {
+          # If validation has only one cohort, use the first training cohort level
+          train_cohort_levels <- levels(stored_model$model$.cohort)
+          newdata$.cohort <- factor(rep(train_cohort_levels[1], nrow(newdata)),
+                                    levels = train_cohort_levels)
+        }
+      }
+      preds <- stats::predict(stored_model, newdata = newdata, type = "response")
+      if (length(preds) != nrow(x_selected) || anyNA(preds)) {
+        stop("Invalid predictions from stored model.")
+      }
+      as.numeric(preds)
+    }, error = function(e) {
+      warning(
+        "Failed to use stored model, falling back to refitting: ",
+        conditionMessage(e),
+        call. = FALSE
+      )
+      NULL
+    })
+
+    # If stored model prediction failed, fall back to default scoring
+    if (is.null(scores)) {
+      scoring_fn <- .default_scoring_fn
+    }
+  } else if (is.null(scoring_fn)) {
     scoring_fn <- .default_scoring_fn
   }
 
-  if (!is.function(scoring_fn)) {
-    stop("`scoring_fn` must be a function.", call. = FALSE)
-  }
+  # If scores not yet computed (no stored model or it failed), use scoring_fn
+ if (!exists("scores") || is.null(scores)) {
+    if (!is.function(scoring_fn)) {
+      stop("`scoring_fn` must be a function.", call. = FALSE)
+    }
 
-  score_args <- list(
-    x_selected = x_selected,
-    selected_features = selected,
-    truth = truth,
-    cohort = cohort_vec
-  )
-  scores <- do.call(scoring_fn, score_args)
+    score_args <- list(
+      x_selected = x_selected,
+      selected_features = selected,
+      truth = truth,
+      cohort = cohort_vec
+    )
+    scores <- do.call(scoring_fn, score_args)
+  }
 
   if (!is.numeric(scores) || length(scores) != length(truth)) {
     stop("`scoring_fn` must return a numeric vector matching the number of samples.",
