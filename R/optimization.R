@@ -26,9 +26,11 @@
 #' @param cohort_aggregator Transformation applied to cohort feature matrices
 #'   prior to alignment. Defaults to `"pairwise_ratios"`, which generates
 #'   pairwise within-cohort contrasts via [`pairwise_col_diff()`] to dampen
-#'   distributional shifts across sites. Future work: support additional
-#'   harmonisation strategies (e.g., empirical Bayes, domain adversarial
-#'   mappings).
+#'   distributional shifts across sites. Other built-in options include
+#'   `"pairwise_log_ratios"` (log-ratios for compositional data),
+#'   `"reference_norm"` (normalize relative to a reference feature), and
+#'   `"none"` (no transformation). Use [`register_aggregator()`] to add custom
+#'   strategies. See [`aggregator_registry()`] for available options.
 #' @param constraints Optional list of constraint descriptors (e.g.,
 #'   from [min_metric_constraint()]) that must evaluate to `TRUE` for a candidate
 #'   solution to be considered feasible.
@@ -48,7 +50,7 @@ optimize_panel <- function(x, y,
                            ),
                            max_features = 5L,
                            feature_pool = NULL,
-                           cohort_aggregator = c("pairwise_ratios", "none"),
+                           cohort_aggregator = "pairwise_ratios",
                            constraints = list(),
                            scoring_fn = NULL,
                            nsga_control = list(),
@@ -58,10 +60,18 @@ optimize_panel <- function(x, y,
          call. = FALSE)
   }
 
-  if (is.character(cohort_aggregator)) {
-    cohort_aggregator <- match.arg(cohort_aggregator)
-  } else {
-    stop("`cohort_aggregator` must be one of 'pairwise_ratios' or 'none'.", call. = FALSE)
+  if (!is.character(cohort_aggregator) || length(cohort_aggregator) != 1L ||
+      !nzchar(cohort_aggregator)) {
+    stop("`cohort_aggregator` must be a single non-empty character string.", call. = FALSE)
+  }
+  if (!exists(cohort_aggregator, envir = .aggregator_registry, inherits = FALSE)) {
+    available <- ls(.aggregator_registry)
+    stop(
+      "Unknown aggregator '", cohort_aggregator, "'. ",
+      "Available: ", paste(available, collapse = ", "), ". ",
+      "Use register_aggregator() to add custom aggregators.",
+      call. = FALSE
+    )
   }
 
   inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, aggregator = "none")
@@ -474,7 +484,13 @@ optimize_panel <- function(x, y,
         )
       }
       matrices <- lapply(matrices, function(mat) {
-        mat[, feature_subset, drop = FALSE]
+        # Preserve reference_feature attribute through subsetting
+        ref_attr <- attr(mat, "reference_feature")
+        result <- mat[, feature_subset, drop = FALSE]
+        if (!is.null(ref_attr)) {
+          attr(result, "reference_feature") <- ref_attr
+        }
+        result
       })
     }
 
@@ -539,7 +555,12 @@ optimize_panel <- function(x, y,
           call. = FALSE
         )
       }
+      # Preserve reference_feature attribute through subsetting
+      ref_attr <- attr(x_mat, "reference_feature")
       x_mat <- x_mat[, feature_subset, drop = FALSE]
+      if (!is.null(ref_attr)) {
+        attr(x_mat, "reference_feature") <- ref_attr
+      }
     }
 
     x_mat <- .apply_cohort_aggregator(list(x_mat), aggregator)[[1]]
@@ -592,24 +613,8 @@ optimize_panel <- function(x, y,
   if (!length(matrices)) {
     return(matrices)
   }
-  if (identical(aggregator, "none")) {
-    return(matrices)
-  }
-  if (!aggregator %in% c("pairwise_ratios")) {
-    stop("Unsupported cohort aggregator: ", aggregator, call. = FALSE)
-  }
-  lapply(matrices, function(mat) {
-    if (ncol(mat) < 2L) {
-      warning(
-        "Aggregator '", aggregator,
-        "' requires at least two features; returning original matrix.",
-        call. = FALSE
-      )
-      return(mat)
-    }
-    # TODO(#transferability): explore ratio-based or domain-adaptive aggregators.
-    pairwise_col_diff(mat)
-  })
+  agg_spec <- .get_aggregator(aggregator)
+  lapply(matrices, agg_spec$fun)
 }
 
 .normalize_constraints <- function(constraints) {

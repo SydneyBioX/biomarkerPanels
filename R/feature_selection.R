@@ -293,6 +293,11 @@ select_transferable_features <- function(x_list,
            "`y_list[[", i, "]]`.", call. = FALSE)
     }
 
+    # Ensure feature names exist (columns of x_mat become rows of expr)
+    if (is.null(colnames(x_mat))) {
+      colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
+    }
+
     expr <- t(x_mat)
     design <- stats::model.matrix(~0 + y_vec)
     colnames(design) <- levels(y_vec)

@@ -6,9 +6,7 @@
 ^NEWS\.md$
 ^README\.md$
 ^tests/data$
-^simulated_gene_expression\.Rds$
 ^\.git$
 ^\.Rproj.user$
-^analysis$
 ^src/.*\\.(o|so|dll)$
 ^biomarkerPanels_.*\.tar\.gz$

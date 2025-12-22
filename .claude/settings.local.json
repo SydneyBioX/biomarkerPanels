@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(R:*)",
+      "Bash(Rscript:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(tree:*)",
+      "Bash(xargs -I {} bash -c 'head -1 \"\"{}\"\" | grep -q \"\"^#! \"\" && echo \"\"{}: script\"\" || echo \"\"{}\"\"')"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

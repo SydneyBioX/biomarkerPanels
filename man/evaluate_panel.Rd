@@ -39,9 +39,10 @@ default row-mean aggregation. Must have signature
 \verb{function(x_selected, selected_features, truth, ...)}.}
 
 \item{cohort_aggregator}{Optional transformation applied to \code{x} before
-evaluation. Defaults to the aggregator stored in the fitted panel
-(currently \code{"pairwise_ratios"}), keeping training and validation pipelines
-aligned. Future work: expose richer harmonisation options.}
+evaluation. Defaults to the aggregator stored in the fitted panel,
+keeping training and validation pipelines aligned. Must be a registered
+aggregator name (see \code{\link[=aggregator_registry]{aggregator_registry()}}). Built-in options include
+\code{"pairwise_ratios"}, \code{"pairwise_log_ratios"}, \code{"reference_norm"}, and \code{"none"}.}
 
 \item{cutoff_prob}{Classification probability threshold used for confusion
 matrix summaries and highlight point on the ROC curve. Defaults to \code{0.5}.}

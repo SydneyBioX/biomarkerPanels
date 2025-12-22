@@ -11,7 +11,7 @@ optimize_panel(
     "num_features")),
   max_features = 5L,
   feature_pool = NULL,
-  cohort_aggregator = c("pairwise_ratios", "none"),
+  cohort_aggregator = "pairwise_ratios",
   constraints = list(),
   scoring_fn = NULL,
   nsga_control = list(),
@@ -39,9 +39,11 @@ constituents. Defaults to all features.}
 \item{cohort_aggregator}{Transformation applied to cohort feature matrices
 prior to alignment. Defaults to \code{"pairwise_ratios"}, which generates
 pairwise within-cohort contrasts via \code{\link[=pairwise_col_diff]{pairwise_col_diff()}} to dampen
-distributional shifts across sites. Future work: support additional
-harmonisation strategies (e.g., empirical Bayes, domain adversarial
-mappings).}
+distributional shifts across sites. Other built-in options include
+\code{"pairwise_log_ratios"} (log-ratios for compositional data),
+\code{"reference_norm"} (normalize relative to a reference feature), and
+\code{"none"} (no transformation). Use \code{\link[=register_aggregator]{register_aggregator()}} to add custom
+strategies. See \code{\link[=aggregator_registry]{aggregator_registry()}} for available options.}
 
 \item{constraints}{Optional list of constraint descriptors (e.g.,
 from \code{\link[=min_metric_constraint]{min_metric_constraint()}}) that must evaluate to \code{TRUE} for a candidate

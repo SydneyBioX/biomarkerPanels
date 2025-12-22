@@ -23,9 +23,10 @@
 #'   default row-mean aggregation. Must have signature
 #'   `function(x_selected, selected_features, truth, ...)`.
 #' @param cohort_aggregator Optional transformation applied to `x` before
-#'   evaluation. Defaults to the aggregator stored in the fitted panel
-#'   (currently `"pairwise_ratios"`), keeping training and validation pipelines
-#'   aligned. Future work: expose richer harmonisation options.
+#'   evaluation. Defaults to the aggregator stored in the fitted panel,
+#'   keeping training and validation pipelines aligned. Must be a registered
+#'   aggregator name (see [`aggregator_registry()`]). Built-in options include
+#'   `"pairwise_ratios"`, `"pairwise_log_ratios"`, `"reference_norm"`, and `"none"`.
 #' @param cutoff_prob Classification probability threshold used for confusion
 #'   matrix summaries and highlight point on the ROC curve. Defaults to `0.5`.
 #' @param positive Label treated as the positive class when computing confusion
@@ -51,7 +52,17 @@ evaluate_panel <- function(panel, x, y,
   if (is.null(cohort_aggregator)) {
     cohort_aggregator <- if (is.null(stored_aggregator)) "none" else stored_aggregator
   } else {
-    cohort_aggregator <- match.arg(cohort_aggregator, c("pairwise_ratios", "none"))
+    if (!is.character(cohort_aggregator) || length(cohort_aggregator) != 1L) {
+      stop("`cohort_aggregator` must be a single character string.", call. = FALSE)
+    }
+    if (!exists(cohort_aggregator, envir = .aggregator_registry, inherits = FALSE)) {
+      available <- ls(.aggregator_registry)
+      stop(
+        "Unknown aggregator '", cohort_aggregator, "'. ",
+        "Available: ", paste(available, collapse = ", "),
+        call. = FALSE
+      )
+    }
   }
 
   if (is.list(x)) {

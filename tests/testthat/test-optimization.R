@@ -174,3 +174,95 @@ test_that("feature_pool accepts base features with pairwise aggregator", {
   components <- unique(unlist(strsplit(res@features, "--", fixed = TRUE)))
   expect_true(all(components %in% c("GeneA", "GeneC")))
 })
+
+# Integration tests for new aggregation strategies
+
+test_that("optimize_panel works with pairwise_log_ratios aggregator", {
+  set.seed(456)
+  sim <- simulate_expression_data(p = 20, n = 30, k = 1, seed = 43)
+  x <- sim$x_list[[1]]
+  # Ensure positive values for log-ratios
+  x <- abs(x) + 1
+  y <- sim$y_list[[1]]
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    max_features = 2,
+    cohort_aggregator = "pairwise_log_ratios",
+    nsga_control = list(popsize = 12, generations = 8)
+  )
+
+  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_equal(res@control$cohort_aggregator, "pairwise_log_ratios")
+  expect_true(all(grepl("/", res@control$feature_pool)))
+})
+
+test_that("optimize_panel works with reference_norm aggregator", {
+  set.seed(789)
+  sim <- simulate_expression_data(p = 15, n = 25, k = 1, seed = 44)
+  x <- sim$x_list[[1]]
+  y <- sim$y_list[[1]]
+
+  # Set reference feature attribute
+  attr(x, "reference_feature") <- colnames(x)[1]
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    max_features = 2,
+    cohort_aggregator = "reference_norm",
+    nsga_control = list(popsize = 12, generations = 8)
+  )
+
+  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_equal(res@control$cohort_aggregator, "reference_norm")
+})
+
+test_that("optimize_panel rejects unregistered aggregator", {
+  set.seed(123)
+  sim <- simulate_expression_data(p = 10, n = 20, k = 1, seed = 45)
+
+  expect_error(
+    optimize_panel(
+      x = sim$x_list[[1]],
+      y = sim$y_list[[1]],
+      objectives = define_objectives(losses = c("sensitivity", "specificity")),
+      max_features = 2,
+      cohort_aggregator = "nonexistent_aggregator",
+      nsga_control = list(popsize = 8, generations = 5)
+    ),
+    "Unknown aggregator"
+  )
+})
+
+test_that("custom aggregator can be registered and used", {
+  # Register custom aggregator
+  custom_agg <- function(x) {
+    # Simple centering aggregator
+    result <- scale(x, center = TRUE, scale = FALSE)
+    colnames(result) <- colnames(x)
+    result
+  }
+  register_aggregator("center_features", custom_agg, "Center each feature", overwrite = TRUE)
+
+  set.seed(321)
+  sim <- simulate_expression_data(p = 10, n = 20, k = 1, seed = 46)
+
+  res <- optimize_panel(
+    x = sim$x_list[[1]],
+    y = sim$y_list[[1]],
+    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    max_features = 2,
+    cohort_aggregator = "center_features",
+    nsga_control = list(popsize = 12, generations = 6)
+  )
+
+  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_equal(res@control$cohort_aggregator, "center_features")
+
+  # Clean up
+  rm("center_features", envir = .aggregator_registry)
+})

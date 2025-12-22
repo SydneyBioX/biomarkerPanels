@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Key Dependencies
+
+- **mco**: NSGA-II multi-objective optimization (`mco::nsga2()`)
+- **limma**: Differential expression analysis for feature ranking
+- **glmnet**: Ridge regression for transferability scoring
+- **SummarizedExperiment**: Bioconductor data structure support
+- **pROC** (suggested): Partial AUC computation for rule-out diagnostics
+
 ## Build Commands
 
 ```bash
@@ -36,6 +44,12 @@ This R package implements multi-objective optimization (NSGA-II via `mco`) for d
 3. **Optimization** (`R/optimization.R`): `optimize_panel()` runs NSGA-II search over feature weights, evaluating candidates via registered loss functions
 4. **Evaluation** (`R/evaluation.R`): `evaluate_panel()` computes validation metrics with ROC diagnostics
 
+**Main Entry Points:**
+- `optimize_panel()` - Run NSGA-II search to find Pareto-optimal panels
+- `evaluate_panel()` - Validate panel performance on held-out data
+- `define_objectives()` / `define_ruleout_objectives()` - Configure optimization targets
+- `get_top_de_features()` / `select_transferable_features()` - Pre-filter candidate features
+
 ### Key Abstractions
 
 **Loss Registry** (`R/loss_functions.R`):
@@ -45,7 +59,12 @@ This R package implements multi-objective optimization (NSGA-II via `mco`) for d
 
 **BiomarkerPanelResult** (`R/panel_class.R`):
 - S4 class storing selected features, metrics, Pareto-optimal solutions, and optimization settings
-- Access metrics via `panel_metrics(result)`
+- Access metrics via `panel_metrics(result)`, model via `panel_model(result)`
+
+**Pareto Solution Selection** (`R/panel_summarization.R`):
+- After optimization, multiple Pareto-optimal solutions exist
+- Use `select_panel_top_sensitivity()`, `select_panel_inclusion_frequency()`, or `select_panel_by_pathway()` to choose a final panel
+- `compute_inclusion_frequencies()` shows how often each feature appears across solutions
 
 **Cohort Aggregator**:
 - Default `"pairwise_ratios"` generates all pairwise column differences via Rcpp (`src/pairwise.cpp`)
@@ -65,3 +84,11 @@ Use `min_metric_constraint()` to enforce hard thresholds (e.g., minimum sensitiv
 ## Testing
 
 Test fixtures are loaded from `tests/data/` via `fixture_path()` helper in `tests/testthat/helper-data.R`.
+
+## Development Notes
+
+**Binary Response Labels**: The package standardizes all response vectors to factors with levels `c("No", "Yes")`. Use `ensure_binary_response()` to coerce diverse input formats.
+
+**C++ Code**: Rcpp functions in `src/pairwise.cpp` are registered via `useDynLib(biomarkerPanels, .registration = TRUE)` in NAMESPACE. After modifying C++ code, run `R CMD INSTALL .` to recompile.
+
+**Rule-Out Diagnostics**: For high-sensitivity screening applications, use `define_ruleout_objectives()` which converts sensitivity to a hard constraint and optimizes partial AUC (`loss_pauc`) in the high-sensitivity region.
