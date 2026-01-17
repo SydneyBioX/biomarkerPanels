@@ -17,7 +17,7 @@ CLAUDE.md
 .claude
 
 # R documentation
-docs/
+helper-docs/
 
 # inst files
 inst/doc

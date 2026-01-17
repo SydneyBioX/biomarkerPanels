@@ -328,3 +328,73 @@ test_that("loss_specificity_at_sensitivity works with build_objectives", {
   direct <- loss_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.95)
   expect_equal(result, direct)
 })
+
+# Tests for cutoff_dependent metadata
+test_that("loss registry includes cutoff_dependent field", {
+  registry <- loss_registry()
+
+  # Cutoff-dependent metrics should have cutoff_dependent = TRUE
+  expect_true(registry$sensitivity$cutoff_dependent)
+  expect_true(registry$specificity$cutoff_dependent)
+  expect_true(registry$balanced_accuracy$cutoff_dependent)
+  expect_true(registry$f1$cutoff_dependent)
+  expect_true(registry$precision$cutoff_dependent)
+  expect_true(registry$npv$cutoff_dependent)
+  expect_true(registry$min_cohort_sensitivity$cutoff_dependent)
+  expect_true(registry$min_cohort_specificity$cutoff_dependent)
+  expect_true(registry$cohort_sensitivity_gap$cutoff_dependent)
+
+  # Cutoff-free metrics should have cutoff_dependent = FALSE
+  expect_false(registry$auc$cutoff_dependent)
+  expect_false(registry$pauc$cutoff_dependent)
+  expect_false(registry$specificity_at_sensitivity$cutoff_dependent)
+  expect_false(registry$num_features$cutoff_dependent)
+  expect_false(registry$max_cohort_brier$cutoff_dependent)
+  expect_false(registry$max_cohort_mean_shift$cutoff_dependent)
+})
+
+test_that("min_metric_constraint warns for cutoff-dependent metrics", {
+  # Should warn for sensitivity
+
+  expect_warning(
+    min_metric_constraint("sensitivity", threshold = 0.9),
+    "depends on a probability cutoff"
+  )
+
+  # Should warn for specificity
+  expect_warning(
+    min_metric_constraint("specificity", threshold = 0.8),
+    "depends on a probability cutoff"
+  )
+
+  # Should NOT warn for AUC
+  expect_no_warning(
+    min_metric_constraint("auc", threshold = 0.8)
+  )
+
+  # Should NOT warn for specificity_at_sensitivity
+  expect_no_warning(
+    min_metric_constraint("specificity_at_sensitivity", threshold = 0.5)
+  )
+})
+
+test_that("register_loss_function accepts cutoff_dependent parameter", {
+  custom_cutoff <- function(truth, scores = NULL, selected = NULL, ...) 0.5
+  name <- paste0("custom_cutoff_", sample(1000, 1))
+
+  register_loss_function(
+    name, custom_cutoff,
+    direction = "maximize",
+    cutoff_dependent = TRUE,
+    overwrite = TRUE
+  )
+
+  registry <- loss_registry()
+  expect_true(registry[[name]]$cutoff_dependent)
+
+  # Should warn when used in constraint
+  expect_warning(
+    min_metric_constraint(name, threshold = 0.4),
+    "depends on a probability cutoff"
+  )
+})

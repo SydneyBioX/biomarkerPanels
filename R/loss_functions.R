@@ -604,46 +604,63 @@ loss_max_cohort_mean_shift <- function(truth, scores = NULL, selected = NULL,
 
 .loss_registry <- new.env(parent = emptyenv())
 
-.register_default_loss <- function(name, fun, direction, label) {
-  assign(name, list(fun = fun, direction = direction, label = label),
-         envir = .loss_registry)
+.register_default_loss <- function(name, fun, direction, label,
+                                    cutoff_dependent = FALSE) {
+  assign(name, list(
+    fun = fun,
+    direction = direction,
+    label = label,
+    cutoff_dependent = cutoff_dependent
+  ), envir = .loss_registry)
 }
 
+# Cutoff-dependent metrics (require probability threshold for classification)
 .register_default_loss(
-  "sensitivity", loss_sensitivity, "maximize", "Sensitivity"
+  "sensitivity", loss_sensitivity, "maximize", "Sensitivity",
+  cutoff_dependent = TRUE
 )
 .register_default_loss(
-  "specificity", loss_specificity, "maximize", "Specificity"
+  "specificity", loss_specificity, "maximize", "Specificity",
+  cutoff_dependent = TRUE
 )
+.register_default_loss(
+  "f1", loss_f1, "maximize", "F1 Score",
+  cutoff_dependent = TRUE
+)
+.register_default_loss(
+  "precision", loss_precision, "maximize", "Precision",
+  cutoff_dependent = TRUE
+)
+.register_default_loss(
+  "npv", loss_npv, "maximize", "Negative Predictive Value",
+  cutoff_dependent = TRUE
+)
+.register_default_loss(
+  "balanced_accuracy", loss_balanced_accuracy, "maximize", "Balanced Accuracy",
+  cutoff_dependent = TRUE
+)
+.register_default_loss(
+  "min_cohort_sensitivity", loss_min_cohort_sensitivity, "maximize",
+  "Minimum Cohort Sensitivity",
+  cutoff_dependent = TRUE
+)
+.register_default_loss(
+  "min_cohort_specificity", loss_min_cohort_specificity, "maximize",
+  "Minimum Cohort Specificity",
+  cutoff_dependent = TRUE
+)
+.register_default_loss(
+  "cohort_sensitivity_gap", loss_cohort_sensitivity_gap, "minimize",
+  "Cohort Sensitivity Gap",
+  cutoff_dependent = TRUE
+)
+
+# Cutoff-free metrics (do not depend on probability threshold)
 .register_default_loss(
   "auc", loss_auc, "maximize", "Area Under ROC Curve"
 )
 .register_default_loss(
-  "f1", loss_f1, "maximize", "F1 Score"
-)
-.register_default_loss(
-  "precision", loss_precision, "maximize", "Precision"
-)
-.register_default_loss(
-  "npv", loss_npv, "maximize", "Negative Predictive Value"
-)
-.register_default_loss(
   "num_features", loss_num_features, "minimize", "Number of Features"
-)
-.register_default_loss(
-  "balanced_accuracy", loss_balanced_accuracy, "maximize", "Balanced Accuracy"
-)
-.register_default_loss(
-  "min_cohort_sensitivity", loss_min_cohort_sensitivity, "maximize",
-  "Minimum Cohort Sensitivity"
-)
-.register_default_loss(
-  "min_cohort_specificity", loss_min_cohort_specificity, "maximize",
-  "Minimum Cohort Specificity"
-)
-.register_default_loss(
-  "cohort_sensitivity_gap", loss_cohort_sensitivity_gap, "minimize",
-  "Cohort Sensitivity Gap"
 )
 .register_default_loss(
   "max_cohort_brier", loss_max_cohort_brier, "minimize",
@@ -668,20 +685,30 @@ loss_max_cohort_mean_shift <- function(truth, scores = NULL, selected = NULL,
 #'   `truth`, `scores`, and `selected`.
 #' @param direction Either `"maximize"` or `"minimize"`.
 #' @param label Human-readable name.
+#' @param cutoff_dependent Logical; if `TRUE`, the loss depends on a probability
+#'   cutoff for classification (e.g., sensitivity, specificity). Cutoff-dependent
+#'   losses may not behave as expected in [min_metric_constraint()] because
+#'   their values depend on the arbitrary `cutoff_prob` parameter.
 #' @param overwrite Logical; set to `TRUE` to replace an existing registration.
 #' @return Invisibly, the registered name.
 #' @export
 register_loss_function <- function(name, fun,
                                    direction = c("maximize", "minimize"),
-                                   label = name, overwrite = FALSE) {
+                                   label = name,
+                                   cutoff_dependent = FALSE,
+                                   overwrite = FALSE) {
   stopifnot(is.character(name), length(name) == 1L, nzchar(name))
   stopifnot(is.function(fun))
   direction <- match.arg(direction)
   if (!overwrite && exists(name, envir = .loss_registry, inherits = FALSE)) {
     stop(sprintf("Loss function '%s' is already registered.", name), call. = FALSE)
   }
-  assign(name, list(fun = fun, direction = direction, label = label),
-         envir = .loss_registry)
+  assign(name, list(
+    fun = fun,
+    direction = direction,
+    label = label,
+    cutoff_dependent = cutoff_dependent
+  ), envir = .loss_registry)
   invisible(name)
 }
 

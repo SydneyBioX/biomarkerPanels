@@ -9,6 +9,7 @@ register_loss_function(
   fun,
   direction = c("maximize", "minimize"),
   label = name,
+  cutoff_dependent = FALSE,
   overwrite = FALSE
 )
 }
@@ -21,6 +22,11 @@ register_loss_function(
 \item{direction}{Either \code{"maximize"} or \code{"minimize"}.}
 
 \item{label}{Human-readable name.}
+
+\item{cutoff_dependent}{Logical; if \code{TRUE}, the loss depends on a probability
+cutoff for classification (e.g., sensitivity, specificity). Cutoff-dependent
+losses may not behave as expected in \code{\link[=min_metric_constraint]{min_metric_constraint()}} because
+their values depend on the arbitrary \code{cutoff_prob} parameter.}
 
 \item{overwrite}{Logical; set to \code{TRUE} to replace an existing registration.}
 }
