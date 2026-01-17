@@ -1,6 +1,6 @@
 test_that("evaluate_panel scores held-out multi-cohort data", {
   panel_features <- c("gene_common1", "gene_common2")
-  metrics <- c(sensitivity = 0.5, specificity = 0.5, c_index = 0.5)
+  metrics <- c(sensitivity = 0.5, specificity = 0.5, auc = 0.5)
   objective_df <- data.frame(
     solution_id = 1L,
     objective = names(metrics),
@@ -38,7 +38,7 @@ test_that("evaluate_panel scores held-out multi-cohort data", {
     y = list(v1$y, v2$y)
   )
 
-  expect_named(eval_res$metrics, c("sensitivity", "specificity", "c_index"))
+  expect_named(eval_res$metrics, c("sensitivity", "specificity", "auc"))
   expect_true(all(is.finite(eval_res$metrics)))
   expect_true(is.matrix(eval_res$confusion))
   expect_equal(dim(eval_res$confusion), c(2, 2))
@@ -57,7 +57,7 @@ test_that("evaluate_panel scores held-out multi-cohort data", {
 
 test_that("evaluate_panel requires column names for single-cohort data", {
   panel_features <- c("gene_common1", "gene_common2")
-  metrics <- c(sensitivity = 0.5, specificity = 0.5, c_index = 0.5)
+  metrics <- c(sensitivity = 0.5, specificity = 0.5, auc = 0.5)
   objective_df <- data.frame(
     solution_id = 1L,
     objective = names(metrics),
@@ -86,7 +86,7 @@ test_that("evaluate_panel requires column names for single-cohort data", {
 
 test_that("evaluate_panel accepts custom cutoff for confusion and ROC highlight", {
   panel_features <- c("g1", "g2")
-  metrics <- c(sensitivity = 0.5, specificity = 0.5, c_index = 0.5)
+  metrics <- c(sensitivity = 0.5, specificity = 0.5, auc = 0.5)
   objective_df <- data.frame(
     solution_id = 1L,
     objective = names(metrics),

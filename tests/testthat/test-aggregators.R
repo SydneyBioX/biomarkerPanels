@@ -1,5 +1,14 @@
 # Tests for cohort aggregator registry and implementations
 
+# Access internal functions via :::
+.get_aggregator <- biomarkerPanels:::.get_aggregator
+.apply_cohort_aggregator <- biomarkerPanels:::.apply_cohort_aggregator
+.aggregator_registry <- biomarkerPanels:::.aggregator_registry
+aggregator_none <- biomarkerPanels:::aggregator_none
+aggregator_pairwise_ratios <- biomarkerPanels:::aggregator_pairwise_ratios
+aggregator_pairwise_log_ratios <- biomarkerPanels:::aggregator_pairwise_log_ratios
+aggregator_reference_norm <- biomarkerPanels:::aggregator_reference_norm
+
 test_that("aggregator registry stores default aggregators", {
   reg <- aggregator_registry()
   expect_type(reg, "list")
@@ -76,15 +85,14 @@ test_that("aggregator_pairwise_ratios generates all pairs", {
   expect_true(all(grepl("--", colnames(result))))
 })
 
-test_that("aggregator_pairwise_ratios warns on single feature", {
+test_that("aggregator_pairwise_ratios errors on single feature", {
   x <- matrix(1:3, nrow = 3, ncol = 1)
   colnames(x) <- "A"
 
-  expect_warning(
-    result <- aggregator_pairwise_ratios(x),
+  expect_error(
+    aggregator_pairwise_ratios(x),
     "requires at least two features"
   )
-  expect_identical(result, x)
 })
 
 test_that("aggregator_pairwise_log_ratios computes log ratios", {
@@ -93,7 +101,7 @@ test_that("aggregator_pairwise_log_ratios computes log ratios", {
   result <- aggregator_pairwise_log_ratios(x)
 
   expect_equal(ncol(result), 1)
-  expect_equal(colnames(result)[1], "A/B")
+  expect_equal(colnames(result)[1], "A--B")
   expect_equal(result[, 1], log(x[, "A"] / x[, "B"]))
 })
 
@@ -104,18 +112,17 @@ test_that("aggregator_pairwise_log_ratios generates all pairs", {
 
   expected_pairs <- 4 * 3 / 2
   expect_equal(ncol(result), expected_pairs)
-  expect_true(all(grepl("/", colnames(result))))
+  expect_true(all(grepl("--", colnames(result))))
 })
 
-test_that("aggregator_pairwise_log_ratios warns on single feature", {
+test_that("aggregator_pairwise_log_ratios errors on single feature", {
   x <- matrix(1:3, nrow = 3, ncol = 1)
   colnames(x) <- "A"
 
-  expect_warning(
-    result <- aggregator_pairwise_log_ratios(x),
+  expect_error(
+    aggregator_pairwise_log_ratios(x),
     "requires at least two features"
   )
-  expect_identical(result, x)
 })
 
 test_that("aggregator_pairwise_log_ratios requires column names", {

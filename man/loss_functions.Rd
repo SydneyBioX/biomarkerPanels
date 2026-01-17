@@ -5,8 +5,8 @@
 \title{Default loss functions for biomarker panel optimization.}
 \description{
 These functions compute scalar metrics such as sensitivity, specificity,
-concordance index, and panel size. They share a common signature so that the
-package can compose them into multi-objective optimization routines.
+AUC, and panel size. They share a common signature so that the package can
+compose them into multi-objective optimization routines.
 }
 \details{
 Each loss accepts a binary response (\code{truth}), numeric prediction scores

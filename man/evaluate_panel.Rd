@@ -8,13 +8,13 @@ evaluate_panel(
   panel,
   x,
   y,
-  objectives = define_objectives(losses = c("sensitivity", "specificity", "c_index")),
+  objectives = define_objectives(losses = c("sensitivity", "specificity", "auc")),
   cohort = NULL,
   assay = NULL,
   scoring_fn = NULL,
   cohort_aggregator = NULL,
   cutoff_prob = 0.5,
-  positive = "Yes"
+  positive = NULL
 )
 }
 \arguments{
@@ -27,7 +27,7 @@ list of such objects for multi-cohort evaluation.}
 list).}
 
 \item{objectives}{Optional override for objectives. Defaults to sensitivity,
-specificity, and c_index.}
+specificity, and auc.}
 
 \item{cohort}{Optional factor identifying cohort membership for each sample
 when \code{x} represents a single cohort. Ignored when \code{x} is provided as a list.}
@@ -48,7 +48,8 @@ aggregator name (see \code{\link[=aggregator_registry]{aggregator_registry()}}).
 matrix summaries and highlight point on the ROC curve. Defaults to \code{0.5}.}
 
 \item{positive}{Label treated as the positive class when computing confusion
-matrices; defaults to \code{"Yes"}.}
+matrices. Defaults to the positive class stored during training (typically
+\code{"Yes"}). Specify explicitly to override.}
 }
 \value{
 A list with \code{metrics} (named numeric vector), \code{objectives}

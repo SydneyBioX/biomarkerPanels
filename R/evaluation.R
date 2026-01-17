@@ -15,7 +15,7 @@
 #' @param y Validation binary response factor (or list of factors when `x` is a
 #'   list).
 #' @param objectives Optional override for objectives. Defaults to sensitivity,
-#'   specificity, and c_index.
+#'   specificity, and auc.
 #' @param cohort Optional factor identifying cohort membership for each sample
 #'   when `x` represents a single cohort. Ignored when `x` is provided as a list.
 #' @param assay For `SummarizedExperiment` inputs, assay name or index to use.
@@ -30,7 +30,8 @@
 #' @param cutoff_prob Classification probability threshold used for confusion
 #'   matrix summaries and highlight point on the ROC curve. Defaults to `0.5`.
 #' @param positive Label treated as the positive class when computing confusion
-#'   matrices; defaults to `"Yes"`.
+#'   matrices. Defaults to the positive class stored during training (typically
+#'   `"Yes"`). Specify explicitly to override.
 #' @return A list with `metrics` (named numeric vector), `objectives`
 #'   (data.frame with columns objective, value, direction), `confusion`
 #'   (2x2 matrix of counts), and `roc` (list containing a `curve` data.frame,
@@ -38,15 +39,21 @@
 #' @export
 evaluate_panel <- function(panel, x, y,
                            objectives = define_objectives(
-                             losses = c("sensitivity", "specificity", "c_index")
+                             losses = c("sensitivity", "specificity", "auc")
                            ),
                            cohort = NULL,
                            assay = NULL,
                            scoring_fn = NULL,
                            cohort_aggregator = NULL,
                            cutoff_prob = 0.5,
-                           positive = "Yes") {
+                           positive = NULL) {
   stopifnot(inherits(panel, "BiomarkerPanelResult"))
+
+  # Use stored positive class from training if not explicitly specified
+  if (is.null(positive)) {
+    stored_positive <- panel@control$positive_class
+    positive <- if (!is.null(stored_positive)) stored_positive else "Yes"
+  }
 
   stored_aggregator <- panel@control$cohort_aggregator
   if (is.null(cohort_aggregator)) {
@@ -116,47 +123,76 @@ evaluate_panel <- function(panel, x, y,
   if (!is.null(stored_model) && is.null(scoring_fn)) {
     # Use the stored model for prediction (true out-of-sample evaluation)
     scores <- tryCatch({
-      newdata <- as.data.frame(x_selected, check.names = TRUE)
+      # Check if this is a glmnet model (regularized) or glm model (unregularized)
+      if (inherits(stored_model, "cv.glmnet")) {
+        # Regularized model: use glmnet prediction
+        scores <- .predict_glmnet_model(
+          model = stored_model,
+          x_selected = x_selected,
+          cohort_vec = cohort_vec
+        )
+      } else {
+        # Standard GLM model: use standard prediction
+        newdata <- as.data.frame(x_selected, check.names = TRUE)
 
-      # Get expected column names from the model (excluding .response and .cohort)
-      model_cols <- names(stored_model$model)
-      feature_cols <- setdiff(model_cols, c(".response", ".cohort"))
+        # Get expected column names from the model (excluding .response and .cohort)
+        model_cols <- names(stored_model$model)
+        feature_cols <- setdiff(model_cols, c(".response", ".cohort"))
 
-      # Ensure newdata column names match model's expected names
-      # The model was fit with check.names=TRUE, so feature names may differ
-      if (length(feature_cols) == ncol(x_selected)) {
-        names(newdata) <- feature_cols
-      }
+        # Robust column name matching: the model was fit with check.names=TRUE,
+        # so we need to match original feature names to their transformed versions.
+        # Create the expected mapping by applying check.names to panel features.
+        expected_names <- make.names(selected, unique = TRUE)
 
-      # Add cohort if the model was trained with cohort
-      if (".cohort" %in% names(stored_model$model)) {
-        if (length(unique(cohort_vec)) > 1L) {
-          newdata$.cohort <- factor(cohort_vec)
+        # Verify the mapping matches what the model expects
+        if (!setequal(expected_names, feature_cols)) {
+          # Names don't match - this could happen if features were renamed
+          # differently during training. Try position-based mapping as fallback.
+          if (length(feature_cols) == ncol(x_selected)) {
+            warning(
+              "Feature name mismatch between training and validation. ",
+              "Using positional mapping (verify features are aligned).",
+              call. = FALSE
+            )
+            names(newdata) <- feature_cols
+          } else {
+            stop("Cannot match validation features to model features.")
+          }
         } else {
-          # If validation has only one cohort, use the first training cohort level
-          train_cohort_levels <- levels(stored_model$model$.cohort)
-          newdata$.cohort <- factor(rep(train_cohort_levels[1], nrow(newdata)),
-                                    levels = train_cohort_levels)
+          # Names match - ensure same order as model expects
+          names(newdata) <- expected_names
+          # Reorder to match model's feature order
+          newdata <- newdata[, feature_cols, drop = FALSE]
         }
+
+        # Add cohort if the model was trained with cohort
+        if (".cohort" %in% names(stored_model$model)) {
+          if (length(unique(cohort_vec)) > 1L) {
+            newdata$.cohort <- factor(cohort_vec)
+          } else {
+            # If validation has only one cohort, use the first training cohort level
+            train_cohort_levels <- levels(stored_model$model$.cohort)
+            newdata$.cohort <- factor(rep(train_cohort_levels[1], nrow(newdata)),
+                                      levels = train_cohort_levels)
+          }
+        }
+        scores <- stats::predict(stored_model, newdata = newdata, type = "response")
       }
-      preds <- stats::predict(stored_model, newdata = newdata, type = "response")
-      if (length(preds) != nrow(x_selected) || anyNA(preds)) {
+
+      if (length(scores) != nrow(x_selected) || anyNA(scores)) {
         stop("Invalid predictions from stored model.")
       }
-      as.numeric(preds)
+      as.numeric(scores)
     }, error = function(e) {
-      warning(
-        "Failed to use stored model, falling back to refitting: ",
+      stop(
+        "Failed to generate predictions from stored model: ",
         conditionMessage(e),
+        "\nPrediction on validation data must use the model trained on training data. ",
+        "Refitting on validation data would invalidate the evaluation. ",
+        "Ensure validation features match training features.",
         call. = FALSE
       )
-      NULL
     })
-
-    # If stored model prediction failed, fall back to default scoring
-    if (is.null(scores)) {
-      scoring_fn <- .default_scoring_fn
-    }
   } else if (is.null(scoring_fn)) {
     scoring_fn <- .default_scoring_fn
   }
@@ -246,7 +282,7 @@ evaluate_panel <- function(panel, x, y,
       ggplot2::theme_minimal()
   }
 
-  roc_auc <- loss_c_index(truth, scores, positive = positive)
+  roc_auc <- loss_auc(truth, scores, positive = positive)
 
   list(
     metrics = objective_values,
@@ -336,4 +372,68 @@ evaluate_panel <- function(panel, x, y,
     stringsAsFactors = FALSE
   )
   df[order(df$fpr, df$tpr), , drop = FALSE]
+}
+
+#' Predict Using Stored glmnet Model
+#'
+#' Helper function to make predictions from a cv.glmnet model stored in a
+#' BiomarkerPanelResult. Handles cohort dummy variables using the metadata
+#' stored during training.
+#'
+#' @param model A cv.glmnet model object with biomarkerPanels_meta attribute.
+#' @param x_selected Matrix of selected features for prediction.
+#' @param cohort_vec Factor of cohort membership for samples.
+#' @return Numeric vector of predicted probabilities.
+#' @keywords internal
+.predict_glmnet_model <- function(model, x_selected, cohort_vec) {
+  x_mat <- as.matrix(x_selected)
+
+  # Get metadata stored during training
+
+  meta <- model$biomarkerPanels_meta
+
+  # Add cohort dummies if the model was trained with them
+  if (!is.null(meta$cohort_info)) {
+    cohort_info <- meta$cohort_info
+    train_levels <- cohort_info$levels
+    n_dummies <- cohort_info$n_dummies
+
+    # Create cohort factor with training levels
+    cohort_factor <- factor(cohort_vec, levels = train_levels)
+
+    # Handle unseen cohort levels - this is a data integrity error
+    if (any(is.na(cohort_factor))) {
+      unseen <- unique(as.character(cohort_vec)[is.na(cohort_factor)])
+      stop(
+        "Validation data contains cohort levels not seen during training: ",
+        paste(unseen, collapse = ", "), ".\n",
+        "Training cohorts: ", paste(train_levels, collapse = ", "), ".\n",
+        "Cannot make valid predictions for unseen cohorts. ",
+        "Either include these cohorts in training or exclude them from validation.",
+        call. = FALSE
+      )
+    }
+
+    cohort_dummies <- stats::model.matrix(~ cohort_factor - 1)[, -1, drop = FALSE]
+
+    # Ensure correct number of dummy columns
+    if (ncol(cohort_dummies) != n_dummies) {
+      # Pad with zeros if needed (for cohorts not in validation data)
+      if (ncol(cohort_dummies) < n_dummies) {
+        padding <- matrix(0, nrow = nrow(cohort_dummies),
+                          ncol = n_dummies - ncol(cohort_dummies))
+        cohort_dummies <- cbind(cohort_dummies, padding)
+      } else {
+        cohort_dummies <- cohort_dummies[, seq_len(n_dummies), drop = FALSE]
+      }
+    }
+
+    colnames(cohort_dummies) <- paste0(".cohort_", seq_len(n_dummies))
+    x_mat <- cbind(x_mat, cohort_dummies)
+  }
+
+  # Predict using lambda.min
+  preds <- stats::predict(model, newx = x_mat, s = "lambda.min", type = "response")[, 1]
+
+  preds
 }

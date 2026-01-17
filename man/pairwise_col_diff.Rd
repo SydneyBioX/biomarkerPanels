@@ -2,35 +2,19 @@
 % Please edit documentation in R/utils.R
 \name{pairwise_col_diff}
 \alias{pairwise_col_diff}
-\title{Compute pairwise difference between matrix columns (C++ implementation)}
+\title{Compute pairwise difference between matrix columns}
 \usage{
 pairwise_col_diff(x)
 }
 \arguments{
 \item{x}{A data matrix of size n times p. Where rows are observations and
 columns are features.}
-
-\item{col_names}{Character vector of column names}
-
-\item{feature_col}{The feature column to divide by}
-
-\item{feature_name}{Name of the feature}
-
-\item{other_names}{Names of other columns}
 }
 \value{
-A matrix of pairwise differences
-
-A matrix of pairwise ratios
-
 A matrix of size n times (p choose 2), where each column is the
 difference between two of the original columns.
 }
 \description{
-Compute pairwise difference between matrix columns (C++ implementation)
-
-Compute pairwise ratios to a specific feature (C++ implementation)
-
 Compute pairwise difference between matrix columns
 }
 \examples{
@@ -40,4 +24,3 @@ x = matrix(rep(1:p, n), nrow = n, ncol = p, byrow = TRUE)
 colnames(x) = paste0("X", 1:p)
 pairwise_col_diff(x)
 }
-\keyword{internal}

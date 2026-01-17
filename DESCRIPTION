@@ -23,7 +23,8 @@ Imports:
     S4Vectors,
     mco,
     limma,
-    glmnet
+    glmnet,
+    pROC
 Suggests:
     testthat (>= 3.0.0),
     covr,
@@ -31,7 +32,7 @@ Suggests:
     rmarkdown,
     ggplot2,
     BiocStyle,
-    pROC
+    GA
 LinkingTo:
     Rcpp
 biocViews: Software, Classification, FeatureExtraction, ROC, Biomarker

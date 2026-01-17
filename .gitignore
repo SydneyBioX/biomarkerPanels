@@ -3,10 +3,25 @@
 .Ruserdata
 .DS_Store
 .Rproj.user
-inst/doc
+
 src/*.o
 src/*.so
 src/*.dll
 *.Rcheck/
+
+# analysis
 analysis/
+
+# claude related files
 CLAUDE.md
+.claude
+
+# R documentation
+docs/
+
+# inst files
+inst/doc
+inst/benchmarks/
+
+# R markdowns
+*.Rmd

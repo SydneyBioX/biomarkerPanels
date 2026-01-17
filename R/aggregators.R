@@ -102,20 +102,25 @@ aggregator_none <- function(x) {
 #'
 #' Computes pairwise differences between all feature pairs. This is the default
 #' aggregator that helps dampen batch effects across cohorts by generating
-#' within-sample contrasts.
+#' within-sample normalized differences.
 #'
-#' @param x A numeric matrix with column names.
+#' @details
+#' For log-normalized expression data (which is standard for microarray and
+#' RNA-seq), pairwise differences are mathematically equivalent to log-ratios.
+#'
+#' @param x A numeric matrix with column names. For best results, data should be
+#'   log-normalized (e.g., log2 CPM, log2 RPKM, or microarray RMA values).
 #' @return Matrix of pairwise differences with (p choose 2) columns.
 #'   Column names follow the pattern "FeatureA--FeatureB".
 #' @keywords internal
 aggregator_pairwise_ratios <- function(x) {
   if (ncol(x) < 2L) {
-    warning(
-      "Aggregator 'pairwise_ratios' requires at least two features; ",
-      "returning original matrix.",
+    stop(
+      "Aggregator 'pairwise_ratios' requires at least two features. ",
+      "Input matrix has ", ncol(x), " column(s). ",
+      "Use aggregator = 'none' if pairwise ratios are not needed.",
       call. = FALSE
     )
-    return(x)
   }
   pairwise_col_diff(x)
 }
@@ -127,46 +132,36 @@ aggregator_pairwise_ratios <- function(x) {
 #'
 #' @param x A numeric matrix with column names. Values should be positive.
 #' @return Matrix of log-ratios with (p choose 2) columns.
-#'   Column names follow the pattern "FeatureA/FeatureB".
+#'   Column names follow the pattern "FeatureA--FeatureB".
 #' @keywords internal
 aggregator_pairwise_log_ratios <- function(x) {
   if (ncol(x) < 2L) {
-    warning(
-      "Aggregator 'pairwise_log_ratios' requires at least two features; ",
-      "returning original matrix.",
+    stop(
+      "Aggregator 'pairwise_log_ratios' requires at least two features. ",
+      "Input matrix has ", ncol(x), " column(s). ",
+      "Use aggregator = 'none' if pairwise log-ratios are not needed.",
       call. = FALSE
     )
-    return(x)
   }
   if (is.null(colnames(x))) {
     stop("x must have column names", call. = FALSE)
   }
 
-  # Sort columns for consistency
-
-col_order <- order(colnames(x))
-  x <- x[, col_order, drop = FALSE]
-  col_names <- colnames(x)
-
-  n <- nrow(x)
-  p <- ncol(x)
-  n_pairs <- (p * (p - 1L)) / 2L
-
-  result <- matrix(NA_real_, nrow = n, ncol = n_pairs)
-  result_names <- character(n_pairs)
-
-  idx <- 1L
-  for (i in seq_len(p - 1L)) {
-    for (j in (i + 1L):p) {
-      ratio <- x[, i] / x[, j]
-      result[, idx] <- log(ratio)
-      result_names[idx] <- paste0(col_names[i], "/", col_names[j])
-      idx <- idx + 1L
-    }
+  # Check for non-positive values that would cause log issues
+  if (any(x <= 0, na.rm = TRUE)) {
+    n_nonpositive <- sum(x <= 0, na.rm = TRUE)
+    stop(
+      "Input matrix contains ", n_nonpositive, " non-positive value(s). ",
+      "Log-ratios require strictly positive values. ",
+      "Either add a pseudocount (x + 1), use 'pairwise_ratios' for log-transformed data, ",
+      "or remove/impute non-positive values.",
+      call. = FALSE
+    )
   }
 
-  colnames(result) <- result_names
-  result
+  # Apply log transformation first, then use pairwise_col_diff
+  # Since log(A/B) = log(A) - log(B), this is mathematically equivalent
+  pairwise_col_diff(log(x))
 }
 
 #' Reference normalization aggregator
@@ -207,7 +202,6 @@ aggregator_reference_norm <- function(x) {
     )
   }
 
-  ref_col <- x[, ref_feature]
   col_names <- colnames(x)
   other_cols <- setdiff(col_names, ref_feature)
 
@@ -220,20 +214,10 @@ aggregator_reference_norm <- function(x) {
     return(x)
   }
 
-  n <- nrow(x)
-  p <- length(other_cols)
+  ref_col <- x[, ref_feature]
+  other_matrix <- x[, other_cols, drop = FALSE]
 
-  result <- matrix(NA_real_, nrow = n, ncol = p)
-  result_names <- character(p)
-
-  for (i in seq_along(other_cols)) {
-    feat_name <- other_cols[i]
-    result[, i] <- x[, feat_name] - ref_col
-    result_names[i] <- paste0(feat_name, "--", ref_feature)
-  }
-
-  colnames(result) <- result_names
-  result
+  .reference_diff_cpp(other_matrix, ref_col, ref_feature, other_cols)
 }
 
 # -----------------------------------------------------------------------------

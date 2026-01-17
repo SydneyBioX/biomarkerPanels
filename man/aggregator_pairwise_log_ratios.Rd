@@ -11,7 +11,7 @@ aggregator_pairwise_log_ratios(x)
 }
 \value{
 Matrix of log-ratios with (p choose 2) columns.
-Column names follow the pattern "FeatureA/FeatureB".
+Column names follow the pattern "FeatureA--FeatureB".
 }
 \description{
 Computes pairwise log-ratios between all feature pairs. Useful for

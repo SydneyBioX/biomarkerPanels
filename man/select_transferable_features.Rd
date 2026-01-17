@@ -12,6 +12,7 @@ select_transferable_features(
   lambda_choice = c("lambda_1se", "lambda_min"),
   min_coefficient = 0,
   require_sign_consistency = TRUE,
+  sign_consistency_threshold = 1,
   standardize = TRUE,
   assay = NULL,
   cv_control = list()
@@ -38,8 +39,11 @@ point for coefficient extraction.}
 cohort-wise minimum magnitude) before a feature is considered transferable.}
 
 \item{require_sign_consistency}{If \code{TRUE}, only retain features whose ridge
-coefficients share the same sign (ignoring near-zero coefficients) across
-cohorts.}
+coefficients meet the \code{sign_consistency_threshold} across cohorts.}
+
+\item{sign_consistency_threshold}{Minimum fraction of cohorts that must agree
+on coefficient sign direction (default 1.0 requires 100\% agreement). Set to
+values like 0.75 to allow partial sign consistency.}
 
 \item{standardize}{Logical; passed to \code{\link[glmnet:glmnet]{glmnet::glmnet()}} to control feature
 standardisation prior to fitting. Defaults to \code{TRUE}.}
@@ -61,8 +65,8 @@ features whose coefficients are both large in magnitude and consistent across
 cohorts. This emphasises biomarkers that deliver transferable signal.
 }
 \details{
-Features are currently aligned across cohorts via a simple
-intersection of shared column names. Future versions will add more flexible
-harmonisation strategies (e.g., imputation or reference-based mapping).
-I promise I'll get to this lol #TODO
+Features are aligned across cohorts via intersection of shared
+column names. For more flexible alignment strategies (e.g., majority
+voting or median imputation), use the \code{feature_alignment} parameter
+in \code{\link[=optimize_panel]{optimize_panel()}}.
 }

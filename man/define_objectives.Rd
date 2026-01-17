@@ -8,7 +8,9 @@ define_objectives(
   losses = c("sensitivity", "specificity"),
   custom = NULL,
   params = list(),
-  directions = NULL
+  directions = NULL,
+  cutoff_strategy = c("fixed", "prevalence", "youden"),
+  cutoff_prob = 0.5
 )
 }
 \arguments{
@@ -22,6 +24,16 @@ define_objectives(
 (e.g., custom cutoff probabilities for sensitivity).}
 
 \item{directions}{Optional named vector overriding loss directions.}
+
+\item{cutoff_strategy}{Strategy for computing classification cutoff. One of:
+\describe{
+\item{"fixed"}{Use \code{cutoff_prob} parameter (default 0.5)}
+\item{"prevalence"}{Cutoff equals training class prevalence}
+\item{"youden"}{Optimal Youden's J point from ROC curve}
+}}
+
+\item{cutoff_prob}{Fixed cutoff probability (default 0.5). Only used when
+\code{cutoff_strategy = "fixed"}.}
 }
 \value{
 Named list of objective descriptors.

@@ -4,14 +4,18 @@
 #' @title Compute pairwise difference between matrix columns (C++)
 NULL
 
-#' @title Compute pairwise ratios to a specific feature (C++)
-NULL
-
 .pairwise_col_diff_cpp <- function(x, col_names) {
     .Call(`_biomarkerPanels_pairwise_col_diff_cpp`, x, col_names)
 }
 
-.pairwise_ratios_cpp <- function(x, feature_col, feature_name, other_names) {
-    .Call(`_biomarkerPanels_pairwise_ratios_cpp`, x, feature_col, feature_name, other_names)
+#' @title Compute differences relative to a reference column (C++)
+#' @param x A numeric matrix (excluding reference column)
+#' @param ref_col The reference column vector
+#' @param ref_name Name of the reference feature
+#' @param other_names Names of other columns
+#' @return A matrix of differences (other - ref)
+#' @keywords internal
+.reference_diff_cpp <- function(x, ref_col, ref_name, other_names) {
+    .Call(`_biomarkerPanels_reference_diff_cpp`, x, ref_col, ref_name, other_names)
 }
 

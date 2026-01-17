@@ -20,6 +20,13 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
     stop("`y` cannot be NULL.", call. = FALSE)
   }
 
+  # Short-circuit: if y is already a factor with levels c("No", "Yes"),
+  # return it unchanged. This handles subsetted factors from cohort-aware
+  # loss functions where only one class may be present in the data.
+  if (is.factor(y) && identical(levels(y), c("No", "Yes"))) {
+    return(y)
+  }
+
   # Convert supported input types to a character vector for processing.
   if (is.factor(y)) {
     y_chr <- as.character(y)

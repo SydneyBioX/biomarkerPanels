@@ -8,10 +8,10 @@
 \description{
 The biomarkerPanels package helps researchers derive small, interpretable
 biomarker panels that satisfy competing performance criteria such as high
-sensitivity at fixed specificity, low assay cost, and robustness across
-cohorts. The package integrates with Bioconductor data structures including
-\code{SummarizedExperiment} to streamline analysis from expression data to
-deployable panel definitions.
+sensitivity at fixed specificity, low assay cost, and transferability across
+cohorts. The package integrates with common Bioconductor data structures
+including \code{SummarizedExperiment} to streamline analysis from expression data
+to deployable panel definitions.
 }
 \section{Modules}{
 

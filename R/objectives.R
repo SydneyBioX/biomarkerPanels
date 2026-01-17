@@ -11,12 +11,42 @@
 #' @param params Named list of additional argument lists for specific losses
 #'   (e.g., custom cutoff probabilities for sensitivity).
 #' @param directions Optional named vector overriding loss directions.
+#' @param cutoff_strategy Strategy for computing classification cutoff. One of:
+#'   \describe{
+#'     \item{"fixed"}{Use `cutoff_prob` parameter (default 0.5)}
+#'     \item{"prevalence"}{Cutoff equals training class prevalence}
+#'     \item{"youden"}{Optimal Youden's J point from ROC curve}
+#'   }
+#' @param cutoff_prob Fixed cutoff probability (default 0.5). Only used when
+#'   `cutoff_strategy = "fixed"`.
 #' @return Named list of objective descriptors.
 #' @export
 define_objectives <- function(losses = c("sensitivity", "specificity"),
                               custom = NULL,
                               params = list(),
-                              directions = NULL) {
+                              directions = NULL,
+                              cutoff_strategy = c("fixed", "prevalence", "youden"),
+                              cutoff_prob = 0.5) {
+  cutoff_strategy <- match.arg(cutoff_strategy)
+
+  # Add cutoff_strategy to params for losses that use cutoffs
+  cutoff_losses <- c("sensitivity", "specificity", "balanced_accuracy",
+                     "min_cohort_sensitivity", "min_cohort_specificity",
+                     "cohort_sensitivity_gap")
+
+  for (loss_name in intersect(losses, cutoff_losses)) {
+    if (is.null(params[[loss_name]])) {
+      params[[loss_name]] <- list()
+    }
+    # Only set if not already specified
+    if (is.null(params[[loss_name]]$cutoff_strategy)) {
+      params[[loss_name]]$cutoff_strategy <- cutoff_strategy
+    }
+    if (is.null(params[[loss_name]]$cutoff_prob)) {
+      params[[loss_name]]$cutoff_prob <- cutoff_prob
+    }
+  }
+
   objectives <- build_objectives(losses, params = params, directions = directions)
 
   if (!is.null(custom)) {

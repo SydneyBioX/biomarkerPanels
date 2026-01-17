@@ -6,9 +6,7 @@
 #' define a panel whose performance is evaluated via the selected losses.
 #' Inputs may be a single cohort (`matrix`, `data.frame`, or
 #' `SummarizedExperiment`) or multiple cohorts supplied as lists of such objects.
-#' Feature alignment across cohorts currently relies on the simple intersection
-#' of shared column names; future releases will add more flexible harmonisation.
-#' Optimisation should be run on training data only—use [evaluate_panel()] for
+#' Optimisation should be run on training data only---use [evaluate_panel()] for
 #' held-out validation.
 #'
 #' @param x Matrix-like object, `SummarizedExperiment`, or list of matrices /
@@ -31,6 +29,15 @@
 #'   `"reference_norm"` (normalize relative to a reference feature), and
 #'   `"none"` (no transformation). Use [`register_aggregator()`] to add custom
 #'   strategies. See [`aggregator_registry()`] for available options.
+#' @param feature_alignment Strategy for aligning features across cohorts:
+#'   \describe{
+#'     \item{"intersection"}{(Default) Keep only features present in ALL cohorts.
+#'       Features missing in any cohort are dropped.}
+#'     \item{"majority"}{Keep features present in >= 50% of cohorts.
+#'       Missing values are imputed with cohort medians.}
+#'     \item{"impute_median"}{Keep all features from any cohort.
+#'       Missing values are imputed with cohort medians.}
+#'   }
 #' @param constraints Optional list of constraint descriptors (e.g.,
 #'   from [min_metric_constraint()]) that must evaluate to `TRUE` for a candidate
 #'   solution to be considered feasible.
@@ -41,6 +48,30 @@
 #'   to `list(popsize = 64, generations = 60, cprob = 0.7, cdist = 5,
 #'   mprob = 0.2, mdist = 10)`.
 #' @param assay For `SummarizedExperiment` inputs, assay name or index to use.
+#' @param seed Optional integer seed for reproducibility. When provided, sets
+#'   the random seed before running NSGA-II optimization. This ensures
+#'   reproducible results across runs. If `NULL` (default), no seed is set and
+#'   results may vary between runs.
+#' @param fitness_cv Logical; if `TRUE` (default), use cross-validation when
+#'   evaluating candidate solutions during NSGA-II optimization. This prevents
+#'   overfitting by computing objective metrics on held-out fold predictions
+#'   rather than in-sample predictions. Recommended for fair comparison with
+#'   regularized methods like Lasso.
+#' @param fitness_cv_folds Number of cross-validation folds for fitness
+#'   evaluation when `fitness_cv = TRUE`. Default is 5.
+#' @param final_model_cv Logical; if `TRUE`, use nested cross-validation when
+#'   fitting the final model to reduce training data contamination. The final
+#'   model coefficients are averaged across CV folds. Default is `FALSE` for
+#'   backward compatibility.
+#' @param cv_folds Number of cross-validation folds when `final_model_cv = TRUE`.
+#'   Default is 5.
+#' @param regularized Logical; if `TRUE` (default), use regularized regression
+#'   (elastic net via glmnet) for scoring candidates during optimization. This
+#'   typically produces more stable fitness estimates and better out-of-sample
+#'   performance compared to unregularized logistic regression.
+#' @param regularized_alpha Elastic net mixing parameter when `regularized = TRUE`.
+#'   `alpha = 1` is lasso, `alpha = 0` is ridge, and values in between give
+#'   elastic net. Default is 0.5 (elastic net).
 #' @return A `BiomarkerPanelResult` with Pareto-optimal solutions summarised in
 #'   the `objectives` slot.
 #' @export
@@ -51,10 +82,19 @@ optimize_panel <- function(x, y,
                            max_features = 5L,
                            feature_pool = NULL,
                            cohort_aggregator = "pairwise_ratios",
+                           feature_alignment = c("intersection", "majority", "impute_median"),
                            constraints = list(),
                            scoring_fn = NULL,
                            nsga_control = list(),
-                           assay = NULL) {
+                           assay = NULL,
+                           seed = NULL,
+                           fitness_cv = TRUE,
+                           fitness_cv_folds = 5L,
+                           final_model_cv = FALSE,
+                           cv_folds = 5L,
+                           regularized = TRUE,
+                           regularized_alpha = 0.5) {
+  feature_alignment <- match.arg(feature_alignment)
   if (!requireNamespace("mco", quietly = TRUE)) {
     stop("The 'mco' package is required. Install it via BiocManager::install('mco').",
          call. = FALSE)
@@ -74,7 +114,8 @@ optimize_panel <- function(x, y,
     )
   }
 
-  inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, aggregator = "none")
+  inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, aggregator = "none",
+                                       feature_alignment = feature_alignment)
   raw_x_mat <- inputs_raw$x
   raw_feature_names <- colnames(raw_x_mat)
   if (is.null(raw_feature_names)) {
@@ -120,12 +161,38 @@ optimize_panel <- function(x, y,
     }
   }
 
+  # Warn about memory usage BEFORE aggregation for pairwise aggregators
+  if (cohort_aggregator %in% c("pairwise_ratios", "pairwise_log_ratios")) {
+    n_base_features <- length(feature_pool_base)
+    if (n_base_features > 100) {
+      n_pairs <- (as.numeric(n_base_features) * (n_base_features - 1)) / 2
+      message(
+        sprintf(
+          "Note: Pairwise aggregation of %d base features will create %.0f pairs.",
+          n_base_features, n_pairs
+        )
+      )
+      if (n_pairs > 10000) {
+        warning(
+          sprintf(
+            "Large feature pool (%d features -> %.0f pairs) may cause slow ",
+            n_base_features, n_pairs
+          ),
+          "optimization. Consider reducing feature_pool via get_top_de_features() ",
+          "or select_transferable_features().",
+          call. = FALSE
+        )
+      }
+    }
+  }
+
   inputs <- .prepare_cohort_inputs(
     x,
     y,
     assay = assay,
     aggregator = cohort_aggregator,
-    feature_subset = feature_pool_base
+    feature_subset = feature_pool_base,
+    feature_alignment = feature_alignment
   )
   x_mat <- inputs$x
   truth <- inputs$truth
@@ -176,33 +243,71 @@ optimize_panel <- function(x, y,
 
   constraint_specs <- .normalize_constraints(constraints)
 
-  nsga_defaults <- list(
-    popsize = 64,
-    generations = 60,
-    cprob = 0.7,
-    cdist = 5,
-    mprob = 0.2,
-    mdist = 10
-  )
+  nsga_defaults <- .get_adaptive_nsga_defaults(decision_dim)
   nsga_args <- utils::modifyList(nsga_defaults, nsga_control)
 
+
+  # Create CV folds for fitness evaluation (if enabled)
+  cv_fold_ids <- NULL
+  if (fitness_cv) {
+    n_samples <- nrow(x_pool)
+    if (n_samples < fitness_cv_folds * 2L) {
+      warning("Too few samples for ", fitness_cv_folds, "-fold CV in fitness evaluation. ",
+              "Falling back to in-sample scoring.", call. = FALSE)
+      fitness_cv <- FALSE
+    } else {
+      cv_fold_ids <- .create_stratified_folds(truth, fitness_cv_folds)
+    }
+  }
+
   evaluate_candidate <- function(decision_vec) {
-    ord <- order(decision_vec, decreasing = TRUE)
+    # Use feature names as secondary sort key for reproducible tie-breaking
+    # This ensures consistent feature selection when decision values are equal
+    feature_names_pool <- colnames(x_pool)
+    ord <- order(decision_vec, feature_names_pool, decreasing = c(TRUE, FALSE),
+                 method = "radix")
     selected_idx <- ord[seq_len(min(max_features, length(ord)))]
-    selected_features <- colnames(x_pool)[selected_idx]
+    selected_features <- feature_names_pool[selected_idx]
     x_selected <- x_pool[, selected_features, drop = FALSE]
 
-    score_args <- list(
-      x_selected = x_selected,
-      selected_features = selected_features,
-      truth = truth
-    )
-    if (!is.null(cohort)) {
-      score_args$cohort <- cohort
+    # Compute scores using CV (out-of-fold predictions) or in-sample
+    if (fitness_cv && !is.null(cv_fold_ids)) {
+      # Cross-validation based scoring: prevents overfitting
+      scores <- .compute_cv_scores(
+        x_selected = x_selected,
+        truth = truth,
+        fold_ids = cv_fold_ids,
+        cohort = cohort,
+        regularized = regularized,
+        alpha = regularized_alpha
+      )
+    } else {
+      # In-sample scoring (for backward compatibility or small datasets)
+      if (regularized || identical(scoring_fn, .default_scoring_fn)) {
+        scores <- .default_scoring_fn(
+          x_selected = x_selected,
+          selected_features = selected_features,
+          truth = truth,
+          cohort = cohort,
+          regularized = regularized,
+          alpha = regularized_alpha
+        )
+      } else {
+        # Custom scoring function provided by user (only used when regularized = FALSE)
+        score_args <- list(
+          x_selected = x_selected,
+          selected_features = selected_features,
+          truth = truth
+        )
+        if (!is.null(cohort)) {
+          score_args$cohort <- cohort
+        }
+        scores <- do.call(scoring_fn, score_args)
+      }
     }
-    scores <- do.call(scoring_fn, score_args)
+
     if (!is.numeric(scores) || length(scores) != nrow(x_pool)) {
-      stop("`scoring_fn` must return a numeric vector matching the number of samples.",
+      stop("Scoring must return a numeric vector matching the number of samples.",
            call. = FALSE)
     }
     constraint_results <- if (length(constraint_specs)) {
@@ -245,7 +350,13 @@ optimize_panel <- function(x, y,
     }
     metrics <- evaluated$metrics
     converted <- mapply(function(val, dir) {
+      # Handle NA, Inf, and -Inf explicitly
       if (is.na(val)) {
+        return(Inf)  # Treat NA as infeasible
+      }
+      if (is.infinite(val)) {
+        # For infinite values, always return +Inf to indicate infeasibility
+        # This prevents issues with NSGA-II when mixing +Inf and -Inf
         return(Inf)
       }
       if (dir == "maximize") {
@@ -266,6 +377,14 @@ optimize_panel <- function(x, y,
     ),
     nsga_args
   )
+
+  # Set random seed for reproducibility if provided
+  if (!is.null(seed)) {
+    if (!is.numeric(seed) || length(seed) != 1L) {
+      stop("`seed` must be a single integer value.", call. = FALSE)
+    }
+    set.seed(as.integer(seed))
+  }
 
   nsga_result <- do.call(mco::nsga2, nsga_params)
 
@@ -318,7 +437,14 @@ optimize_panel <- function(x, y,
   # Fit the final model on the selected features for storage
   selected_features <- primary_solution$features
   x_selected <- x_pool[, selected_features, drop = FALSE]
-  final_model <- .fit_final_model(x_selected, truth, cohort)
+  if (regularized) {
+    final_model <- .fit_final_model_regularized(x_selected, truth, cohort,
+                                                 alpha = regularized_alpha)
+  } else if (final_model_cv) {
+    final_model <- .fit_final_model_cv(x_selected, truth, cohort, cv_folds)
+  } else {
+    final_model <- .fit_final_model(x_selected, truth, cohort)
+  }
 
   panel <- new(
     "BiomarkerPanelResult",
@@ -332,11 +458,22 @@ optimize_panel <- function(x, y,
       nsga2 = nsga_args,
       scoring_function = deparse(substitute(scoring_fn)),
       cohort_aggregator = cohort_aggregator,
+      feature_alignment = feature_alignment,
       constraints = if (length(constraint_specs)) {
         vapply(constraint_specs, `[[`, character(1), "label")
       } else {
         character()
-      }
+      },
+      # Store positive class for consistent evaluation
+      # ensure_binary_response() standardizes to levels c("No", "Yes")
+      positive_class = "Yes",
+      response_levels = levels(truth),
+      # Store seed for reproducibility documentation
+      seed = seed,
+      final_model_cv = final_model_cv,
+      cv_folds = if (final_model_cv) cv_folds else NULL,
+      regularized = regularized,
+      regularized_alpha = if (regularized) regularized_alpha else NULL
     ),
     training_data = list(
       n = nrow(x_mat),
@@ -352,300 +489,4 @@ optimize_panel <- function(x, y,
   )
 
   panel
-}
-
-.default_scoring_fn <- function(x_selected, selected_features, truth,
-                                cohort = NULL, ...) {
-  n <- length(truth)
-  if (is.null(x_selected) || ncol(x_selected) == 0L) {
-    return(rep(0.5, n))
-  }
-
-  fallback_scores <- function(mat) {
-    if (ncol(mat) == 1L) {
-      centered <- mat[, 1] - mean(mat[, 1])
-      sd_val <- stats::sd(mat[, 1])
-      if (isTRUE(all.equal(sd_val, 0))) {
-        centered[] <- 0
-      } else {
-        centered <- centered / sd_val
-      }
-      return(stats::plogis(centered))
-    }
-    centered <- sweep(mat, 2, colMeans(mat), "-")
-    sds <- apply(centered, 2, stats::sd)
-    sds[sds == 0] <- 1
-    scaled <- sweep(centered, 2, sds, "/")
-    stats::plogis(rowMeans(scaled))
-  }
-
-  logistic_scores <- tryCatch({
-    df <- data.frame(
-      .response = as.integer(truth) - 1L,
-      as.data.frame(x_selected, check.names = TRUE)
-    )
-    # Add cohort as a covariate if provided and has multiple levels
-    if (!is.null(cohort) && length(unique(cohort)) > 1L) {
-      df$.cohort <- factor(cohort)
-    }
-    fit <- suppressWarnings(stats::glm(.response ~ ., data = df, family = stats::binomial()))
-    preds <- stats::predict(fit, type = "response")
-    if (length(preds) != nrow(x_selected) || anyNA(preds)) {
-      stop("Invalid logistic predictions.")
-    }
-    preds
-  }, error = function(e) {
-    warning(
-      "Falling back to heuristic scoring because logistic regression failed: ",
-      conditionMessage(e),
-      call. = FALSE
-    )
-    fallback_scores(x_selected)
-  })
-
-  logistic_scores
-}
-
-# Fit and return the final model for storage in BiomarkerPanelResult
-.fit_final_model <- function(x_selected, truth, cohort = NULL) {
-  if (is.null(x_selected) || ncol(x_selected) == 0L) {
-    return(NULL)
-  }
-
-  tryCatch({
-    df <- data.frame(
-      .response = as.integer(truth) - 1L,
-      as.data.frame(x_selected, check.names = TRUE)
-    )
-    # Add cohort as a covariate if provided and has multiple levels
-    if (!is.null(cohort) && length(unique(cohort)) > 1L) {
-      df$.cohort <- factor(cohort)
-    }
-    fit <- suppressWarnings(stats::glm(.response ~ ., data = df, family = stats::binomial()))
-    fit
-  }, error = function(e) {
-    warning(
-      "Failed to fit final model: ",
-      conditionMessage(e),
-      call. = FALSE
-    )
-    NULL
-  })
-}
-
-.prepare_cohort_inputs <- function(x, y, assay = NULL,
-                                   aggregator = "none",
-                                   feature_subset = NULL) {
-  if (is.list(x)) {
-    if (!is.list(y)) {
-      stop("When `x` is a list, `y` must also be a list.", call. = FALSE)
-    }
-    if (length(x) != length(y)) {
-      stop("`x` and `y` lists must have the same length.", call. = FALSE)
-    }
-    cohort_names <- names(x)
-    if (is.null(cohort_names) || any(cohort_names == "")) {
-      cohort_names <- sprintf("cohort_%02d", seq_along(x))
-    }
-
-    matrices <- lapply(seq_along(x), function(i) {
-      .extract_feature_matrix(x[[i]], assay = assay)
-    })
-
-    for (i in seq_along(matrices)) {
-      if (is.null(colnames(matrices[[i]]))) {
-        colnames(matrices[[i]]) <- sprintf("feature_%04d", seq_len(ncol(matrices[[i]])))
-      }
-    }
-
-    feature_sets <- lapply(matrices, colnames)
-    # TODO(#transferability): support more flexible feature alignment strategies.
-    common_features <- Reduce(intersect, feature_sets)
-    if (is.null(common_features) || !length(common_features)) {
-      stop(
-        "No shared features were found across cohorts. Provide data with ",
-        "overlapping feature identifiers (future releases will support more ",
-        "flexible alignment).",
-        call. = FALSE
-      )
-    }
-    ordered_features <- feature_sets[[1]][feature_sets[[1]] %in% common_features]
-    matrices <- lapply(matrices, function(mat) {
-      mat[, ordered_features, drop = FALSE]
-    })
-
-    if (!is.null(feature_subset)) {
-      missing <- setdiff(feature_subset, ordered_features)
-      if (length(missing)) {
-        stop(
-          "Feature(s) not found across all cohorts: ",
-          paste(missing, collapse = ", "),
-          call. = FALSE
-        )
-      }
-      matrices <- lapply(matrices, function(mat) {
-        # Preserve reference_feature attribute through subsetting
-        ref_attr <- attr(mat, "reference_feature")
-        result <- mat[, feature_subset, drop = FALSE]
-        if (!is.null(ref_attr)) {
-          attr(result, "reference_feature") <- ref_attr
-        }
-        result
-      })
-    }
-
-    matrices <- .apply_cohort_aggregator(matrices, aggregator)
-
-    feature_sets <- lapply(matrices, colnames)
-    if (any(vapply(feature_sets, is.null, logical(1)))) {
-      stop("Aggregator produced matrices without column names.", call. = FALSE)
-    }
-    common_features <- Reduce(intersect, feature_sets)
-    if (is.null(common_features) || !length(common_features)) {
-      stop(
-        "No shared features were found across cohorts after aggregation.",
-        call. = FALSE
-      )
-    }
-    ordered_features <- feature_sets[[1]][feature_sets[[1]] %in% common_features]
-    matrices <- lapply(matrices, function(mat) {
-      mat[, ordered_features, drop = FALSE]
-    })
-
-    counts <- vapply(matrices, nrow, integer(1))
-    response_list <- lapply(seq_along(y), function(i) {
-      yi <- ensure_binary_response(y[[i]])
-      if (length(yi) != counts[[i]]) {
-        stop("Length of `y[[", i, "]]` must match number of samples in `x[[", i, "]]`.",
-             call. = FALSE)
-      }
-      yi
-    })
-
-    combined_x <- do.call(rbind, matrices)
-    truth <- factor(
-      unlist(lapply(response_list, as.character), use.names = FALSE),
-      levels = levels(response_list[[1]])
-    )
-    cohort <- factor(rep(cohort_names, counts), levels = cohort_names)
-
-    list(
-      x = combined_x,
-      truth = truth,
-      cohort = cohort,
-      cohort_names = cohort_names,
-      cohort_counts = setNames(as.list(counts), cohort_names)
-    )
-  } else {
-    x_mat <- .extract_feature_matrix(x, assay = assay)
-    truth <- ensure_binary_response(y)
-    if (nrow(x_mat) != length(truth)) {
-      stop("`x` and `y` must have matching sample sizes.", call. = FALSE)
-    }
-    if (is.null(colnames(x_mat))) {
-      colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
-    }
-
-    if (!is.null(feature_subset)) {
-      missing <- setdiff(feature_subset, colnames(x_mat))
-      if (length(missing)) {
-        stop(
-          "Feature(s) not found in `x`: ",
-          paste(missing, collapse = ", "),
-          call. = FALSE
-        )
-      }
-      # Preserve reference_feature attribute through subsetting
-      ref_attr <- attr(x_mat, "reference_feature")
-      x_mat <- x_mat[, feature_subset, drop = FALSE]
-      if (!is.null(ref_attr)) {
-        attr(x_mat, "reference_feature") <- ref_attr
-      }
-    }
-
-    x_mat <- .apply_cohort_aggregator(list(x_mat), aggregator)[[1]]
-    if (is.null(colnames(x_mat))) {
-      stop("`x` must have column names in order to align with panel features.",
-           call. = FALSE)
-    }
-    cohort_names <- "cohort_01"
-    list(
-      x = x_mat,
-      truth = truth,
-      cohort = factor(rep(cohort_names, nrow(x_mat)), levels = cohort_names),
-      cohort_names = cohort_names,
-      cohort_counts = setNames(list(nrow(x_mat)), cohort_names)
-    )
-  }
-}
-
-.extract_feature_matrix <- function(x, assay = NULL) {
-  if (inherits(x, "SummarizedExperiment")) {
-    assays <- SummarizedExperiment::assayNames(x)
-    if (is.null(assay)) {
-      assay <- assays[1]
-    }
-    return(SummarizedExperiment::assay(x, assay))
-  }
-  if (is.data.frame(x)) {
-    x <- as.matrix(x)
-  }
-  if (!is.matrix(x)) {
-    stop("`x` must be a matrix-like object.", call. = FALSE)
-  }
-  mode(x) <- "numeric"
-  x
-}
-
-.resolve_feature_pool <- function(pool, feature_names) {
-  if (is.numeric(pool)) {
-    pool <- feature_names[pool]
-  }
-  if (!all(pool %in% feature_names)) {
-    missing <- setdiff(pool, feature_names)
-    stop("Feature(s) not found in `x`: ",
-         paste(missing, collapse = ", "), call. = FALSE)
-  }
-  unique(pool)
-}
-
-.apply_cohort_aggregator <- function(matrices, aggregator) {
-  if (!length(matrices)) {
-    return(matrices)
-  }
-  agg_spec <- .get_aggregator(aggregator)
-  lapply(matrices, agg_spec$fun)
-}
-
-.normalize_constraints <- function(constraints) {
-  if (!length(constraints)) {
-    return(list())
-  }
-  if (!is.list(constraints)) {
-    stop("`constraints` must be supplied as a list.", call. = FALSE)
-  }
-  lapply(seq_along(constraints), function(i) {
-    entry <- constraints[[i]]
-    label <- names(constraints)[i]
-    if (is.function(entry)) {
-      fun <- entry
-    } else if (is.list(entry) && !is.null(entry$fun) && is.function(entry$fun)) {
-      fun <- entry$fun
-      if (!is.null(entry$label) && nzchar(entry$label)) {
-        label <- entry$label
-      }
-    } else {
-      stop(
-        "`constraints` entries must be functions or lists containing a `fun` element.",
-        call. = FALSE
-      )
-    }
-    if (is.null(label) || !nzchar(label)) {
-      label <- sprintf("constraint_%02d", i)
-    }
-    list(
-      fun = fun,
-      label = label
-    )
-  })
 }

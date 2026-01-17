@@ -40,12 +40,20 @@ get_top_de_features <- function(x_list,
   )
 
   if (!length(limma_stats$feature_names)) {
-    return(character())
+    stop(
+      "No features available for differential expression analysis. ",
+      "Check that input matrices have column names and contain numeric data.",
+      call. = FALSE
+    )
   }
 
   ordered_p <- .aggregate_de_pvalues(limma_stats$t_matrix, combination_method)
   if (!length(ordered_p)) {
-    return(character())
+    stop(
+      "Differential expression analysis produced no ranked features. ",
+      "This may indicate that all features have identical expression across groups.",
+      call. = FALSE
+    )
   }
 
   head(names(ordered_p), n = min(n_features, length(ordered_p)))
@@ -122,8 +130,10 @@ select_features_for_ratios <- function(x_list,
 #' @param min_coefficient Minimum absolute coefficient required (applied to the
 #'   cohort-wise minimum magnitude) before a feature is considered transferable.
 #' @param require_sign_consistency If `TRUE`, only retain features whose ridge
-#'   coefficients share the same sign (ignoring near-zero coefficients) across
-#'   cohorts.
+#'   coefficients meet the `sign_consistency_threshold` across cohorts.
+#' @param sign_consistency_threshold Minimum fraction of cohorts that must agree
+#'   on coefficient sign direction (default 1.0 requires 100% agreement). Set to
+#'   values like 0.75 to allow partial sign consistency.
 #' @param standardize Logical; passed to [glmnet::glmnet()] to control feature
 #'   standardisation prior to fitting. Defaults to `TRUE`.
 #' @param cv_control Optional named list of additional arguments forwarded to
@@ -131,10 +141,10 @@ select_features_for_ratios <- function(x_list,
 #' @return A list containing the selected feature identifiers, per-feature
 #'   scoring metadata, coefficient matrix, and the lambda value used for each
 #'   cohort.
-#' @details Features are currently aligned across cohorts via a simple
-#'   intersection of shared column names. Future versions will add more flexible
-#'   harmonisation strategies (e.g., imputation or reference-based mapping). 
-#'   I promise I'll get to this lol #TODO
+#' @details Features are aligned across cohorts via intersection of shared
+#'   column names. For more flexible alignment strategies (e.g., majority
+#'   voting or median imputation), use the `feature_alignment` parameter
+#'   in [optimize_panel()].
 #' @export
 #'
 #' @importFrom glmnet cv.glmnet glmnet
@@ -145,6 +155,7 @@ select_transferable_features <- function(x_list,
                                          lambda_choice = c("lambda_1se", "lambda_min"),
                                          min_coefficient = 0,
                                          require_sign_consistency = TRUE,
+                                         sign_consistency_threshold = 1.0,
                                          standardize = TRUE,
                                          assay = NULL,
                                          cv_control = list()) {
@@ -161,19 +172,11 @@ select_transferable_features <- function(x_list,
   feature_names <- prepared$feature_names
 
   if (!length(feature_names)) {
-    return(list(
-      features = character(),
-      scores = data.frame(),
-      coefficients = matrix(numeric(), nrow = 0, ncol = length(cohort_names),
-                            dimnames = list(character(), cohort_names)),
-      lambda = numeric(),
-      settings = list(
-        lambda_choice = lambda_choice,
-        min_coefficient = min_coefficient,
-        require_sign_consistency = require_sign_consistency,
-        standardize = standardize
-      )
-    ))
+    stop(
+      "No common features found across cohorts for ridge regression. ",
+      "Check that cohorts have overlapping feature names.",
+      call. = FALSE
+    )
   }
 
   lambda_vec <- .resolve_lambda_vector(lambda, length(matrices))
@@ -224,7 +227,8 @@ select_transferable_features <- function(x_list,
   combined_scores <- .score_transferable_features(
     coefficient_matrix,
     min_coefficient = min_coefficient,
-    require_sign_consistency = require_sign_consistency
+    require_sign_consistency = require_sign_consistency,
+    sign_consistency_threshold = sign_consistency_threshold
   )
 
   if (!nrow(combined_scores)) {
@@ -237,6 +241,7 @@ select_transferable_features <- function(x_list,
         lambda_choice = if (is.null(lambda_vec)) lambda_choice else "fixed",
         min_coefficient = min_coefficient,
         require_sign_consistency = require_sign_consistency,
+        sign_consistency_threshold = sign_consistency_threshold,
         standardize = standardize
       )
     ))
@@ -260,6 +265,7 @@ select_transferable_features <- function(x_list,
       lambda_choice = if (is.null(lambda_vec)) lambda_choice else "fixed",
       min_coefficient = min_coefficient,
       require_sign_consistency = require_sign_consistency,
+      sign_consistency_threshold = sign_consistency_threshold,
       standardize = standardize
     )
   )
@@ -573,7 +579,8 @@ select_transferable_features <- function(x_list,
   }
 
   feature_sets <- lapply(matrices, colnames)
-  # TODO(#transferability): replace simple intersection alignment with robust harmonisation.
+  # Uses intersection alignment for consistency with ridge models across cohorts
+  # For more flexible alignment, use .align_features() from cohort_preparation.R
   common_features <- Reduce(intersect, feature_sets)
   if (is.null(common_features) || !length(common_features)) {
     stop(
@@ -621,7 +628,8 @@ select_transferable_features <- function(x_list,
 
 .score_transferable_features <- function(coefficient_matrix,
                                          min_coefficient,
-                                         require_sign_consistency) {
+                                         require_sign_consistency,
+                                         sign_consistency_threshold = 1.0) {
   if (!nrow(coefficient_matrix)) {
     return(data.frame())
   }
@@ -634,13 +642,18 @@ select_transferable_features <- function(x_list,
   sd_coeff <- apply(coefficient_matrix, 1, stats::sd)
   min_abs <- apply(abs_coeff, 1, min)
 
-  sign_consistent <- apply(coefficient_matrix, 1, function(vals) {
+  # Compute sign consistency as fraction of cohorts agreeing with median sign
+  sign_agreement <- apply(coefficient_matrix, 1, function(vals) {
     nz <- vals[abs(vals) > 1e-6]
     if (!length(nz)) {
-      return(TRUE)
+      return(1.0)  # All zeros -> consistent
     }
-    all(nz >= 0) || all(nz <= 0)
+    median_sign <- sign(stats::median(nz))
+    mean(sign(nz) == median_sign)
   })
+
+  # For backward compatibility, sign_consistent is TRUE if agreement >= threshold
+  sign_consistent <- sign_agreement >= sign_consistency_threshold
 
   score <- mean_abs / (sd_coeff + 1e-6)
 
@@ -655,6 +668,7 @@ select_transferable_features <- function(x_list,
     mean_abs = mean_abs,
     sd = sd_coeff,
     min_abs = min_abs,
+    sign_agreement = sign_agreement,
     sign_consistent = sign_consistent,
     score = score,
     stringsAsFactors = FALSE

@@ -22,24 +22,24 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// pairwise_ratios_cpp
-NumericMatrix pairwise_ratios_cpp(NumericMatrix x, NumericVector feature_col, String feature_name, CharacterVector other_names);
-RcppExport SEXP _biomarkerPanels_pairwise_ratios_cpp(SEXP xSEXP, SEXP feature_colSEXP, SEXP feature_nameSEXP, SEXP other_namesSEXP) {
+// reference_diff_cpp
+NumericMatrix reference_diff_cpp(NumericMatrix x, NumericVector ref_col, String ref_name, CharacterVector other_names);
+RcppExport SEXP _biomarkerPanels_reference_diff_cpp(SEXP xSEXP, SEXP ref_colSEXP, SEXP ref_nameSEXP, SEXP other_namesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< NumericMatrix >::type x(xSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type feature_col(feature_colSEXP);
-    Rcpp::traits::input_parameter< String >::type feature_name(feature_nameSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type ref_col(ref_colSEXP);
+    Rcpp::traits::input_parameter< String >::type ref_name(ref_nameSEXP);
     Rcpp::traits::input_parameter< CharacterVector >::type other_names(other_namesSEXP);
-    rcpp_result_gen = Rcpp::wrap(pairwise_ratios_cpp(x, feature_col, feature_name, other_names));
+    rcpp_result_gen = Rcpp::wrap(reference_diff_cpp(x, ref_col, ref_name, other_names));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
     {"_biomarkerPanels_pairwise_col_diff_cpp", (DL_FUNC) &_biomarkerPanels_pairwise_col_diff_cpp, 2},
-    {"_biomarkerPanels_pairwise_ratios_cpp", (DL_FUNC) &_biomarkerPanels_pairwise_ratios_cpp, 4},
+    {"_biomarkerPanels_reference_diff_cpp", (DL_FUNC) &_biomarkerPanels_reference_diff_cpp, 4},
     {NULL, NULL, 0}
 };
 

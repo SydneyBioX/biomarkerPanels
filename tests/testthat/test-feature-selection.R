@@ -86,6 +86,7 @@ test_that("select_features_for_ratios returns stable and informative sets", {
 })
 
 test_that("select_transferable_features prioritises consistent ridge coefficients", {
+  skip_slow_tests()
   make_cohort <- function(seed, delta) {
     set.seed(seed)
     n <- 80L
@@ -124,6 +125,7 @@ test_that("select_transferable_features prioritises consistent ridge coefficient
 })
 
 test_that("select_transferable_features intersects cohort feature sets", {
+  skip_slow_tests()
   make_dataset <- function(seed, cols) {
     set.seed(seed)
     n <- 60L
@@ -151,4 +153,65 @@ test_that("select_transferable_features intersects cohort feature sets", {
   expect_true(all(result$features %in% c("gene_common1", "gene_common2")))
   expect_equal(colnames(result$coefficients), c("cohort_01", "cohort_02"))
   expect_true(all(rownames(result$coefficients) %in% c("gene_common1", "gene_common2")))
+})
+
+# Issue 3: sign_consistency_threshold tests
+test_that("sign_consistency_threshold allows partial sign consistency", {
+  skip_slow_tests()
+  # Create 4 cohorts where geneB has sign inconsistency in one cohort
+  make_cohort <- function(seed, b_sign) {
+    set.seed(seed)
+    n <- 80L
+    x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
+    colnames(x) <- c("geneA", "geneB")
+    # geneA always has positive effect, geneB has varying sign
+    linear <- 1.5 * x[, "geneA"] + b_sign * 0.8 * x[, "geneB"]
+    prob <- stats::plogis(linear)
+    y <- factor(ifelse(runif(n) < prob, "Yes", "No"), levels = c("No", "Yes"))
+    list(x = x, y = y)
+  }
+
+  # cohort 4 has opposite sign for geneB
+  cohorts <- list(
+    make_cohort(101, 1),   # positive geneB
+    make_cohort(102, 1),   # positive geneB
+    make_cohort(103, 1),   # positive geneB
+    make_cohort(104, -1)   # negative geneB
+  )
+
+  x_list <- lapply(cohorts, `[[`, "x")
+  y_list <- lapply(cohorts, `[[`, "y")
+
+  # With 100% sign consistency (default), geneB should be excluded
+  result_strict <- select_transferable_features(
+    x_list, y_list,
+    n_features = 2,
+    require_sign_consistency = TRUE,
+    sign_consistency_threshold = 1.0,
+    lambda = 0.1
+  )
+
+  # With 75% sign consistency, geneB should be included (3/4 = 75% agree)
+  result_lenient <- select_transferable_features(
+    x_list, y_list,
+    n_features = 2,
+    require_sign_consistency = TRUE,
+    sign_consistency_threshold = 0.75,
+    lambda = 0.1
+  )
+
+  # geneA should be in both (100% sign consistency)
+  expect_true("geneA" %in% result_strict$features)
+  expect_true("geneA" %in% result_lenient$features)
+
+  # geneB should be excluded from strict, included in lenient
+  expect_false("geneB" %in% result_strict$features)
+  expect_true("geneB" %in% result_lenient$features)
+
+  # Verify sign_consistency_threshold is stored in settings
+  expect_equal(result_strict$settings$sign_consistency_threshold, 1.0)
+  expect_equal(result_lenient$settings$sign_consistency_threshold, 0.75)
+
+  # Verify sign_agreement column exists and has proper values
+  expect_true("sign_agreement" %in% names(result_lenient$scores))
 })

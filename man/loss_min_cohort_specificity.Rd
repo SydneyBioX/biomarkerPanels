@@ -9,6 +9,7 @@ loss_min_cohort_specificity(
   scores = NULL,
   selected = NULL,
   cutoff_prob = 0.5,
+  cutoff_strategy = c("fixed", "prevalence", "youden"),
   positive = "Yes",
   cohort = NULL
 )
@@ -20,7 +21,12 @@ loss_min_cohort_specificity(
 
 \item{selected}{Ignored; kept for signature compatibility.}
 
-\item{cutoff_prob}{Classification probability cutoff applied to \code{scores}.}
+\item{cutoff_prob}{Classification probability cutoff applied to \code{scores}.
+Ignored when \code{cutoff_strategy} is not \code{"fixed"}.}
+
+\item{cutoff_strategy}{Strategy for computing cutoff. One of \code{"fixed"}
+(use \code{cutoff_prob}), \code{"prevalence"} (cutoff = class prevalence), or
+\code{"youden"} (optimal Youden's J). Default is \code{"fixed"}.}
 
 \item{positive}{Label treated as the positive ("event") class.}
 

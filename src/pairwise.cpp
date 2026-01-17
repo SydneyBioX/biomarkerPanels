@@ -10,7 +10,13 @@ using namespace Rcpp;
  NumericMatrix pairwise_col_diff_cpp(NumericMatrix x, CharacterVector col_names) {
    int n = x.nrow();
    int p = x.ncol();
-   int n_pairs = (p * (p - 1)) / 2;
+   // Use long long to avoid integer overflow for large p
+   // (p * (p-1) / 2 can exceed INT_MAX when p > ~46,340)
+   long long n_pairs_ll = (static_cast<long long>(p) * (p - 1)) / 2;
+   if (n_pairs_ll > INT_MAX) {
+     Rcpp::stop("Too many feature pairs for pairwise aggregation");
+   }
+   int n_pairs = static_cast<int>(n_pairs_ll);
    
    // Pre-allocate result
    NumericMatrix result(n, n_pairs);
@@ -35,34 +41,32 @@ using namespace Rcpp;
    return result;
  }
 
-//' @title Compute pairwise ratios to a specific feature (C++)
- //' @param x A numeric matrix
- //' @param feature_col The feature column vector
- //' @param feature_name Name of the feature
- //' @param other_names Names of other columns
- //' @return A matrix of pairwise ratios
- //' @keywords internal
- // [[Rcpp::export(.pairwise_ratios_cpp)]]
- NumericMatrix pairwise_ratios_cpp(NumericMatrix x, NumericVector feature_col, 
-                                   String feature_name, CharacterVector other_names) {
-   int n = x.nrow();
-   int p = x.ncol();
-   
-   NumericMatrix result(n, p);
-   CharacterVector result_names(p);
-   
-   // Convert feature_name to std::string once
-   std::string feat_str = feature_name;
-   
-   for (int j = 0; j < p; j++) {
-     for (int i = 0; i < n; i++) {
-       result(i, j) = feature_col[i] / x(i, j);
-     }
-     // Create column name using std::string for concatenation
-     std::string other_str = Rcpp::as<std::string>(other_names[j]);
-     result_names[j] = feat_str + "/" + other_str;
-   }
-   
-   colnames(result) = result_names;
-   return result;
- }
+//' @title Compute differences relative to a reference column (C++)
+//' @param x A numeric matrix (excluding reference column)
+//' @param ref_col The reference column vector
+//' @param ref_name Name of the reference feature
+//' @param other_names Names of other columns
+//' @return A matrix of differences (other - ref)
+//' @keywords internal
+// [[Rcpp::export(.reference_diff_cpp)]]
+NumericMatrix reference_diff_cpp(NumericMatrix x, NumericVector ref_col,
+                                 String ref_name, CharacterVector other_names) {
+  int n = x.nrow();
+  int p = x.ncol();
+
+  NumericMatrix result(n, p);
+  CharacterVector result_names(p);
+
+  std::string ref_str = ref_name;
+
+  for (int j = 0; j < p; j++) {
+    for (int i = 0; i < n; i++) {
+      result(i, j) = x(i, j) - ref_col[i];
+    }
+    std::string other_str = Rcpp::as<std::string>(other_names[j]);
+    result_names[j] = other_str + "--" + ref_str;
+  }
+
+  colnames(result) = result_names;
+  return result;
+}
