@@ -10,6 +10,42 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// select_stable_genes_cpp
+NumericVector select_stable_genes_cpp(NumericMatrix abs_t, NumericMatrix se_matrix, std::string method);
+RcppExport SEXP _biomarkerPanels_select_stable_genes_cpp(SEXP abs_tSEXP, SEXP se_matrixSEXP, SEXP methodSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type abs_t(abs_tSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type se_matrix(se_matrixSEXP);
+    Rcpp::traits::input_parameter< std::string >::type method(methodSEXP);
+    rcpp_result_gen = Rcpp::wrap(select_stable_genes_cpp(abs_t, se_matrix, method));
+    return rcpp_result_gen;
+END_RCPP
+}
+// score_transferable_features_cpp
+List score_transferable_features_cpp(NumericMatrix coefficient_matrix);
+RcppExport SEXP _biomarkerPanels_score_transferable_features_cpp(SEXP coefficient_matrixSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type coefficient_matrix(coefficient_matrixSEXP);
+    rcpp_result_gen = Rcpp::wrap(score_transferable_features_cpp(coefficient_matrix));
+    return rcpp_result_gen;
+END_RCPP
+}
+// aggregate_de_pvalues_cpp
+NumericVector aggregate_de_pvalues_cpp(NumericMatrix t_matrix, std::string method);
+RcppExport SEXP _biomarkerPanels_aggregate_de_pvalues_cpp(SEXP t_matrixSEXP, SEXP methodSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type t_matrix(t_matrixSEXP);
+    Rcpp::traits::input_parameter< std::string >::type method(methodSEXP);
+    rcpp_result_gen = Rcpp::wrap(aggregate_de_pvalues_cpp(t_matrix, method));
+    return rcpp_result_gen;
+END_RCPP
+}
 // pairwise_col_diff_cpp
 NumericMatrix pairwise_col_diff_cpp(NumericMatrix x, CharacterVector col_names);
 RcppExport SEXP _biomarkerPanels_pairwise_col_diff_cpp(SEXP xSEXP, SEXP col_namesSEXP) {
@@ -36,10 +72,26 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// compute_roc_curve_cpp
+DataFrame compute_roc_curve_cpp(NumericVector scores, LogicalVector is_positive);
+RcppExport SEXP _biomarkerPanels_compute_roc_curve_cpp(SEXP scoresSEXP, SEXP is_positiveSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type scores(scoresSEXP);
+    Rcpp::traits::input_parameter< LogicalVector >::type is_positive(is_positiveSEXP);
+    rcpp_result_gen = Rcpp::wrap(compute_roc_curve_cpp(scores, is_positive));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_biomarkerPanels_select_stable_genes_cpp", (DL_FUNC) &_biomarkerPanels_select_stable_genes_cpp, 3},
+    {"_biomarkerPanels_score_transferable_features_cpp", (DL_FUNC) &_biomarkerPanels_score_transferable_features_cpp, 1},
+    {"_biomarkerPanels_aggregate_de_pvalues_cpp", (DL_FUNC) &_biomarkerPanels_aggregate_de_pvalues_cpp, 2},
     {"_biomarkerPanels_pairwise_col_diff_cpp", (DL_FUNC) &_biomarkerPanels_pairwise_col_diff_cpp, 2},
     {"_biomarkerPanels_reference_diff_cpp", (DL_FUNC) &_biomarkerPanels_reference_diff_cpp, 4},
+    {"_biomarkerPanels_compute_roc_curve_cpp", (DL_FUNC) &_biomarkerPanels_compute_roc_curve_cpp, 2},
     {NULL, NULL, 0}
 };
 

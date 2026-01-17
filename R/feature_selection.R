@@ -381,7 +381,8 @@ select_transferable_features <- function(x_list,
   )
 }
 
-.aggregate_de_pvalues <- function(t_matrix, combination_method) {
+# Pure R implementation kept for testing
+.aggregate_de_pvalues_pure_r <- function(t_matrix, combination_method) {
   if (length(t_matrix) == 0L) {
     return(numeric())
   }
@@ -415,7 +416,34 @@ select_transferable_features <- function(x_list,
   sort(two_sided, decreasing = FALSE)
 }
 
-.select_stable_genes <- function(t_matrix, se_matrix, method, top_n) {
+# Main implementation using C++
+.aggregate_de_pvalues <- function(t_matrix, combination_method) {
+  if (length(t_matrix) == 0L) {
+    return(numeric())
+  }
+
+  # Map method names to C++ expected format
+  method_map <- c(
+    "stouffer" = "Stouffer",
+    "Stouffer" = "Stouffer",
+    "fisher" = "Fisher",
+    "Fisher" = "Fisher",
+    "osp" = "OSP",
+    "OSP" = "OSP",
+    "maxp" = "maxP",
+    "maxP" = "maxP"
+  )
+
+  cpp_method <- method_map[combination_method]
+  if (is.na(cpp_method)) {
+    stop("Unsupported combination method: ", combination_method, call. = FALSE)
+  }
+
+  .aggregate_de_pvalues_cpp(t_matrix, cpp_method)
+}
+
+# Pure R implementation kept for testing
+.select_stable_genes_pure_r <- function(t_matrix, se_matrix, method, top_n) {
   if (length(t_matrix) == 0L || nrow(t_matrix) == 0L) {
     return(character())
   }
@@ -461,6 +489,28 @@ select_transferable_features <- function(x_list,
   }
 
   scores[!is.finite(scores)] <- NA_real_
+  valid_idx <- which(!is.na(scores))
+  if (!length(valid_idx)) {
+    return(character())
+  }
+
+  ordered <- valid_idx[order(scores[valid_idx], decreasing = TRUE)]
+  top_k <- head(ordered, n = min(top_n, length(ordered)))
+  rownames(abs_t)[top_k]
+}
+
+# Main implementation using C++
+.select_stable_genes <- function(t_matrix, se_matrix, method, top_n) {
+  if (length(t_matrix) == 0L || nrow(t_matrix) == 0L) {
+    return(character())
+  }
+
+  abs_t <- abs(t_matrix)
+
+  # Call C++ implementation
+  scores <- .select_stable_genes_cpp(abs_t, se_matrix, method)
+
+  # Post-processing same as R version
   valid_idx <- which(!is.na(scores))
   if (!length(valid_idx)) {
     return(character())
@@ -626,6 +676,59 @@ select_transferable_features <- function(x_list,
   coef_vec[feature_names]
 }
 
+# Pure R implementation kept for testing
+.score_transferable_features_pure_r <- function(coefficient_matrix,
+                                                 min_coefficient,
+                                                 require_sign_consistency,
+                                                 sign_consistency_threshold = 1.0) {
+  if (!nrow(coefficient_matrix)) {
+    return(data.frame())
+  }
+
+  feature_names <- rownames(coefficient_matrix)
+  row_index <- seq_len(nrow(coefficient_matrix))
+
+  abs_coeff <- abs(coefficient_matrix)
+  mean_abs <- rowMeans(abs_coeff)
+  sd_coeff <- apply(coefficient_matrix, 1, stats::sd)
+  min_abs <- apply(abs_coeff, 1, min)
+
+  sign_agreement <- apply(coefficient_matrix, 1, function(vals) {
+    nz <- vals[abs(vals) > 1e-6]
+    if (!length(nz)) {
+      return(1.0)
+    }
+    median_sign <- sign(stats::median(nz))
+    mean(sign(nz) == median_sign)
+  })
+
+  sign_consistent <- sign_agreement >= sign_consistency_threshold
+  score <- mean_abs / (sd_coeff + 1e-6)
+
+  keep <- is.finite(score) & !is.na(score) & (min_abs >= min_coefficient)
+  if (require_sign_consistency) {
+    keep <- keep & sign_consistent
+  }
+
+  score_df <- data.frame(
+    feature = feature_names,
+    row_index = row_index,
+    mean_abs = mean_abs,
+    sd = sd_coeff,
+    min_abs = min_abs,
+    sign_agreement = sign_agreement,
+    sign_consistent = sign_consistent,
+    score = score,
+    stringsAsFactors = FALSE
+  )
+
+  score_df <- score_df[keep, , drop = FALSE]
+  score_df <- score_df[order(score_df$score, decreasing = TRUE), , drop = FALSE]
+  rownames(score_df) <- NULL
+  score_df
+}
+
+# Main implementation using C++
 .score_transferable_features <- function(coefficient_matrix,
                                          min_coefficient,
                                          require_sign_consistency,
@@ -635,26 +738,17 @@ select_transferable_features <- function(x_list,
   }
 
   feature_names <- rownames(coefficient_matrix)
-  row_index <- seq_len(nrow(coefficient_matrix))  # keep position for duplicate feature names
+  row_index <- seq_len(nrow(coefficient_matrix))
 
-  abs_coeff <- abs(coefficient_matrix)
-  mean_abs <- rowMeans(abs_coeff)
-  sd_coeff <- apply(coefficient_matrix, 1, stats::sd)
-  min_abs <- apply(abs_coeff, 1, min)
+  # Call C++ implementation for the heavy computation
+  cpp_result <- .score_transferable_features_cpp(coefficient_matrix)
 
-  # Compute sign consistency as fraction of cohorts agreeing with median sign
-  sign_agreement <- apply(coefficient_matrix, 1, function(vals) {
-    nz <- vals[abs(vals) > 1e-6]
-    if (!length(nz)) {
-      return(1.0)  # All zeros -> consistent
-    }
-    median_sign <- sign(stats::median(nz))
-    mean(sign(nz) == median_sign)
-  })
+  mean_abs <- cpp_result$mean_abs
+  sd_coeff <- cpp_result$sd
+  min_abs <- cpp_result$min_abs
+  sign_agreement <- cpp_result$sign_agreement
 
-  # For backward compatibility, sign_consistent is TRUE if agreement >= threshold
   sign_consistent <- sign_agreement >= sign_consistency_threshold
-
   score <- mean_abs / (sd_coeff + 1e-6)
 
   keep <- is.finite(score) & !is.na(score) & (min_abs >= min_coefficient)

@@ -335,7 +335,8 @@ evaluate_panel <- function(panel, x, y,
   )
 }
 
-.compute_roc_curve <- function(truth, scores, positive) {
+# Pure R implementation of ROC curve computation (kept for testing)
+.compute_roc_curve_pure_r <- function(truth, scores, positive) {
   truth <- ensure_binary_response(truth, positive = positive)
   levels_truth <- levels(truth)
   if (!positive %in% levels_truth) {
@@ -371,6 +372,24 @@ evaluate_panel <- function(panel, x, y,
     specificity = 1 - mat["fpr", ],
     stringsAsFactors = FALSE
   )
+  df[order(df$fpr, df$tpr), , drop = FALSE]
+}
+
+# Main ROC curve computation using C++ implementation
+.compute_roc_curve <- function(truth, scores, positive) {
+  truth <- ensure_binary_response(truth, positive = positive)
+  levels_truth <- levels(truth)
+  if (!positive %in% levels_truth) {
+    positive <- levels_truth[length(levels_truth)]
+  }
+
+  # Convert truth to logical vector for C++
+  is_positive <- truth == positive
+
+  # Call C++ implementation
+  df <- .compute_roc_curve_cpp(as.numeric(scores), is_positive)
+
+  # Sort by fpr, tpr for consistency with pure R version
   df[order(df$fpr, df$tpr), , drop = FALSE]
 }
 
