@@ -464,6 +464,96 @@ loss_pauc <- function(truth, scores = NULL, selected = NULL,
   })
 }
 
+#' Specificity at a Fixed Sensitivity Threshold
+#'
+#' Computes the specificity achievable when the classifier operates at a
+#' specified sensitivity level. This is useful for rule-out diagnostic
+#' applications where a minimum sensitivity is mandatory, and we want to
+#' know the best achievable specificity at that operating point.
+#'
+#' Uses [pROC::coords()] to find the operating point on the ROC curve
+#' corresponding to the target sensitivity, then returns the specificity
+#' at that point. If the exact target sensitivity cannot be achieved,
+#' pROC interpolates to the nearest achievable point.
+#'
+#' @inheritParams loss_sensitivity
+#' @param target_sensitivity The sensitivity threshold at which to evaluate
+#'   specificity (default 0.90). Must be between 0 and 1.
+#' @return Specificity at the target sensitivity, or `NA_real_` if computation
+#'   fails (e.g., degenerate ROC curve with no class separation).
+#' @seealso [loss_pauc()] for partial AUC in the high-sensitivity region,
+#'   [loss_sensitivity()] and [loss_specificity()] for threshold-based metrics.
+#' @export
+#' @examples
+#' truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
+#' scores <- c(runif(50, 0, 0.6), runif(50, 0.4, 1))
+#'
+#' # Specificity when sensitivity is fixed at 90%
+#' loss_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.90)
+#'
+#' # Specificity when sensitivity is fixed at 95%
+#' loss_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.95)
+loss_specificity_at_sensitivity <- function(truth, scores = NULL, selected = NULL,
+                                             positive = "Yes",
+                                             target_sensitivity = 0.90) {
+  if (!requireNamespace("pROC", quietly = TRUE)) {
+    stop("The 'pROC' package is required for this metric. ",
+         "Install it via install.packages('pROC').", call. = FALSE)
+  }
+  truth <- ensure_binary_response(truth)
+  if (is.null(scores)) {
+    stop("`scores` must be supplied to compute specificity at sensitivity.", call. = FALSE)
+  }
+
+  if (target_sensitivity < 0 || target_sensitivity > 1) {
+    stop("`target_sensitivity` must be between 0 and 1.", call. = FALSE)
+  }
+
+  pos_count <- sum(truth == positive)
+  neg_count <- sum(truth != positive)
+  if (pos_count == 0L) {
+    stop("Cannot compute specificity at sensitivity: no positive samples in the data.",
+         call. = FALSE)
+  }
+  if (neg_count == 0L) {
+    stop("Cannot compute specificity at sensitivity: no negative samples in the data.",
+         call. = FALSE)
+  }
+
+  tryCatch({
+    roc_obj <- pROC::roc(
+      response = truth,
+      predictor = scores,
+      levels = c(setdiff(levels(truth), positive), positive),
+      direction = "<",
+      quiet = TRUE
+    )
+
+    # Get specificity at the target sensitivity point
+    coords_result <- pROC::coords(
+      roc_obj,
+      x = target_sensitivity,
+      input = "sensitivity",
+      ret = "specificity"
+    )
+
+    # coords returns a data.frame; extract specificity
+    spec_value <- coords_result$specificity
+
+    if (length(spec_value) == 0 || is.na(spec_value)) {
+      return(NA_real_)
+    }
+
+    as.numeric(spec_value)
+  }, error = function(e) {
+    stop(
+      "Specificity at sensitivity computation failed: ", conditionMessage(e),
+      "\nThis typically indicates insufficient data or class imbalance.",
+      call. = FALSE
+    )
+  })
+}
+
 #' Maximum Mean Shift Across Cohorts
 #'
 #' Computes pairwise distances between cohort-specific mean expression vectors
@@ -565,6 +655,10 @@ loss_max_cohort_mean_shift <- function(truth, scores = NULL, selected = NULL,
 )
 .register_default_loss(
   "pauc", loss_pauc, "maximize", "Partial AUC (High Sensitivity)"
+)
+.register_default_loss(
+  "specificity_at_sensitivity", loss_specificity_at_sensitivity, "maximize",
+  "Specificity at Target Sensitivity"
 )
 
 #' Register a loss function.

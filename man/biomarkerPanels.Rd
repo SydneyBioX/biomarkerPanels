@@ -16,7 +16,6 @@ to deployable panel definitions.
 \section{Modules}{
 
 \itemize{
-\item Data simulation tools for benchmarking algorithms (\code{simulate_expression_data}).
 \item Objective construction helpers (\code{define_objectives}).
 \item Optimization engines (\code{optimize_panel}).
 \item Evaluation utilities (\code{evaluate_panel}, \code{plot_pareto_front}).

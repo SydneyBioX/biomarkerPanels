@@ -248,3 +248,83 @@ test_that("new loss functions work with build_objectives", {
   expect_true(is.numeric(objs$precision$fun(truth, scores)))
   expect_true(is.numeric(objs$npv$fun(truth, scores)))
 })
+
+# Tests for loss_specificity_at_sensitivity
+test_that("loss_specificity_at_sensitivity computes correctly", {
+  set.seed(42)
+  truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
+  # Well-separated scores
+  scores <- c(rnorm(50, 0.3, 0.1), rnorm(50, 0.7, 0.1))
+
+  spec_at_90 <- loss_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.90)
+  expect_true(is.numeric(spec_at_90))
+  expect_gte(spec_at_90, 0)
+  expect_lte(spec_at_90, 1)
+
+  # Higher target sensitivity should yield lower or equal specificity
+  spec_at_95 <- loss_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.95)
+  expect_lte(spec_at_95, spec_at_90 + 0.01)  # small tolerance for interpolation
+
+  # Lower target sensitivity should yield higher or equal specificity
+  spec_at_80 <- loss_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.80)
+  expect_gte(spec_at_80, spec_at_90 - 0.01)  # small tolerance for interpolation
+})
+
+test_that("loss_specificity_at_sensitivity handles edge cases", {
+  truth <- factor(c(rep("No", 10), rep("Yes", 10)), levels = c("No", "Yes"))
+
+  # Poor discrimination
+  poor_scores <- c(runif(10, 0.4, 0.6), runif(10, 0.4, 0.6))
+  spec_poor <- loss_specificity_at_sensitivity(truth, poor_scores, target_sensitivity = 0.90)
+  expect_true(is.numeric(spec_poor))
+
+  # Error when no positives
+  truth_no_pos <- factor(rep("No", 10), levels = c("No", "Yes"))
+  expect_error(
+    loss_specificity_at_sensitivity(truth_no_pos, runif(10)),
+    "no positive samples"
+  )
+
+  # Error when no negatives
+  truth_no_neg <- factor(rep("Yes", 10), levels = c("No", "Yes"))
+  expect_error(
+    loss_specificity_at_sensitivity(truth_no_neg, runif(10)),
+    "no negative samples"
+  )
+
+  # Invalid target_sensitivity
+  expect_error(
+    loss_specificity_at_sensitivity(truth, runif(20), target_sensitivity = 1.5),
+    "between 0 and 1"
+  )
+
+  # Missing scores
+  expect_error(
+    loss_specificity_at_sensitivity(truth),
+    "scores.*must be supplied"
+  )
+})
+
+test_that("loss_specificity_at_sensitivity is registered correctly", {
+  registry <- loss_registry()
+  expect_true("specificity_at_sensitivity" %in% names(registry))
+  expect_equal(registry$specificity_at_sensitivity$direction, "maximize")
+})
+
+test_that("loss_specificity_at_sensitivity works with build_objectives", {
+  objs <- build_objectives(
+    "specificity_at_sensitivity",
+    params = list(specificity_at_sensitivity = list(target_sensitivity = 0.95))
+  )
+
+  set.seed(42)
+  truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
+  scores <- c(rnorm(50, 0.3, 0.1), rnorm(50, 0.7, 0.1))
+
+  result <- objs$specificity_at_sensitivity$fun(truth, scores)
+  expect_true(is.numeric(result))
+
+  # Should match direct call with same parameter
+  direct <- loss_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.95)
+  expect_equal(result, direct)
+})
