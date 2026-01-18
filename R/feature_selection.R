@@ -507,7 +507,7 @@ select_transferable_features <- function(x_list,
 
   abs_t <- abs(t_matrix)
 
-  # Call C++ implementation
+  # Call C++ implementation - so much faster lol 
   scores <- .select_stable_genes_cpp(abs_t, se_matrix, method)
 
   # Post-processing same as R version

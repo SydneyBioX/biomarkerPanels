@@ -311,3 +311,101 @@ select_panel_by_pathway <- function(high_sensitivity_panels,
     pathway_assignments = assignments_df
   )
 }
+
+#' Analyze Feature Selection Stability Across Pareto Solutions
+#'
+#' Computes feature inclusion frequencies and pairwise Jaccard similarity
+#' between all Pareto-optimal solutions in a `BiomarkerPanelResult`.
+#'
+#' @param result A [`BiomarkerPanelResult`] object containing optimization results.
+#' @return A list with class `"FeatureStabilityResult"` containing:
+#'   \describe{
+#'     \item{frequencies}{Data frame with columns `feature`, `count`, `proportion`
+#'       ordered by descending count.}
+#'     \item{jaccard_matrix}{Symmetric matrix of pairwise Jaccard similarity
+#'       coefficients between solutions. Row/column names are `solution_id` values.}
+#'     \item{n_solutions}{Integer count of Pareto-optimal solutions analyzed.}
+#'     \item{mean_jaccard}{Mean pairwise Jaccard similarity (excluding diagonal).}
+#'   }
+#' @export
+#' @seealso [compute_inclusion_frequencies()], [plot_feature_stability()]
+#' @examples
+#' # After running optimize_panel():
+#' # stability <- analyze_feature_stability(panel_result)
+#' # stability$frequencies
+#' # stability$jaccard_matrix
+analyze_feature_stability <- function(result) {
+  stopifnot(inherits(result, "BiomarkerPanelResult"))
+
+  solution_features <- .extract_solution_features(result)
+  n_solutions <- length(solution_features)
+
+  # Handle empty result
+
+  if (n_solutions == 0L) {
+    return(structure(
+      list(
+        frequencies = data.frame(
+          feature = character(),
+          count = integer(),
+          proportion = numeric(),
+          stringsAsFactors = FALSE
+        ),
+        jaccard_matrix = matrix(nrow = 0L, ncol = 0L),
+        n_solutions = 0L,
+        mean_jaccard = NA_real_
+      ),
+      class = "FeatureStabilityResult"
+    ))
+  }
+
+  # Compute frequencies by reusing compute_inclusion_frequencies()
+  frequencies <- compute_inclusion_frequencies(list(result))
+
+  # Compute Jaccard similarity matrix
+  solution_ids <- names(solution_features)
+  jaccard_matrix <- matrix(
+    NA_real_,
+    nrow = n_solutions,
+    ncol = n_solutions,
+    dimnames = list(solution_ids, solution_ids)
+  )
+
+  for (i in seq_len(n_solutions)) {
+    for (j in seq_len(i)) {
+      set_i <- solution_features[[i]]
+      set_j <- solution_features[[j]]
+
+      if (length(set_i) == 0L && length(set_j) == 0L) {
+        jaccard <- 1.0
+      } else if (length(set_i) == 0L || length(set_j) == 0L) {
+        jaccard <- 0.0
+      } else {
+        intersection_size <- length(intersect(set_i, set_j))
+        union_size <- length(union(set_i, set_j))
+        jaccard <- intersection_size / union_size
+      }
+
+      jaccard_matrix[i, j] <- jaccard
+      jaccard_matrix[j, i] <- jaccard
+    }
+  }
+
+  # Calculate mean Jaccard (off-diagonal)
+  if (n_solutions > 1L) {
+    off_diag <- jaccard_matrix[lower.tri(jaccard_matrix)]
+    mean_jaccard <- mean(off_diag)
+  } else {
+    mean_jaccard <- NA_real_
+  }
+
+  structure(
+    list(
+      frequencies = frequencies,
+      jaccard_matrix = jaccard_matrix,
+      n_solutions = n_solutions,
+      mean_jaccard = mean_jaccard
+    ),
+    class = "FeatureStabilityResult"
+  )
+}

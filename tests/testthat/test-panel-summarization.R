@@ -95,3 +95,277 @@ test_that("select_panel_by_pathway integrates pathway knowledge", {
   expect_equal(selection$features, c("B", "C", "A"))
   expect_true(all(selection$pathway_assignments$pathway %in% c("P1", "P2")))
 })
+
+# ============================================================================
+# analyze_feature_stability tests
+# ============================================================================
+
+test_that("analyze_feature_stability returns correct structure", {
+  objectives <- data.frame(
+    solution_id = c(1, 1, 2, 2, 3, 3),
+    objective = rep(c("sens", "spec"), 3),
+    value = c(0.8, 0.7, 0.75, 0.72, 0.82, 0.68),
+    direction = rep("maximize", 6),
+    stringsAsFactors = FALSE
+  )
+  objectives$features <- I(list(
+    c("A", "B", "C"),
+    c("A", "B", "C"),
+    c("B", "C", "D"),
+    c("B", "C", "D"),
+    c("A", "C", "D", "E"),
+    c("A", "C", "D", "E")
+  ))
+
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = c("A", "B"),
+    metrics = c(sensitivity = 0.8),
+    objectives = objectives,
+    control = list(),
+    training_data = list()
+  )
+
+  stability <- analyze_feature_stability(panel)
+
+  expect_s3_class(stability, "FeatureStabilityResult")
+  expect_named(stability, c("frequencies", "jaccard_matrix", "n_solutions", "mean_jaccard"))
+
+  expect_equal(nrow(stability$frequencies), 5L)
+  expect_equal(colnames(stability$frequencies), c("feature", "count", "proportion"))
+  expect_equal(stability$frequencies$feature[1], "C")
+  expect_equal(stability$frequencies$count[1], 3L)
+
+  expect_equal(dim(stability$jaccard_matrix), c(3L, 3L))
+  expect_equal(rownames(stability$jaccard_matrix), c("1", "2", "3"))
+  expect_equal(unname(diag(stability$jaccard_matrix)), rep(1.0, 3))
+  expect_equal(stability$jaccard_matrix[1, 2], stability$jaccard_matrix[2, 1])
+
+  expect_equal(stability$n_solutions, 3L)
+  expect_true(stability$mean_jaccard >= 0 && stability$mean_jaccard <= 1)
+})
+
+test_that("analyze_feature_stability computes Jaccard correctly", {
+  objectives <- data.frame(
+    solution_id = c(1, 2),
+    objective = c("sens", "sens"),
+    value = c(0.8, 0.75),
+    direction = c("maximize", "maximize"),
+    stringsAsFactors = FALSE
+  )
+  objectives$features <- I(list(
+    c("A", "B"),
+    c("B", "C")
+  ))
+
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = c("A", "B"),
+    metrics = c(sensitivity = 0.8),
+    objectives = objectives,
+    control = list(),
+    training_data = list()
+  )
+
+  stability <- analyze_feature_stability(panel)
+
+  expect_equal(stability$jaccard_matrix[1, 2], 1/3, tolerance = 1e-10)
+  expect_equal(stability$mean_jaccard, 1/3, tolerance = 1e-10)
+})
+
+test_that("analyze_feature_stability handles empty result", {
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = character(),
+    metrics = numeric(),
+    objectives = data.frame(),
+    control = list(),
+    training_data = list()
+  )
+
+  stability <- analyze_feature_stability(panel)
+
+  expect_s3_class(stability, "FeatureStabilityResult")
+  expect_equal(nrow(stability$frequencies), 0L)
+  expect_equal(dim(stability$jaccard_matrix), c(0L, 0L))
+  expect_equal(stability$n_solutions, 0L)
+  expect_true(is.na(stability$mean_jaccard))
+})
+
+test_that("analyze_feature_stability handles single solution", {
+  objectives <- data.frame(
+    solution_id = c(1, 1),
+    objective = c("sens", "spec"),
+    value = c(0.8, 0.7),
+    direction = c("maximize", "maximize"),
+    stringsAsFactors = FALSE
+  )
+  objectives$features <- I(list(c("A", "B"), c("A", "B")))
+
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = c("A", "B"),
+    metrics = c(sensitivity = 0.8),
+    objectives = objectives,
+    control = list(),
+    training_data = list()
+  )
+
+  stability <- analyze_feature_stability(panel)
+
+  expect_equal(stability$n_solutions, 1L)
+  expect_equal(dim(stability$jaccard_matrix), c(1L, 1L))
+  expect_equal(stability$jaccard_matrix[1, 1], 1.0)
+  expect_true(is.na(stability$mean_jaccard))
+})
+
+test_that("analyze_feature_stability handles empty features in solution", {
+  objectives <- data.frame(
+    solution_id = c(1, 2),
+    objective = c("sens", "sens"),
+    value = c(0.8, 0.75),
+    direction = c("maximize", "maximize"),
+    stringsAsFactors = FALSE
+  )
+  objectives$features <- I(list(
+    character(),
+    c("A", "B")
+  ))
+
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = c("A", "B"),
+    metrics = c(sensitivity = 0.8),
+    objectives = objectives,
+    control = list(),
+    training_data = list()
+  )
+
+  stability <- analyze_feature_stability(panel)
+
+  expect_equal(stability$jaccard_matrix[1, 1], 1.0)
+  expect_equal(stability$jaccard_matrix[1, 2], 0.0)
+  expect_equal(stability$jaccard_matrix[2, 2], 1.0)
+})
+
+# ============================================================================
+# plot_feature_stability tests
+# ============================================================================
+
+test_that("plot_feature_stability returns ggplot object", {
+  skip_if_not_installed("ggplot2")
+
+  objectives <- data.frame(
+    solution_id = c(1, 1, 2, 2),
+    objective = rep(c("sens", "spec"), 2),
+    value = c(0.8, 0.7, 0.75, 0.72),
+    direction = rep("maximize", 4),
+    stringsAsFactors = FALSE
+  )
+  objectives$features <- I(list(
+    c("A", "B", "C"),
+    c("A", "B", "C"),
+    c("B", "C", "D"),
+    c("B", "C", "D")
+  ))
+
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = c("A", "B"),
+    metrics = c(sensitivity = 0.8),
+    objectives = objectives,
+    control = list(),
+    training_data = list()
+  )
+
+  stability <- analyze_feature_stability(panel)
+  p <- plot_feature_stability(stability)
+
+  expect_s3_class(p, "ggplot")
+})
+
+test_that("plot_feature_stability respects top_n parameter", {
+  skip_if_not_installed("ggplot2")
+
+  objectives <- data.frame(
+    solution_id = 1,
+    objective = "sens",
+    value = 0.8,
+    direction = "maximize",
+    stringsAsFactors = FALSE
+  )
+  objectives$features <- I(list(LETTERS[1:15]))
+
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = LETTERS[1:5],
+    metrics = c(sensitivity = 0.8),
+    objectives = objectives,
+    control = list(),
+    training_data = list()
+  )
+
+  stability <- analyze_feature_stability(panel)
+  p <- plot_feature_stability(stability, top_n = 5)
+
+  expect_s3_class(p, "ggplot")
+  plot_data <- ggplot2::ggplot_build(p)$data[[1]]
+  expect_lte(nrow(plot_data), 5L)
+})
+
+test_that("plot_feature_stability handles empty stability result", {
+  skip_if_not_installed("ggplot2")
+
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = character(),
+    metrics = numeric(),
+    objectives = data.frame(),
+    control = list(),
+    training_data = list()
+  )
+
+  stability <- analyze_feature_stability(panel)
+  p <- plot_feature_stability(stability)
+
+  expect_s3_class(p, "ggplot")
+})
+
+test_that("plot_feature_stability validates inputs", {
+  skip_if_not_installed("ggplot2")
+
+  expect_error(
+    plot_feature_stability(list(a = 1)),
+    "must be output from analyze_feature_stability"
+  )
+
+  objectives <- data.frame(
+    solution_id = 1,
+    objective = "sens",
+    value = 0.8,
+    direction = "maximize",
+    stringsAsFactors = FALSE
+  )
+  objectives$features <- I(list(c("A", "B")))
+
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = c("A", "B"),
+    metrics = c(sensitivity = 0.8),
+    objectives = objectives,
+    control = list(),
+    training_data = list()
+  )
+
+  stability <- analyze_feature_stability(panel)
+
+  expect_error(
+    plot_feature_stability(stability, top_n = -1),
+    "positive integer"
+  )
+
+  expect_error(
+    plot_feature_stability(stability, highlight_threshold = 1.5),
+    "between 0 and 1"
+  )
+})
