@@ -335,47 +335,16 @@ evaluate_panel <- function(panel, x, y,
   )
 }
 
-# Pure R implementation of ROC curve computation (kept for testing)
-.compute_roc_curve_pure_r <- function(truth, scores, positive) {
-  truth <- ensure_binary_response(truth, positive = positive)
-  levels_truth <- levels(truth)
-  if (!positive %in% levels_truth) {
-    positive <- levels_truth[length(levels_truth)]
-  }
-  negative <- setdiff(levels_truth, positive)
-  if (!length(negative)) {
-    stop("Unable to determine negative class for ROC.", call. = FALSE)
-  }
-  negative <- negative[1]
-
-  thresholds <- sort(unique(scores), decreasing = TRUE)
-  thresholds <- c(Inf, thresholds, -Inf)
-
-  pos_total <- sum(truth == positive)
-  neg_total <- sum(truth == negative)
-
-  compute_point <- function(thresh) {
-    predicted_positive <- scores >= thresh
-    tp <- sum(predicted_positive & truth == positive)
-    fp <- sum(predicted_positive & truth == negative)
-    tpr <- if (pos_total == 0) NA_real_ else tp / pos_total
-    fpr <- if (neg_total == 0) NA_real_ else fp / neg_total
-    c(tpr = tpr, fpr = fpr)
-  }
-
-  mat <- vapply(thresholds, compute_point, numeric(2))
-  df <- data.frame(
-    threshold = thresholds,
-    tpr = mat["tpr", ],
-    fpr = mat["fpr", ],
-    sensitivity = mat["tpr", ],
-    specificity = 1 - mat["fpr", ],
-    stringsAsFactors = FALSE
-  )
-  df[order(df$fpr, df$tpr), , drop = FALSE]
-}
-
-# Main ROC curve computation using C++ implementation
+#' Compute ROC Curve
+#'
+#' Computes the ROC curve for a set of predictions. Uses C++ for performance.
+#'
+#' @param truth A binary response vector or factor.
+#' @param scores Numeric vector of predicted scores or probabilities.
+#' @param positive The label for the positive class.
+#' @return A data.frame with columns `threshold`, `tpr`, `fpr`, `sensitivity`,
+#'   and `specificity`.
+#' @keywords internal
 .compute_roc_curve <- function(truth, scores, positive) {
   truth <- ensure_binary_response(truth, positive = positive)
   levels_truth <- levels(truth)
@@ -626,4 +595,56 @@ evaluate_panel_by_cohort <- function(panel,
   attr(result, "features") <- features
 
   result
+}
+
+# ==============================================================================
+# PURE R REFERENCE IMPLEMENTATIONS (for testing)
+# TODO: Remove these once Rcpp equivalents are fully debugged and validated.
+# See tests/testthat/test-rcpp-equivalence.R for equivalence tests.
+# ==============================================================================
+
+#' Pure R Reference Implementation of ROC Curve Computation
+#'
+#' Kept for regression testing against the C++ implementation.
+#' TODO: Remove once Rcpp equivalents are fully debugged and validated.
+#'
+#' @inheritParams .compute_roc_curve
+#' @keywords internal
+.compute_roc_curve_pure_r <- function(truth, scores, positive) {
+  truth <- ensure_binary_response(truth, positive = positive)
+  levels_truth <- levels(truth)
+  if (!positive %in% levels_truth) {
+    positive <- levels_truth[length(levels_truth)]
+  }
+  negative <- setdiff(levels_truth, positive)
+  if (!length(negative)) {
+    stop("Unable to determine negative class for ROC.", call. = FALSE)
+  }
+  negative <- negative[1]
+
+  thresholds <- sort(unique(scores), decreasing = TRUE)
+  thresholds <- c(Inf, thresholds, -Inf)
+
+  pos_total <- sum(truth == positive)
+  neg_total <- sum(truth == negative)
+
+  compute_point <- function(thresh) {
+    predicted_positive <- scores >= thresh
+    tp <- sum(predicted_positive & truth == positive)
+    fp <- sum(predicted_positive & truth == negative)
+    tpr <- if (pos_total == 0) NA_real_ else tp / pos_total
+    fpr <- if (neg_total == 0) NA_real_ else fp / neg_total
+    c(tpr = tpr, fpr = fpr)
+  }
+
+  mat <- vapply(thresholds, compute_point, numeric(2))
+  df <- data.frame(
+    threshold = thresholds,
+    tpr = mat["tpr", ],
+    fpr = mat["fpr", ],
+    sensitivity = mat["tpr", ],
+    specificity = 1 - mat["fpr", ],
+    stringsAsFactors = FALSE
+  )
+  df[order(df$fpr, df$tpr), , drop = FALSE]
 }

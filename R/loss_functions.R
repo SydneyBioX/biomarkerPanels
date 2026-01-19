@@ -326,7 +326,15 @@ loss_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
   }
 }
 
-# Gap aggregator: max - min
+#' Gap Aggregator for Cohort Metrics
+#'
+#' Computes the range (max - min) of values across cohorts. Used internally
+#' by cohort gap loss functions.
+#'
+#' @param values Numeric vector of per-cohort metric values.
+#' @param na.rm Logical; whether to remove NA values before computation.
+#' @return The difference between max and min values.
+#' @keywords internal
 .gap_aggregator <- function(values, na.rm = TRUE) {
   max(values, na.rm = na.rm) - min(values, na.rm = na.rm)
 }
@@ -604,6 +612,19 @@ loss_max_cohort_mean_shift <- function(truth, scores = NULL, selected = NULL,
 
 .loss_registry <- new.env(parent = emptyenv())
 
+#' Register a Default Loss Function
+#'
+#' Internal helper to register built-in loss functions in the loss registry.
+#' Used during package loading to populate `.loss_registry`.
+#'
+#' @param name Character name for the loss function.
+#' @param fun The loss function itself.
+#' @param direction Either "maximize" or "minimize".
+#' @param label Human-readable label for the metric.
+#' @param cutoff_dependent Logical; whether the metric requires a probability
+#'   cutoff for classification.
+#' @return Invisible NULL; called for side effect of registering the loss.
+#' @keywords internal
 .register_default_loss <- function(name, fun, direction, label,
                                     cutoff_dependent = FALSE) {
   assign(name, list(

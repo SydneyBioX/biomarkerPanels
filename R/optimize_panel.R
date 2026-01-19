@@ -1,6 +1,6 @@
 #' Optimize Biomarker Panels with NSGA-II
 #'
-#' Wrapper around [mco::nsga2()] that composes registered loss functions into a
+#' Wrapper around [rmoo::nsga2()] that composes registered loss functions into a
 #' multi-objective search for compact biomarker panels. Candidate solutions are
 #' represented as weights over a feature pool; the top `max_features` features
 #' define a panel whose performance is evaluated via the selected losses.
@@ -44,9 +44,8 @@
 #' @param scoring_fn Function producing per-sample scores from the selected
 #'   features. Signature:
 #'   `function(x_selected, selected_features, truth, cohort = NULL, ...)`.
-#' @param nsga_control Named list of arguments passed to [mco::nsga2()]. Defaults
-#'   to `list(popsize = 64, generations = 60, cprob = 0.7, cdist = 5,
-#'   mprob = 0.2, mdist = 10)`.
+#' @param nsga_control Named list of arguments passed to [rmoo::nsga2()]. Defaults
+#'   to `list(popSize = 64, maxiter = 60, pcrossover = 0.7, pmutation = 0.2)`.
 #' @param assay For `SummarizedExperiment` inputs, assay name or index to use.
 #' @param seed Optional integer seed for reproducibility. When provided, sets
 #'   the random seed before running NSGA-II optimization. This ensures
@@ -95,8 +94,8 @@ optimize_panel <- function(x, y,
                            regularized = TRUE,
                            regularized_alpha = 0.5) {
   feature_alignment <- match.arg(feature_alignment)
-  if (!requireNamespace("mco", quietly = TRUE)) {
-    stop("The 'mco' package is required. Install it via BiocManager::install('mco').",
+  if (!requireNamespace("rmoo", quietly = TRUE)) {
+    stop("The 'rmoo' package is required. Install it via install.packages('rmoo').",
          call. = FALSE)
   }
 
@@ -343,7 +342,8 @@ optimize_panel <- function(x, y,
     )
   }
 
-  objective_wrapper <- function(decision_vec) {
+  # Evaluate a single decision vector and return converted objective values
+  evaluate_single <- function(decision_vec) {
     evaluated <- evaluate_candidate(decision_vec)
     if (length(constraint_specs) && !evaluated$feasible) {
       return(rep(Inf, length(objectives)))
@@ -367,13 +367,26 @@ optimize_panel <- function(x, y,
     as.numeric(converted)
   }
 
+  # rmoo fitness function: can receive matrix (rows=individuals) or vector (single individual)
+  # Must return matrix when receiving matrix input
+  objective_wrapper <- function(x) {
+    if (is.null(dim(x))) {
+      # Single individual as vector
+      return(evaluate_single(x))
+    }
+    # Matrix input: evaluate each row and return matrix of objectives
+    t(apply(x, 1, evaluate_single))
+  }
+
   nsga_params <- c(
     list(
-      fn = objective_wrapper,
-      idim = decision_dim,
-      odim = length(objectives),
-      lower.bounds = rep(0, decision_dim),
-      upper.bounds = rep(1, decision_dim)
+      type = "real-valued",
+      fitness = objective_wrapper,
+      nObj = length(objectives),
+      lower = rep(0, decision_dim),
+      upper = rep(1, decision_dim),
+      monitor = FALSE,
+      summary = FALSE
     ),
     nsga_args
   )
@@ -386,14 +399,20 @@ optimize_panel <- function(x, y,
     set.seed(as.integer(seed))
   }
 
-  nsga_result <- do.call(mco::nsga2, nsga_params)
+  nsga_result <- do.call(rmoo::nsga2, nsga_params)
 
-  if (is.null(dim(nsga_result$par))) {
-    nsga_result$par <- matrix(nsga_result$par, nrow = 1)
+  # Filter to Pareto-optimal solutions (front rank == 1)
+  # rmoo returns full population; mco returned only Pareto-optimal
+  optimal_idx <- which(nsga_result@front == 1)
+  pareto_pop <- nsga_result@population[optimal_idx, , drop = FALSE]
+
+  # Handle edge case: single solution returns vector instead of matrix
+  if (is.null(dim(pareto_pop))) {
+    pareto_pop <- matrix(pareto_pop, nrow = 1)
   }
 
-  solutions <- lapply(seq_len(nrow(nsga_result$par)), function(i) {
-    decision_vec <- nsga_result$par[i, ]
+  solutions <- lapply(seq_len(nrow(pareto_pop)), function(i) {
+    decision_vec <- pareto_pop[i, ]
     evaluate_candidate(decision_vec)
   })
 

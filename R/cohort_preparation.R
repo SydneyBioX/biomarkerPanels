@@ -360,20 +360,19 @@ NULL
 #' @keywords internal
 .get_adaptive_nsga_defaults <- function(n_features) {
   # Base parameters that don't change with problem size
+  # Note: rmoo uses SBX crossover (nc=20) and polynomial mutation (nm=0.2) by default
   base_params <- list(
-    cprob = 0.7,
-    cdist = 5,
-    mprob = 0.2,
-    mdist = 10
+    pcrossover = 0.7,
+    pmutation = 0.2
   )
 
   # Scale population and generations based on feature pool size
   if (n_features <= 30) {
-    adaptive_params <- list(popsize = 64, generations = 60)
+    adaptive_params <- list(popSize = 64, maxiter = 60)
   } else if (n_features <= 100) {
-    adaptive_params <- list(popsize = 128, generations = 150)
+    adaptive_params <- list(popSize = 128, maxiter = 150)
   } else {
-    adaptive_params <- list(popsize = 200, generations = 300)
+    adaptive_params <- list(popSize = 200, maxiter = 300)
   }
 
   c(adaptive_params, base_params)

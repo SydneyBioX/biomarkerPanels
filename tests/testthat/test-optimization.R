@@ -12,7 +12,7 @@ test_that("optimize_panel returns a BiomarkerPanelResult", {
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
     cohort_aggregator = "none",
-    nsga_control = list(popsize = 20, generations = 20)
+    nsga_control = list(popSize = 20, maxiter = 20)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -36,7 +36,7 @@ test_that("optimize_panel handles multiple cohorts", {
     max_features = 4,
     feature_pool = colnames(fixture$x_list[[1]])[seq_len(12)],
     cohort_aggregator = "none",
-    nsga_control = list(popsize = 16, generations = 15)
+    nsga_control = list(popSize = 16, maxiter = 15)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -67,7 +67,7 @@ test_that("optimize_panel intersects feature sets across cohorts", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
     cohort_aggregator = "none",
-    nsga_control = list(popsize = 12, generations = 8)
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -100,7 +100,7 @@ test_that("optimize_panel enforces minimum metric constraints", {
     feature_pool = colnames(x),
     constraints = list(min_metric_constraint("sensitivity", threshold = 0.9)),
     cohort_aggregator = "none",
-    nsga_control = list(popsize = 16, generations = 15)
+    nsga_control = list(popSize = 16, maxiter = 15)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -126,7 +126,7 @@ test_that("optimize_panel errors when constraints infeasible", {
       feature_pool = colnames(x),
       constraints = list(min_metric_constraint("sensitivity", threshold = 1.01)),
       cohort_aggregator = "none",
-      nsga_control = list(popsize = 12, generations = 10)
+      nsga_control = list(popSize = 12, maxiter = 10)
     ),
     "No solutions satisfied the supplied constraints"
   )
@@ -150,7 +150,7 @@ test_that("pairwise cohort aggregator produces contrast features", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
     cohort_aggregator = "pairwise_ratios",
-    nsga_control = list(popsize = 12, generations = 8)
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -172,7 +172,7 @@ test_that("feature_pool accepts base features with pairwise aggregator", {
     max_features = 1,
     feature_pool = c("GeneA", "GeneC"),
     cohort_aggregator = "pairwise_ratios",
-    nsga_control = list(popsize = 12, generations = 5)
+    nsga_control = list(popSize = 12, maxiter = 5)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -199,7 +199,7 @@ test_that("optimize_panel works with pairwise_log_ratios aggregator", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
     cohort_aggregator = "pairwise_log_ratios",
-    nsga_control = list(popsize = 12, generations = 8)
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -223,7 +223,7 @@ test_that("optimize_panel works with reference_norm aggregator", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
     cohort_aggregator = "reference_norm",
-    nsga_control = list(popsize = 12, generations = 8)
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -242,7 +242,7 @@ test_that("optimize_panel rejects unregistered aggregator", {
       objectives = define_objectives(losses = c("sensitivity", "specificity")),
       max_features = 2,
       cohort_aggregator = "nonexistent_aggregator",
-      nsga_control = list(popsize = 8, generations = 5)
+      nsga_control = list(popSize = 8, maxiter = 5)
     ),
     "Unknown aggregator"
   )
@@ -268,7 +268,7 @@ test_that("custom aggregator can be registered and used", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
     cohort_aggregator = "center_features",
-    nsga_control = list(popsize = 12, generations = 6)
+    nsga_control = list(popSize = 12, maxiter = 6)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -283,28 +283,28 @@ test_that(".get_adaptive_nsga_defaults scales with feature pool size", {
   # Small feature pool: original defaults
 
   small <- biomarkerPanels:::.get_adaptive_nsga_defaults(20)
-  expect_equal(small$popsize, 64)
+  expect_equal(small$popSize, 64)
 
-  expect_equal(small$generations, 60)
+  expect_equal(small$maxiter, 60)
 
   # Medium feature pool: larger population and generations
   medium <- biomarkerPanels:::.get_adaptive_nsga_defaults(50)
-  expect_equal(medium$popsize, 128)
-  expect_equal(medium$generations, 150)
+  expect_equal(medium$popSize, 128)
+  expect_equal(medium$maxiter, 150)
 
  # Large feature pool: even larger population and generations
   large <- biomarkerPanels:::.get_adaptive_nsga_defaults(150)
-  expect_equal(large$popsize, 200)
-  expect_equal(large$generations, 300)
+  expect_equal(large$popSize, 200)
+  expect_equal(large$maxiter, 300)
 
   # All should have consistent base parameters
-  expect_equal(small$cprob, 0.7)
-  expect_equal(medium$cprob, 0.7)
-  expect_equal(large$cprob, 0.7)
+  expect_equal(small$pcrossover, 0.7)
+  expect_equal(medium$pcrossover, 0.7)
+  expect_equal(large$pcrossover, 0.7)
 })
 
 test_that("optimize_panel uses adaptive defaults without explicit nsga_control", {
-  skip_extended_tests()  # Very slow: popsize=128, generations=150
+  skip_extended_tests()  # Very slow: popSize=128, maxiter=150
   set.seed(999)
   sim <- simulate_expression_data(p = 40, n = 30, k = 1, seed = 99)
   x <- sim$x_list[[1]]
@@ -322,8 +322,8 @@ test_that("optimize_panel uses adaptive defaults without explicit nsga_control",
 
   expect_s4_class(res, "BiomarkerPanelResult")
   # Verify that the stored nsga2 settings reflect adaptive defaults
-  expect_equal(res@control$nsga2$popsize, 128)
-  expect_equal(res@control$nsga2$generations, 150)
+  expect_equal(res@control$nsga2$popSize, 128)
+  expect_equal(res@control$nsga2$maxiter, 150)
 })
 
 # Issue 4: feature_alignment tests
@@ -364,7 +364,7 @@ test_that("feature_alignment = 'majority' keeps features in >= 50% cohorts", {
     max_features = 2,
     cohort_aggregator = "none",
     feature_alignment = "majority",
-    nsga_control = list(popsize = 12, generations = 8)
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -404,7 +404,7 @@ test_that("feature_alignment = 'intersection' is default and drops partial featu
     max_features = 2,
     cohort_aggregator = "none",
     feature_alignment = "intersection",
-    nsga_control = list(popsize = 12, generations = 5)
+    nsga_control = list(popSize = 12, maxiter = 5)
   )
 
   expect_equal(res@control$feature_alignment, "intersection")
@@ -429,7 +429,7 @@ test_that("final_model_cv = TRUE uses cross-validated coefficients", {
     feature_pool = colnames(x)[seq_len(10)],
     cohort_aggregator = "none",
     final_model_cv = FALSE,
-    nsga_control = list(popsize = 12, generations = 8)
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   # With CV
@@ -442,7 +442,7 @@ test_that("final_model_cv = TRUE uses cross-validated coefficients", {
     cohort_aggregator = "none",
     final_model_cv = TRUE,
     cv_folds = 5L,
-    nsga_control = list(popsize = 12, generations = 8)
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(res_no_cv, "BiomarkerPanelResult")
@@ -478,7 +478,7 @@ test_that("final_model_cv falls back when data is too small", {
     cohort_aggregator = "none",
     final_model_cv = TRUE,
     cv_folds = 5L,
-    nsga_control = list(popsize = 8, generations = 5)
+    nsga_control = list(popSize = 8, maxiter = 5)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -505,7 +505,7 @@ test_that("regularized = TRUE produces cv.glmnet model", {
     cohort_aggregator = "none",
     regularized = TRUE,
     regularized_alpha = 0.5,
-    nsga_control = list(popsize = 16, generations = 10)
+    nsga_control = list(popSize = 16, maxiter = 10)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -535,7 +535,7 @@ test_that("regularized = FALSE produces glm model", {
     feature_pool = colnames(x)[seq_len(10)],
     cohort_aggregator = "none",
     regularized = FALSE,
-    nsga_control = list(popsize = 16, generations = 10)
+    nsga_control = list(popSize = 16, maxiter = 10)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")
@@ -571,7 +571,7 @@ test_that("evaluate_panel works with regularized cv.glmnet model", {
     feature_pool = colnames(x)[seq_len(12)],
     cohort_aggregator = "none",
     regularized = TRUE,
-    nsga_control = list(popsize = 16, generations = 10)
+    nsga_control = list(popSize = 16, maxiter = 10)
   )
 
   # Evaluate on test set
@@ -603,7 +603,7 @@ test_that("regularized scoring with different alpha values", {
     cohort_aggregator = "none",
     regularized = TRUE,
     regularized_alpha = 1.0,
-    nsga_control = list(popsize = 12, generations = 8)
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   # Ridge (alpha = 0)
@@ -616,7 +616,7 @@ test_that("regularized scoring with different alpha values", {
     cohort_aggregator = "none",
     regularized = TRUE,
     regularized_alpha = 0.0,
-    nsga_control = list(popsize = 12, generations = 8)
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(res_lasso, "BiomarkerPanelResult")
@@ -644,7 +644,7 @@ test_that("regularized scoring handles multi-cohort data", {
     cohort_aggregator = "none",
     regularized = TRUE,
     regularized_alpha = 0.5,
-    nsga_control = list(popsize = 12, generations = 10)
+    nsga_control = list(popSize = 12, maxiter = 10)
   )
 
   expect_s4_class(res, "BiomarkerPanelResult")

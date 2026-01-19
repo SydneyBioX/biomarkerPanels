@@ -1,3 +1,5 @@
+# ---- Exported Functions ----
+
 #' Get Top Differentially Expressed Features
 #'
 #' Applies moderated t-statistics via `limma` across one or more cohorts, then
@@ -271,6 +273,20 @@ select_transferable_features <- function(x_list,
   )
 }
 
+# ---- DE Analysis Helpers ----
+
+#' Compute Limma Statistics Across Cohorts
+#'
+#' Runs differential expression analysis via limma on each cohort and returns
+#' the t-statistics and standard errors for all features.
+#'
+#' @param x_list A matrix, `SummarizedExperiment`, or list of such objects.
+#' @param y_list A binary response aligned with `x_list`.
+#' @param contrast Optional contrast string or list of strings.
+#' @param assay For `SummarizedExperiment` inputs, the assay name or index.
+#' @return A list with `t_matrix`, `se_matrix`, `feature_names`, and
+#'   `cohort_names`.
+#' @keywords internal
 .compute_limma_statistics <- function(x_list,
                                       y_list,
                                       contrast = NULL,
@@ -381,42 +397,18 @@ select_transferable_features <- function(x_list,
   )
 }
 
-# Pure R implementation kept for testing
-.aggregate_de_pvalues_pure_r <- function(t_matrix, combination_method) {
-  if (length(t_matrix) == 0L) {
-    return(numeric())
-  }
+# ---- P-value Aggregation ----
 
-  z_scores <- apply(t_matrix, 2, .rank_to_z)
-  if (is.vector(z_scores)) {
-    z_scores <- matrix(
-      z_scores,
-      ncol = 1,
-      dimnames = list(rownames(t_matrix), colnames(t_matrix))
-    )
-  }
-
-  combined_p <- apply(z_scores, 1, function(z_vec) {
-    valid <- !is.na(z_vec) & is.finite(z_vec)
-    if (!any(valid)) {
-      return(NA_real_)
-    }
-    .combine_pvalues(z_vec[valid], combination_method)
-  })
-
-  if (is.null(names(combined_p)) && !is.null(rownames(z_scores))) {
-    names(combined_p) <- rownames(z_scores)
-  }
-
-  combined_p <- pmax(combined_p, .Machine$double.xmin, na.rm = FALSE)
-  combined_z <- stats::qnorm(combined_p, lower.tail = FALSE)
-  two_sided <- 2 * stats::pnorm(-abs(combined_z))
-  two_sided <- two_sided[!is.na(two_sided)]
-
-  sort(two_sided, decreasing = FALSE)
-}
-
-# Main implementation using C++
+#' Aggregate Differential Expression P-values Across Cohorts
+#'
+#' Converts t-statistics to z-scores and combines them across cohorts using the
+#' specified meta-analysis method. Uses C++ for performance.
+#'
+#' @param t_matrix A matrix of t-statistics (features x cohorts).
+#' @param combination_method One of `"OSP"`, `"Stouffer"`, `"Fisher"`, or
+#'   `"maxP"`.
+#' @return A named numeric vector of two-sided p-values, sorted ascending.
+#' @keywords internal
 .aggregate_de_pvalues <- function(t_matrix, combination_method) {
   if (length(t_matrix) == 0L) {
     return(numeric())
@@ -442,64 +434,20 @@ select_transferable_features <- function(x_list,
   .aggregate_de_pvalues_cpp(t_matrix, cpp_method)
 }
 
-# Pure R implementation kept for testing
-.select_stable_genes_pure_r <- function(t_matrix, se_matrix, method, top_n) {
-  if (length(t_matrix) == 0L || nrow(t_matrix) == 0L) {
-    return(character())
-  }
+# ---- Stable Gene Selection ----
 
-  abs_t <- abs(t_matrix)
-
-  scores <- vapply(seq_len(nrow(abs_t)), function(idx) {
-    t_row <- abs_t[idx, ]
-    se_row <- se_matrix[idx, ]
-
-    if (method == "precision_weighted") {
-      precision_row <- 1 / (se_row + 1e-8)
-      valid <- !is.na(t_row) & !is.na(precision_row) & is.finite(precision_row) & precision_row > 0
-      if (!any(valid)) {
-        return(NA_real_)
-      }
-      stats::weighted.mean(1 / (t_row[valid] + 0.01), precision_row[valid])
-    } else if (method == "cv_t_stats") {
-      valid <- !is.na(t_row) & is.finite(t_row)
-      if (!any(valid)) {
-        return(NA_real_)
-      }
-      vals <- t_row[valid]
-      mean_abs <- mean(vals)
-      sd_abs <- stats::sd(vals)
-      if (is.na(sd_abs)) {
-        sd_abs <- 0
-      }
-      1 / ((sd_abs + 1e-6) * (mean_abs + 0.01))
-    } else if (method == "inverse_t_se") {
-      valid <- !is.na(t_row) & !is.na(se_row) & is.finite(t_row) & is.finite(se_row)
-      if (!any(valid)) {
-        return(NA_real_)
-      }
-      mean((t_row[valid] + 0.01) * (se_row[valid] + 1e-8))
-    } else {
-      NA_real_
-    }
-  }, numeric(1))
-
-  if (method == "inverse_t_se") {
-    scores <- 1 / (scores + 1e-6)
-  }
-
-  scores[!is.finite(scores)] <- NA_real_
-  valid_idx <- which(!is.na(scores))
-  if (!length(valid_idx)) {
-    return(character())
-  }
-
-  ordered <- valid_idx[order(scores[valid_idx], decreasing = TRUE)]
-  top_k <- head(ordered, n = min(top_n, length(ordered)))
-  rownames(abs_t)[top_k]
-}
-
-# Main implementation using C++
+#' Select Stable Genes Based on T-statistic Variability
+#'
+#' Scores genes by stability across cohorts using the specified method and
+#' returns the top-scoring features. Uses C++ for performance.
+#'
+#' @param t_matrix A matrix of t-statistics (features x cohorts).
+#' @param se_matrix A matrix of standard errors (features x cohorts).
+#' @param method One of `"precision_weighted"`, `"cv_t_stats"`, or
+#'   `"inverse_t_se"`.
+#' @param top_n Number of top stable features to return.
+#' @return A character vector of feature names.
+#' @keywords internal
 .select_stable_genes <- function(t_matrix, se_matrix, method, top_n) {
   if (length(t_matrix) == 0L || nrow(t_matrix) == 0L) {
     return(character())
@@ -507,7 +455,7 @@ select_transferable_features <- function(x_list,
 
   abs_t <- abs(t_matrix)
 
-  # Call C++ implementation - so much faster lol 
+  # Uses C++ for performance
   scores <- .select_stable_genes_cpp(abs_t, se_matrix, method)
 
   # Post-processing same as R version
@@ -521,12 +469,23 @@ select_transferable_features <- function(x_list,
   rownames(abs_t)[top_k]
 }
 
+# ---- Utility Functions ----
+
+#' Convert Values to Z-scores via Rank Transformation
+#'
+#' Transforms values to z-scores using rank-based normal quantile
+#' transformation. Used internally for p-value combination methods.
+#'
+#' @param values A numeric vector to transform.
+#' @return A numeric vector of z-scores with the same names as input.
+#' @keywords internal
 .rank_to_z <- function(values) { # nocov start
   if (all(is.na(values))) {
     out <- rep(NA_real_, length(values))
     names(out) <- names(values)
     return(out)
   }
+
   valid <- !is.na(values) & is.finite(values)
   out <- rep(NA_real_, length(values))
   if (!any(valid)) {
@@ -540,6 +499,14 @@ select_transferable_features <- function(x_list,
   out
 } # nocov end
 
+#' Combine P-values Using Meta-analysis Methods
+#'
+#' Combines z-scores into a single p-value using the specified method.
+#'
+#' @param z_scores A numeric vector of z-scores.
+#' @param method One of `"Stouffer"`, `"OSP"`, `"Fisher"`, or `"maxP"`.
+#' @return A single combined p-value.
+#' @keywords internal
 .combine_pvalues <- function(z_scores, method) { # nocov start
   if (!length(z_scores)) {
     return(NA_real_)
@@ -561,10 +528,22 @@ select_transferable_features <- function(x_list,
   stop("Unsupported combination method: ", method, call. = FALSE)
 } # nocov end
 
+#' Resolve Contrast String for Limma
+#'
+#' Returns the appropriate contrast string for a given cohort, handling both
+#' single contrasts and cohort-specific contrast lists.
+#'
+#' @param contrast User-supplied contrast or `NULL` for default.
+#' @param cohort_index Index of the current cohort.
+#' @param total_cohorts Total number of cohorts.
+#' @param level_names Factor levels from the response.
+#' @return A contrast string for [limma::makeContrasts()].
+#' @keywords internal
 .resolve_contrast <- function(contrast, cohort_index, total_cohorts, level_names) {
   if (length(level_names) < 2L) {
     stop("`y_list` must contain exactly two levels.", call. = FALSE)
   }
+
   if (is.null(contrast)) {
     return(paste(level_names[2], level_names[1], sep = "-"))
   }
@@ -578,16 +557,32 @@ select_transferable_features <- function(x_list,
        call. = FALSE)
 }
 
+#' Ensure Input is a List of Cohorts
+#'
+#' Wraps single objects in a list for consistent multi-cohort handling.
+#'
+#' @param x An object or list of objects.
+#' @return A list.
+#' @keywords internal
 .as_cohort_list <- function(x) { # nocov start
   if (is.null(x)) {
     stop("Input cannot be NULL.", call. = FALSE)
   }
+
   if (is.list(x)) {
     return(x)
   }
   list(x)
 } # nocov end
 
+#' Validate Positive Integer Parameter
+#'
+#' Checks that a parameter is a positive integer and coerces it.
+#'
+#' @param x The value to validate.
+#' @param name Parameter name for error messages.
+#' @return An integer value.
+#' @keywords internal
 .validate_positive_integer <- function(x, name) {
   if (!is.numeric(x) || length(x) != 1L || is.na(x) || x < 1L) {
     stop("`", name, "` must be a positive integer.", call. = FALSE)
@@ -595,6 +590,19 @@ select_transferable_features <- function(x_list,
   as.integer(x)
 }
 
+# ---- Ridge Regression Helpers ----
+
+#' Prepare Inputs for Ridge Regression
+#'
+#' Extracts feature matrices and responses from cohort lists, aligns features
+#' across cohorts via intersection, and converts responses to binary integers.
+#'
+#' @param x_list A matrix, `SummarizedExperiment`, or list of such objects.
+#' @param y_list A binary response aligned with `x_list`.
+#' @param assay For `SummarizedExperiment` inputs, the assay name or index.
+#' @return A list with `matrices`, `responses`, `cohort_names`, and
+#'   `feature_names`.
+#' @keywords internal
 .prepare_ridge_inputs <- function(x_list, y_list, assay = NULL) {
   x_list <- .as_cohort_list(x_list)
   y_list <- .as_cohort_list(y_list)
@@ -653,10 +661,20 @@ select_transferable_features <- function(x_list,
   )
 }
 
+#' Resolve Lambda Parameter Vector
+#'
+#' Validates and expands the lambda parameter for ridge regression, handling
+#' both single values and cohort-specific vectors.
+#'
+#' @param lambda User-supplied lambda or `NULL` for cross-validation.
+#' @param num_cohorts Number of cohorts.
+#' @return A numeric vector of length `num_cohorts`, or `NULL`.
+#' @keywords internal
 .resolve_lambda_vector <- function(lambda, num_cohorts) {
   if (is.null(lambda)) {
     return(NULL)
   }
+
   if (!is.numeric(lambda) || any(!is.finite(lambda)) || any(lambda <= 0)) {
     stop("`lambda` must be positive numeric.", call. = FALSE)
   }
@@ -669,6 +687,16 @@ select_transferable_features <- function(x_list,
   }
 }
 
+#' Extract Coefficients from Glmnet Model
+#'
+#' Extracts feature coefficients (excluding intercept) from a fitted glmnet
+#' model at the specified lambda value.
+#'
+#' @param model A fitted glmnet or cv.glmnet object.
+#' @param lambda The lambda value at which to extract coefficients.
+#' @param feature_names Character vector of feature names to return.
+#' @return A named numeric vector of coefficients.
+#' @keywords internal
 .extract_glmnet_coefficients <- function(model, lambda, feature_names) {
   coef_mat <- stats::coef(model, s = lambda)
   coef_vec <- as.numeric(coef_mat)[-1]
@@ -676,11 +704,24 @@ select_transferable_features <- function(x_list,
   coef_vec[feature_names]
 }
 
-# Pure R implementation kept for testing
-.score_transferable_features_pure_r <- function(coefficient_matrix,
-                                                 min_coefficient,
-                                                 require_sign_consistency,
-                                                 sign_consistency_threshold = 1.0) {
+# ---- Transferable Feature Scoring ----
+
+#' Score Features by Transferability Across Cohorts
+#'
+#' Computes feature scores based on mean coefficient magnitude, consistency
+#' across cohorts, and sign agreement. Uses C++ for performance.
+#'
+#' @param coefficient_matrix A matrix of ridge coefficients (features x cohorts).
+#' @param min_coefficient Minimum absolute coefficient required.
+#' @param require_sign_consistency Whether to filter by sign consistency.
+#' @param sign_consistency_threshold Minimum fraction of cohorts agreeing on
+#'   coefficient sign.
+#' @return A data.frame with feature scores, sorted by decreasing score.
+#' @keywords internal
+.score_transferable_features <- function(coefficient_matrix,
+                                         min_coefficient,
+                                         require_sign_consistency,
+                                         sign_consistency_threshold = 1.0) {
   if (!nrow(coefficient_matrix)) {
     return(data.frame())
   }
@@ -688,19 +729,13 @@ select_transferable_features <- function(x_list,
   feature_names <- rownames(coefficient_matrix)
   row_index <- seq_len(nrow(coefficient_matrix))
 
-  abs_coeff <- abs(coefficient_matrix)
-  mean_abs <- rowMeans(abs_coeff)
-  sd_coeff <- apply(coefficient_matrix, 1, stats::sd)
-  min_abs <- apply(abs_coeff, 1, min)
+  # Call C++ implementation for the heavy computation
+  cpp_result <- .score_transferable_features_cpp(coefficient_matrix)
 
-  sign_agreement <- apply(coefficient_matrix, 1, function(vals) {
-    nz <- vals[abs(vals) > 1e-6]
-    if (!length(nz)) {
-      return(1.0)
-    }
-    median_sign <- sign(stats::median(nz))
-    mean(sign(nz) == median_sign)
-  })
+  mean_abs <- cpp_result$mean_abs
+  sd_coeff <- cpp_result$sd
+  min_abs <- cpp_result$min_abs
+  sign_agreement <- cpp_result$sign_agreement
 
   sign_consistent <- sign_agreement >= sign_consistency_threshold
   score <- mean_abs / (sd_coeff + 1e-6)
@@ -728,11 +763,127 @@ select_transferable_features <- function(x_list,
   score_df
 }
 
-# Main implementation using C++
-.score_transferable_features <- function(coefficient_matrix,
-                                         min_coefficient,
-                                         require_sign_consistency,
-                                         sign_consistency_threshold = 1.0) {
+# ==============================================================================
+# PURE R REFERENCE IMPLEMENTATIONS (for testing)
+# TODO: Remove these once Rcpp equivalents are fully debugged and validated.
+# See tests/testthat/test-rcpp-equivalence.R for equivalence tests.
+# ==============================================================================
+
+#' Pure R Reference Implementation of DE P-value Aggregation
+#'
+#' Kept for regression testing against the C++ implementation.
+#' TODO: Remove once Rcpp equivalents are fully debugged and validated.
+#'
+#' @inheritParams .aggregate_de_pvalues
+#' @keywords internal
+.aggregate_de_pvalues_pure_r <- function(t_matrix, combination_method) {
+  if (length(t_matrix) == 0L) {
+    return(numeric())
+  }
+
+  z_scores <- apply(t_matrix, 2, .rank_to_z)
+  if (is.vector(z_scores)) {
+    z_scores <- matrix(
+      z_scores,
+      ncol = 1,
+      dimnames = list(rownames(t_matrix), colnames(t_matrix))
+    )
+  }
+
+  combined_p <- apply(z_scores, 1, function(z_vec) {
+    valid <- !is.na(z_vec) & is.finite(z_vec)
+    if (!any(valid)) {
+      return(NA_real_)
+    }
+    .combine_pvalues(z_vec[valid], combination_method)
+  })
+
+  if (is.null(names(combined_p)) && !is.null(rownames(z_scores))) {
+    names(combined_p) <- rownames(z_scores)
+  }
+
+  combined_p <- pmax(combined_p, .Machine$double.xmin, na.rm = FALSE)
+  combined_z <- stats::qnorm(combined_p, lower.tail = FALSE)
+  two_sided <- 2 * stats::pnorm(-abs(combined_z))
+  two_sided <- two_sided[!is.na(two_sided)]
+
+  sort(two_sided, decreasing = FALSE)
+}
+
+#' Pure R Reference Implementation of Stable Gene Selection
+#'
+#' Kept for regression testing against the C++ implementation.
+#' TODO: Remove once Rcpp equivalents are fully debugged and validated.
+#'
+#' @inheritParams .select_stable_genes
+#' @keywords internal
+.select_stable_genes_pure_r <- function(t_matrix, se_matrix, method, top_n) {
+  if (length(t_matrix) == 0L || nrow(t_matrix) == 0L) {
+    return(character())
+  }
+
+  abs_t <- abs(t_matrix)
+
+  scores <- vapply(seq_len(nrow(abs_t)), function(idx) {
+    t_row <- abs_t[idx, ]
+    se_row <- se_matrix[idx, ]
+
+    if (method == "precision_weighted") {
+      precision_row <- 1 / (se_row + 1e-8)
+      valid <- !is.na(t_row) & !is.na(precision_row) & is.finite(precision_row) & precision_row > 0
+      if (!any(valid)) {
+        return(NA_real_)
+      }
+      stats::weighted.mean(1 / (t_row[valid] + 0.01), precision_row[valid])
+    } else if (method == "cv_t_stats") {
+      valid <- !is.na(t_row) & is.finite(t_row)
+      if (!any(valid)) {
+        return(NA_real_)
+      }
+      vals <- t_row[valid]
+      mean_abs <- mean(vals)
+      sd_abs <- stats::sd(vals)
+      if (is.na(sd_abs)) {
+        sd_abs <- 0
+      }
+      1 / ((sd_abs + 1e-6) * (mean_abs + 0.01))
+    } else if (method == "inverse_t_se") {
+      valid <- !is.na(t_row) & !is.na(se_row) & is.finite(t_row) & is.finite(se_row)
+      if (!any(valid)) {
+        return(NA_real_)
+      }
+      mean((t_row[valid] + 0.01) * (se_row[valid] + 1e-8))
+    } else {
+      NA_real_
+    }
+  }, numeric(1))
+
+  if (method == "inverse_t_se") {
+    scores <- 1 / (scores + 1e-6)
+  }
+
+  scores[!is.finite(scores)] <- NA_real_
+  valid_idx <- which(!is.na(scores))
+  if (!length(valid_idx)) {
+    return(character())
+  }
+
+  ordered <- valid_idx[order(scores[valid_idx], decreasing = TRUE)]
+  top_k <- head(ordered, n = min(top_n, length(ordered)))
+  rownames(abs_t)[top_k]
+}
+
+#' Pure R Reference Implementation of Transferable Feature Scoring
+#'
+#' Kept for regression testing against the C++ implementation.
+#' TODO: Remove once Rcpp equivalents are fully debugged and validated.
+#'
+#' @inheritParams .score_transferable_features
+#' @keywords internal
+.score_transferable_features_pure_r <- function(coefficient_matrix,
+                                                 min_coefficient,
+                                                 require_sign_consistency,
+                                                 sign_consistency_threshold = 1.0) {
   if (!nrow(coefficient_matrix)) {
     return(data.frame())
   }
@@ -740,13 +891,19 @@ select_transferable_features <- function(x_list,
   feature_names <- rownames(coefficient_matrix)
   row_index <- seq_len(nrow(coefficient_matrix))
 
-  # Call C++ implementation for the heavy computation
-  cpp_result <- .score_transferable_features_cpp(coefficient_matrix)
+  abs_coeff <- abs(coefficient_matrix)
+  mean_abs <- rowMeans(abs_coeff)
+  sd_coeff <- apply(coefficient_matrix, 1, stats::sd)
+  min_abs <- apply(abs_coeff, 1, min)
 
-  mean_abs <- cpp_result$mean_abs
-  sd_coeff <- cpp_result$sd
-  min_abs <- cpp_result$min_abs
-  sign_agreement <- cpp_result$sign_agreement
+  sign_agreement <- apply(coefficient_matrix, 1, function(vals) {
+    nz <- vals[abs(vals) > 1e-6]
+    if (!length(nz)) {
+      return(1.0)
+    }
+    median_sign <- sign(stats::median(nz))
+    mean(sign(nz) == median_sign)
+  })
 
   sign_consistent <- sign_agreement >= sign_consistency_threshold
   score <- mean_abs / (sd_coeff + 1e-6)

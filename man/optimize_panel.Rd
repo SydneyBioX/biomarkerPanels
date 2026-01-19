@@ -71,8 +71,8 @@ solution to be considered feasible.}
 features. Signature:
 \verb{function(x_selected, selected_features, truth, cohort = NULL, ...)}.}
 
-\item{nsga_control}{Named list of arguments passed to \code{\link[mco:nsga2]{mco::nsga2()}}. Defaults
-to \code{list(popsize = 64, generations = 60, cprob = 0.7, cdist = 5, mprob = 0.2, mdist = 10)}.}
+\item{nsga_control}{Named list of arguments passed to \code{\link[rmoo:nsga2]{rmoo::nsga2()}}. Defaults
+to \code{list(popSize = 64, maxiter = 60, pcrossover = 0.7, pmutation = 0.2)}.}
 
 \item{assay}{For \code{SummarizedExperiment} inputs, assay name or index to use.}
 
@@ -112,7 +112,7 @@ A \code{BiomarkerPanelResult} with Pareto-optimal solutions summarised in
 the \code{objectives} slot.
 }
 \description{
-Wrapper around \code{\link[mco:nsga2]{mco::nsga2()}} that composes registered loss functions into a
+Wrapper around \code{\link[rmoo:nsga2]{rmoo::nsga2()}} that composes registered loss functions into a
 multi-objective search for compact biomarker panels. Candidate solutions are
 represented as weights over a feature pool; the top \code{max_features} features
 define a panel whose performance is evaluated via the selected losses.
