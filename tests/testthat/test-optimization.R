@@ -1,6 +1,7 @@
 test_that("optimize_panel returns a BiomarkerPanelResult", {
   skip_slow_tests()
   set.seed(123)
+
   sim <- simulate_expression_data(p = 30, n = 25, k = 1, seed = 42)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
@@ -22,6 +23,122 @@ test_that("optimize_panel returns a BiomarkerPanelResult", {
   expect_true(all(res@objectives$objective %in% c("sensitivity", "specificity", "num_features")))
   expect_equal(res@training_data$num_cohorts, 1L)
   expect_equal(res@training_data$cohort_labels, "cohort_01")
+})
+
+test_that("num_features objective allows variable panel sizes", {
+  skip_slow_tests()
+  set.seed(999)
+  # Create data with varying signal strength across features
+  # Some features have strong signal, others moderate, others none
+  n <- 80L
+  p <- 15L
+  x <- matrix(rnorm(n * p), nrow = n, ncol = p)
+  colnames(x) <- paste0("gene_", seq_len(p))
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+  # Strong signal on first 2 genes
+  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 3
+  # Moderate signal on genes 3-5
+  x[y == "Yes", 3:5] <- x[y == "Yes", 3:5] + 1.5
+  # Weak signal on genes 6-8
+  x[y == "Yes", 6:8] <- x[y == "Yes", 6:8] + 0.5
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    max_features = 8,
+    feature_pool = colnames(x),
+    cohort_aggregator = "none",
+    nsga_control = list(popSize = 50, maxiter = 40)
+  )
+
+  expect_s4_class(res, "BiomarkerPanelResult")
+
+  # Extract num_features values from all Pareto solutions
+  nf_values <- res@objectives[res@objectives$objective == "num_features", "value"]
+
+  # All sizes should be between 2 (min for regularized) and max_features
+  expect_true(all(nf_values >= 2),
+              info = paste("Some panel sizes < 2:", paste(nf_values[nf_values < 2], collapse = ", ")))
+  expect_true(all(nf_values <= 8),
+              info = paste("Some panel sizes > 8:", paste(nf_values[nf_values > 8], collapse = ", ")))
+
+  # With threshold-based selection and varying signal, we expect some variation
+
+  # in panel sizes across the Pareto front (but not guaranteed)
+  unique_sizes <- unique(nf_values)
+  # Log info about panel sizes for debugging
+  message("Panel sizes in Pareto front: ", paste(sort(unique_sizes), collapse = ", "))
+
+  # Primary check: mechanism allows variable sizes (not all forced to max_features)
+  # The old implementation would always return max_features; new implementation can vary
+  expect_true(
+    min(nf_values) < 8,
+    info = "Threshold selection should allow panels smaller than max_features"
+  )
+})
+
+test_that("metrics num_features equals length of features", {
+  # Minimal optimization: tiny data, few iterations - should run in < 5 seconds
+  set.seed(42)
+  n <- 20L
+  p <- 6L
+  x <- matrix(rnorm(n * p), nrow = n)
+  colnames(x) <- paste0("g", seq_len(p))
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 2  # signal
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    max_features = 4,
+    cohort_aggregator = "none",
+    nsga_control = list(popSize = 8, maxiter = 5)
+  )
+
+  # THE KEY CHECK: stored metric must match actual feature count
+  expect_equal(
+    as.numeric(res@metrics["num_features"]),
+    length(res@features),
+    info = "num_features metric must equal actual feature count"
+  )
+})
+
+test_that("all Pareto solutions have consistent feature counts", {
+  # Minimal optimization: tiny data, few iterations - should run in < 5 seconds
+  set.seed(123)
+  n <- 20L
+  p <- 6L
+  x <- matrix(rnorm(n * p), nrow = n)
+  colnames(x) <- paste0("g", seq_len(p))
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 2  # signal
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    max_features = 4,
+    cohort_aggregator = "none",
+    nsga_control = list(popSize = 8, maxiter = 5)
+  )
+
+  # Check each Pareto solution in the objectives dataframe
+  objectives_df <- res@objectives
+  nf_rows <- objectives_df[objectives_df$objective == "num_features", ]
+
+  expect_true(nrow(nf_rows) > 0, info = "Should have num_features rows in objectives")
+
+  for (i in seq_len(nrow(nf_rows))) {
+    stored_count <- nf_rows$value[i]
+    solution_features <- nf_rows$features[[i]]
+    expect_equal(
+      stored_count, length(solution_features),
+      info = paste("Solution", i, "feature count mismatch:",
+                   "stored =", stored_count, "actual =", length(solution_features))
+    )
+  }
 })
 
 test_that("optimize_panel handles multiple cohorts", {
@@ -113,8 +230,8 @@ test_that("optimize_panel errors when constraints infeasible", {
   skip_slow_tests()
   set.seed(5002)
   n <- 40L
-  x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
-  colnames(x) <- c("gene_common1", "gene_common2")
+  x <- matrix(rnorm(n * 3), nrow = n, ncol = 3)
+  colnames(x) <- c("gene_common1", "gene_common2", "gene_common3")
   y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
 
   expect_error(
@@ -122,7 +239,7 @@ test_that("optimize_panel errors when constraints infeasible", {
       x = x,
       y = y,
       objectives = define_objectives(losses = c("specificity")),
-      max_features = 1,
+      max_features = 2,
       feature_pool = colnames(x),
       constraints = list(min_metric_constraint("sensitivity", threshold = 1.01)),
       cohort_aggregator = "none",

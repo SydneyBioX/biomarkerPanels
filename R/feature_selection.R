@@ -312,7 +312,9 @@ select_transferable_features <- function(x_list,
 
     if (nrow(x_mat) != length(y_vec)) {
       stop("Number of rows in `x_list[[", i, "]]` must match the length of ",
-           "`y_list[[", i, "]]`.", call. = FALSE)
+        "`y_list[[", i, "]]`.",
+        call. = FALSE
+      )
     }
 
     # Ensure feature names exist (columns of x_mat become rows of expr)
@@ -321,7 +323,7 @@ select_transferable_features <- function(x_list,
     }
 
     expr <- t(x_mat)
-    design <- stats::model.matrix(~0 + y_vec)
+    design <- stats::model.matrix(~ 0 + y_vec)
     colnames(design) <- levels(y_vec)
 
     contrast_str <- .resolve_contrast(
@@ -360,14 +362,16 @@ select_transferable_features <- function(x_list,
 
   feature_names <- unique(unlist(lapply(t_list, names), use.names = FALSE))
 
+  # Throw an error if no features are detected.
   if (!length(feature_names)) {
-    empty <- matrix(numeric(0), nrow = 0, ncol = length(x_list))
-    return(list(
-      t_matrix = empty,
-      se_matrix = empty,
-      feature_names = character(),
-      cohort_names = cohort_names
-    ))
+    stop("No features detected in input data after computing test statistics.", call. = FALSE)
+    # empty <- matrix(numeric(0), nrow = 0, ncol = length(x_list))
+    # return(list(
+    #   t_matrix = empty,
+    #   se_matrix = empty,
+    #   feature_names = character(),
+    #   cohort_names = cohort_names
+    # ))
   }
 
   t_matrix <- matrix(
@@ -455,7 +459,7 @@ select_transferable_features <- function(x_list,
 
   abs_t <- abs(t_matrix)
 
-  # Uses C++ for performance
+  # Uses C++ for speeeeedddd
   scores <- .select_stable_genes_cpp(abs_t, se_matrix, method)
 
   # Post-processing same as R version
@@ -554,7 +558,8 @@ select_transferable_features <- function(x_list,
     return(contrast[[cohort_index]])
   }
   stop("`contrast` must be length 1 or match the number of cohorts.",
-       call. = FALSE)
+    call. = FALSE
+  )
 }
 
 #' Ensure Input is a List of Cohorts
@@ -625,7 +630,9 @@ select_transferable_features <- function(x_list,
 
     if (nrow(x_mat) != length(y_vec)) {
       stop("Number of rows in `x_list[[", i, "]]` must match the length of ",
-           "`y_list[[", i, "]]`.", call. = FALSE)
+        "`y_list[[", i, "]]`.",
+        call. = FALSE
+      )
     }
 
     if (is.null(colnames(x_mat))) {
@@ -881,9 +888,9 @@ select_transferable_features <- function(x_list,
 #' @inheritParams .score_transferable_features
 #' @keywords internal
 .score_transferable_features_pure_r <- function(coefficient_matrix,
-                                                 min_coefficient,
-                                                 require_sign_consistency,
-                                                 sign_consistency_threshold = 1.0) {
+                                                min_coefficient,
+                                                require_sign_consistency,
+                                                sign_consistency_threshold = 1.0) {
   if (!nrow(coefficient_matrix)) {
     return(data.frame())
   }

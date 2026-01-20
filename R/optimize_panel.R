@@ -2,8 +2,9 @@
 #'
 #' Wrapper around [rmoo::nsga2()] that composes registered loss functions into a
 #' multi-objective search for compact biomarker panels. Candidate solutions are
-#' represented as weights over a feature pool; the top `max_features` features
-#' define a panel whose performance is evaluated via the selected losses.
+#' represented as weights over a feature pool; features with weight > 0.5 are
+#' included in the panel (up to `max_features`). This threshold-based selection
+#' allows variable panel sizes, making the `num_features` objective meaningful.
 #' Inputs may be a single cohort (`matrix`, `data.frame`, or
 #' `SummarizedExperiment`) or multiple cohorts supplied as lists of such objects.
 #' Optimisation should be run on training data only---use [evaluate_panel()] for
@@ -15,7 +16,10 @@
 #'   `x`. When `x` is a list, `y` must be a list of the same length.
 #' @param objectives Named list of objective descriptors as returned by
 #'   [define_objectives()].
-#' @param max_features Maximum number of biomarkers permitted in a panel.
+#' @param max_features Maximum number of biomarkers permitted in a panel. Acts
+#'   as an upper bound; actual panel size varies based on how many features have
+#'   weight > 0.5 in the decision vector. Minimum is 2 features when
+#'   `regularized = TRUE` (glmnet requirement), or 1 when `regularized = FALSE`.
 #' @param feature_pool Optional subset of feature identifiers (names or integer
 #'   indices) considered during optimization. When a cohort aggregator is used,
 #'   specify the underlying (pre-aggregation) feature names; aggregated labels
@@ -213,6 +217,14 @@ optimize_panel <- function(x, y,
     stop("`feature_pool` produced zero features.", call. = FALSE)
   }
 
+  min_features_for_regularized <- 2L
+  if (regularized && max_features < min_features_for_regularized) {
+    stop("`max_features` must be at least ", min_features_for_regularized,
+         " when `regularized = TRUE` (glmnet requirement). ",
+         "Either increase `max_features` or set `regularized = FALSE`.",
+         call. = FALSE)
+  }
+
   if (max_features < 1L) {
     stop("`max_features` must be at least 1.", call. = FALSE)
   }
@@ -259,13 +271,34 @@ optimize_panel <- function(x, y,
     }
   }
 
+  # Minimum features needed: glmnet requires >= 2 features when regularized
+
+  min_features_required <- if (regularized) 2L else 1L
+
   evaluate_candidate <- function(decision_vec) {
-    # Use feature names as secondary sort key for reproducible tie-breaking
-    # This ensures consistent feature selection when decision values are equal
+    # Threshold-based selection: include features with weight > 0.5
+    # This allows variable panel sizes, making num_features objective meaningful
     feature_names_pool <- colnames(x_pool)
-    ord <- order(decision_vec, feature_names_pool, decreasing = c(TRUE, FALSE),
-                 method = "radix")
-    selected_idx <- ord[seq_len(min(max_features, length(ord)))]
+    above_threshold <- which(decision_vec > 0.5)
+
+    if (length(above_threshold) < min_features_required) {
+      # Fallback: take top min_features_required by weight
+      ord <- order(decision_vec, feature_names_pool, decreasing = c(TRUE, FALSE),
+                   method = "radix")
+      selected_idx <- ord[seq_len(min(min_features_required, length(ord)))]
+    } else if (length(above_threshold) > max_features) {
+      # Cap at max_features, using feature names for reproducible tie-breaking
+      weights_above <- decision_vec[above_threshold]
+      names_above <- feature_names_pool[above_threshold]
+      ord <- order(weights_above, names_above, decreasing = c(TRUE, FALSE),
+                   method = "radix")
+      selected_idx <- above_threshold[ord[seq_len(max_features)]]
+    } else {
+      selected_idx <- above_threshold
+    }
+
+    # Sort by descending weight for consistent output ordering
+    selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
     selected_features <- feature_names_pool[selected_idx]
     x_selected <- x_pool[, selected_features, drop = FALSE]
 

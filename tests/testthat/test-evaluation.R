@@ -324,3 +324,224 @@ test_that("plot_cohort_comparison errors without cohort column", {
     "cohort"
   )
 })
+
+# ============================================================================
+# find_threshold_for_sensitivity tests
+# ============================================================================
+
+test_that("find_threshold_for_sensitivity returns correct structure", {
+  skip_if_not_installed("pROC")
+
+  panel_features <- c("g1", "g2")
+  metrics <- c(sensitivity = 0.5, specificity = 0.5, auc = 0.5)
+  objective_df <- data.frame(
+    solution_id = 1L,
+    objective = names(metrics),
+    value = metrics,
+    direction = c("maximize", "maximize", "maximize"),
+    stringsAsFactors = FALSE
+  )
+  objective_df$features <- I(rep(list(panel_features), nrow(objective_df)))
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = panel_features,
+    metrics = metrics,
+    objectives = objective_df,
+    control = list(positive_class = "Yes"),
+    training_data = list()
+  )
+
+  # Create well-separated data
+  set.seed(123)
+  x <- matrix(c(rnorm(30, -1), rnorm(30, 1)), nrow = 30, ncol = 2)
+  colnames(x) <- c("g1", "g2")
+  y <- factor(c(rep("No", 15), rep("Yes", 15)), levels = c("No", "Yes"))
+
+  result <- find_threshold_for_sensitivity(panel, x, y, target_sensitivity = 0.90)
+
+  expect_type(result, "list")
+  expect_named(result, c("threshold", "sensitivity", "specificity",
+                          "target_sensitivity", "auc"))
+  expect_true(is.numeric(result$threshold))
+  expect_true(result$sensitivity >= 0 && result$sensitivity <= 1)
+  expect_true(result$specificity >= 0 && result$specificity <= 1)
+  expect_equal(result$target_sensitivity, 0.90)
+  expect_true(result$auc >= 0 && result$auc <= 1)
+})
+
+test_that("find_threshold_for_sensitivity achieves target sensitivity", {
+  skip_if_not_installed("pROC")
+
+  panel_features <- c("g1", "g2")
+  metrics <- c(sensitivity = 0.5, specificity = 0.5, auc = 0.5)
+  objective_df <- data.frame(
+    solution_id = 1L,
+    objective = names(metrics),
+    value = metrics,
+    direction = c("maximize", "maximize", "maximize"),
+    stringsAsFactors = FALSE
+  )
+  objective_df$features <- I(rep(list(panel_features), nrow(objective_df)))
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = panel_features,
+    metrics = metrics,
+    objectives = objective_df,
+    control = list(positive_class = "Yes"),
+    training_data = list()
+  )
+
+  # Create well-separated data for reliable ROC
+  set.seed(456)
+  n <- 100
+  x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
+  colnames(x) <- c("g1", "g2")
+  # Create signal: g1 predicts outcome
+  linear <- 2 * x[, "g1"]
+  prob <- stats::plogis(linear)
+  y <- factor(ifelse(prob > 0.5, "Yes", "No"), levels = c("No", "Yes"))
+
+  result <- find_threshold_for_sensitivity(panel, x, y, target_sensitivity = 0.90)
+
+  # Sensitivity should be at or near target (within tolerance due to discrete points)
+  expect_gte(result$sensitivity, 0.85)
+})
+
+test_that("find_threshold_for_sensitivity validates inputs", {
+  skip_if_not_installed("pROC")
+
+  panel_features <- c("g1", "g2")
+  metrics <- c(sensitivity = 0.5)
+  objective_df <- data.frame(
+    solution_id = 1L,
+    objective = names(metrics),
+    value = metrics,
+    direction = "maximize",
+    stringsAsFactors = FALSE
+  )
+  objective_df$features <- I(list(panel_features))
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = panel_features,
+    metrics = metrics,
+    objectives = objective_df,
+    control = list(),
+    training_data = list()
+  )
+
+  set.seed(123)
+  x <- matrix(rnorm(40), nrow = 20, ncol = 2)
+  colnames(x) <- c("g1", "g2")
+  y <- factor(rep(c("No", "Yes"), each = 10), levels = c("No", "Yes"))
+
+  # Invalid target_sensitivity
+  expect_error(
+    find_threshold_for_sensitivity(panel, x, y, target_sensitivity = 1.5),
+    "between 0 and 1"
+  )
+
+  expect_error(
+    find_threshold_for_sensitivity(panel, x, y, target_sensitivity = -0.1),
+    "between 0 and 1"
+  )
+})
+
+# ============================================================================
+# evaluate_panel_at_sensitivity tests
+# ============================================================================
+
+test_that("evaluate_panel_at_sensitivity combines threshold finding and evaluation", {
+  skip_if_not_installed("pROC")
+
+  panel_features <- c("g1", "g2")
+  metrics <- c(sensitivity = 0.5, specificity = 0.5, auc = 0.5)
+  objective_df <- data.frame(
+    solution_id = 1L,
+    objective = names(metrics),
+    value = metrics,
+    direction = c("maximize", "maximize", "maximize"),
+    stringsAsFactors = FALSE
+  )
+  objective_df$features <- I(rep(list(panel_features), nrow(objective_df)))
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = panel_features,
+    metrics = metrics,
+    objectives = objective_df,
+    control = list(positive_class = "Yes"),
+    training_data = list()
+  )
+
+  set.seed(789)
+  n <- 100
+  x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
+  colnames(x) <- c("g1", "g2")
+  linear <- 2 * x[, "g1"]
+  prob <- stats::plogis(linear)
+  y <- factor(ifelse(prob > 0.5, "Yes", "No"), levels = c("No", "Yes"))
+
+  result <- evaluate_panel_at_sensitivity(panel, x, y, target_sensitivity = 0.90)
+
+  # Should have standard evaluate_panel structure
+  expect_type(result, "list")
+  expect_true("metrics" %in% names(result))
+  expect_true("confusion" %in% names(result))
+  expect_true("roc" %in% names(result))
+
+  # Should also have target_sensitivity_info
+
+  expect_true("target_sensitivity_info" %in% names(result))
+  expect_equal(result$target_sensitivity_info$target_sensitivity, 0.90)
+
+  # The cutoff used should match the threshold found
+  expect_equal(result$cutoff, result$target_sensitivity_info$threshold)
+
+  # The sensitivity in the result should be near target
+  expect_gte(result$metrics["sensitivity"], 0.85)
+})
+
+test_that("evaluate_panel_at_sensitivity uses correct threshold vs default", {
+  skip_if_not_installed("pROC")
+
+  panel_features <- c("g1", "g2")
+  metrics <- c(sensitivity = 0.5, specificity = 0.5, auc = 0.5)
+  objective_df <- data.frame(
+    solution_id = 1L,
+    objective = names(metrics),
+    value = metrics,
+    direction = c("maximize", "maximize", "maximize"),
+    stringsAsFactors = FALSE
+  )
+  objective_df$features <- I(rep(list(panel_features), nrow(objective_df)))
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = panel_features,
+    metrics = metrics,
+    objectives = objective_df,
+    control = list(positive_class = "Yes"),
+    training_data = list()
+  )
+
+  # Create data with shifted scores (all predictions tend to be low)
+  set.seed(999)
+  n <- 100
+  x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
+  colnames(x) <- c("g1", "g2")
+  # g1 has small coefficients so predictions are low
+  x[, "g1"] <- x[, "g1"] - 2
+  y <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
+  # Add signal: Yes samples have slightly higher g1
+  x[51:100, "g1"] <- x[51:100, "g1"] + 1.5
+
+  # Default evaluation at cutoff=0.5
+  eval_default <- evaluate_panel(panel, x, y, cutoff_prob = 0.5)
+
+  # Evaluation at target sensitivity
+  eval_target <- evaluate_panel_at_sensitivity(panel, x, y, target_sensitivity = 0.90)
+
+  # Target-based evaluation should achieve at least target sensitivity
+  expect_gte(eval_target$metrics["sensitivity"], 0.90)
+
+  # Target-based evaluation should use the computed threshold, not 0.5
+  expect_equal(eval_target$cutoff, eval_target$target_sensitivity_info$threshold)
+})

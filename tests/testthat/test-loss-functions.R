@@ -18,6 +18,43 @@ test_that("loss_num_features counts correctly", {
   expect_equal(loss_num_features(selected = NULL), 0)
 })
 
+test_that("loss_num_features is consistent with feature vector length", {
+
+  # Test various input types - key property: output equals length(selected)
+  features_char <- c("gene_A", "gene_B", "gene_C")
+  expect_equal(loss_num_features(selected = features_char), length(features_char))
+
+  features_5 <- paste0("feature_", seq_len(5))
+  expect_equal(loss_num_features(selected = features_5), length(features_5))
+
+  # Logical vectors: count equals sum of TRUE values
+  features_logical <- c(TRUE, FALSE, TRUE, TRUE, FALSE)
+  expect_equal(loss_num_features(selected = features_logical), sum(features_logical))
+
+  # Empty/NULL cases
+  expect_equal(loss_num_features(selected = character(0)), 0)
+  expect_equal(loss_num_features(selected = NULL), 0)
+})
+
+test_that("loss_num_features handles edge cases", {
+  # Single feature
+  expect_equal(loss_num_features(selected = "single_gene"), 1)
+
+  # Large panel
+  big_panel <- paste0("gene_", seq_len(100))
+  expect_equal(loss_num_features(selected = big_panel), 100)
+
+  # All FALSE logical
+  expect_equal(loss_num_features(selected = rep(FALSE, 10)), 0)
+
+  # All TRUE logical
+  expect_equal(loss_num_features(selected = rep(TRUE, 5)), 5)
+
+  # Mixed with names (shouldn't affect counting)
+  named_features <- c(a = "gene1", b = "gene2")
+  expect_equal(loss_num_features(selected = named_features), 2)
+})
+
 test_that("build_objectives wraps registered losses", {
   objs <- build_objectives(c("sensitivity", "num_features"),
                            params = list(sensitivity = list(cutoff_prob = 0.7)))
