@@ -2,19 +2,23 @@
 % Please edit documentation in R/cohort_preparation.R
 \name{.get_adaptive_nsga_defaults}
 \alias{.get_adaptive_nsga_defaults}
-\title{Get Adaptive NSGA-II Defaults Based on Feature Pool Size}
+\title{Get Adaptive NSGA Defaults Based on Feature Pool Size and Algorithm}
 \usage{
-.get_adaptive_nsga_defaults(n_features)
+.get_adaptive_nsga_defaults(n_features, algorithm = "NSGA-III")
 }
 \arguments{
 \item{n_features}{Number of features in the decision space.}
+
+\item{algorithm}{Algorithm to use: \code{"NSGA-III"} or \code{"NSGA-II"}.}
 }
 \value{
-Named list of NSGA-II parameters.
+Named list of NSGA parameters.
 }
 \description{
-Computes appropriate NSGA-II hyperparameters based on the dimensionality
-of the optimization problem. Larger feature pools require more generations
-and larger populations to adequately explore the search space.
+Computes appropriate NSGA-II or NSGA-III hyperparameters based on the
+dimensionality of the optimization problem and the selected algorithm.
+Larger feature pools require more generations and larger populations to
+adequately explore the search space. NSGA-III typically benefits from
+larger populations for good reference point coverage.
 }
 \keyword{internal}

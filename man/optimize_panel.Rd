@@ -15,6 +15,7 @@ optimize_panel(
   feature_alignment = "intersection",
   constraints = list(),
   scoring_fn = NULL,
+  algorithm = c("NSGA-II", "NSGA-III"),
   nsga_control = list(),
   assay = NULL,
   seed = NULL,
@@ -36,7 +37,10 @@ experiments representing one or more cohorts.}
 \item{objectives}{Named list of objective descriptors as returned by
 \code{\link[=define_objectives]{define_objectives()}}.}
 
-\item{max_features}{Maximum number of biomarkers permitted in a panel.}
+\item{max_features}{Maximum number of biomarkers permitted in a panel. Acts
+as an upper bound; actual panel size varies based on how many features have
+weight > 0.5 in the decision vector. Minimum is 2 features when
+\code{regularized = TRUE} (glmnet requirement), or 1 when \code{regularized = FALSE}.}
 
 \item{feature_pool}{Optional subset of feature identifiers (names or integer
 indices) considered during optimization. When a cohort aggregator is used,
@@ -71,8 +75,16 @@ solution to be considered feasible.}
 features. Signature:
 \verb{function(x_selected, selected_features, truth, cohort = NULL, ...)}.}
 
-\item{nsga_control}{Named list of arguments passed to \code{\link[rmoo:nsga2]{rmoo::nsga2()}}. Defaults
-to \code{list(popSize = 64, maxiter = 60, pcrossover = 0.7, pmutation = 0.2)}.}
+\item{algorithm}{Multi-objective optimization algorithm. \code{"NSGA-II"} (default)
+uses crowding distance for diversity preservation. \code{"NSGA-III"} uses
+reference-point-based selection for many-objective problems but has a bug
+in rmoo 0.3.0 (use NSGA-II as workaround).}
+
+\item{nsga_control}{Named list of arguments passed to \code{\link[rmoo:nsga2]{rmoo::nsga2()}} (or
+\code{\link[rmoo:nsga3]{rmoo::nsga3()}}). For NSGA-III, \code{n_partitions} controls reference point
+density (default computed from number of objectives). Defaults to adaptive
+values based on feature pool size. Note: \code{parallel = TRUE} is not recommended
+as it is slower than sequential execution due to overhead.}
 
 \item{assay}{For \code{SummarizedExperiment} inputs, assay name or index to use.}
 
@@ -112,12 +124,13 @@ A \code{BiomarkerPanelResult} with Pareto-optimal solutions summarised in
 the \code{objectives} slot.
 }
 \description{
-Wrapper around \code{\link[rmoo:nsga2]{rmoo::nsga2()}} that composes registered loss functions into a
-multi-objective search for compact biomarker panels. Candidate solutions are
-represented as weights over a feature pool; the top \code{max_features} features
-define a panel whose performance is evaluated via the selected losses.
-Inputs may be a single cohort (\code{matrix}, \code{data.frame}, or
-\code{SummarizedExperiment}) or multiple cohorts supplied as lists of such objects.
-Optimisation should be run on training data only---use \code{\link[=evaluate_panel]{evaluate_panel()}} for
-held-out validation.
+Wrapper around \code{\link[rmoo:nsga2]{rmoo::nsga2()}} (or \code{\link[rmoo:nsga3]{rmoo::nsga3()}}) that composes registered
+loss functions into a multi-objective search for compact biomarker panels.
+Candidate solutions are represented as weights over a feature pool; features
+with weight > 0.5 are included in the panel (up to \code{max_features}). This
+threshold-based selection allows variable panel sizes, making the
+\code{num_features} objective meaningful. Inputs may be a single cohort (\code{matrix},
+\code{data.frame}, or \code{SummarizedExperiment}) or multiple cohorts supplied as
+lists of such objects. Optimisation should be run on training data only---use
+\code{\link[=evaluate_panel]{evaluate_panel()}} for held-out validation.
 }

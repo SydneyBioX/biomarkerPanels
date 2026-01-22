@@ -1,14 +1,14 @@
 #' Optimize Biomarker Panels with NSGA-II
 #'
-#' Wrapper around [rmoo::nsga2()] that composes registered loss functions into a
-#' multi-objective search for compact biomarker panels. Candidate solutions are
-#' represented as weights over a feature pool; features with weight > 0.5 are
-#' included in the panel (up to `max_features`). This threshold-based selection
-#' allows variable panel sizes, making the `num_features` objective meaningful.
-#' Inputs may be a single cohort (`matrix`, `data.frame`, or
-#' `SummarizedExperiment`) or multiple cohorts supplied as lists of such objects.
-#' Optimisation should be run on training data only---use [evaluate_panel()] for
-#' held-out validation.
+#' Wrapper around [rmoo::nsga2()] (or [rmoo::nsga3()]) that composes registered
+#' loss functions into a multi-objective search for compact biomarker panels.
+#' Candidate solutions are represented as weights over a feature pool; features
+#' with weight > 0.5 are included in the panel (up to `max_features`). This
+#' threshold-based selection allows variable panel sizes, making the
+#' `num_features` objective meaningful. Inputs may be a single cohort (`matrix`,
+#' `data.frame`, or `SummarizedExperiment`) or multiple cohorts supplied as
+#' lists of such objects. Optimisation should be run on training data only---use
+#' [evaluate_panel()] for held-out validation.
 #'
 #' @param x Matrix-like object, `SummarizedExperiment`, or list of matrices /
 #'   experiments representing one or more cohorts.
@@ -48,8 +48,15 @@
 #' @param scoring_fn Function producing per-sample scores from the selected
 #'   features. Signature:
 #'   `function(x_selected, selected_features, truth, cohort = NULL, ...)`.
-#' @param nsga_control Named list of arguments passed to [rmoo::nsga2()]. Defaults
-#'   to `list(popSize = 64, maxiter = 60, pcrossover = 0.7, pmutation = 0.2)`.
+#' @param algorithm Multi-objective optimization algorithm. `"NSGA-II"` (default)
+#'   uses crowding distance for diversity preservation. `"NSGA-III"` uses
+#'   reference-point-based selection for many-objective problems but has a bug
+#'   in rmoo 0.3.0 (use NSGA-II as workaround).
+#' @param nsga_control Named list of arguments passed to [rmoo::nsga2()] (or
+#'   [rmoo::nsga3()]). For NSGA-III, `n_partitions` controls reference point
+#'   density (default computed from number of objectives). Defaults to adaptive
+#'   values based on feature pool size. Note: `parallel = TRUE` is not recommended
+#'   as it is slower than sequential execution due to overhead.
 #' @param assay For `SummarizedExperiment` inputs, assay name or index to use.
 #' @param seed Optional integer seed for reproducibility. When provided, sets
 #'   the random seed before running NSGA-II optimization. This ensures
@@ -75,6 +82,14 @@
 #' @param regularized_alpha Elastic net mixing parameter when `regularized = TRUE`.
 #'   `alpha = 1` is lasso, `alpha = 0` is ridge, and values in between give
 #'   elastic net. Default is 0.5 (elastic net).
+#' @param selection_threshold Either a fixed numeric threshold in (0,1) for
+#'   feature selection, or `"adaptive"` (default) to use gap-based selection
+#'   that allows variable panel sizes in the Pareto front. Fixed thresholds
+#'   (e.g., 0.5) tend to produce panels at `max_features` because more features
+
+#'   improve accuracy. Adaptive selection finds natural breakpoints in the
+#'   weight distribution, enabling the `num_features` objective to drive panel
+#'   size diversity.
 #' @return A `BiomarkerPanelResult` with Pareto-optimal solutions summarised in
 #'   the `objectives` slot.
 #' @export
@@ -88,6 +103,7 @@ optimize_panel <- function(x, y,
                            feature_alignment = "intersection",
                            constraints = list(),
                            scoring_fn = NULL,
+                           algorithm = c("NSGA-II", "NSGA-III"),
                            nsga_control = list(),
                            assay = NULL,
                            seed = NULL,
@@ -96,7 +112,9 @@ optimize_panel <- function(x, y,
                            final_model_cv = FALSE,
                            cv_folds = 5L,
                            regularized = TRUE,
-                           regularized_alpha = 0.5) {
+                           regularized_alpha = 0.5,
+                           selection_threshold = "adaptive") {
+  algorithm <- match.arg(algorithm)
   feature_alignment <- match.arg(feature_alignment)
   if (!requireNamespace("rmoo", quietly = TRUE)) {
     stop("The 'rmoo' package is required. Install it via install.packages('rmoo').",
@@ -254,7 +272,7 @@ optimize_panel <- function(x, y,
 
   constraint_specs <- .normalize_constraints(constraints)
 
-  nsga_defaults <- .get_adaptive_nsga_defaults(decision_dim)
+  nsga_defaults <- .get_adaptive_nsga_defaults(decision_dim, algorithm)
   nsga_args <- utils::modifyList(nsga_defaults, nsga_control)
 
 
@@ -276,25 +294,56 @@ optimize_panel <- function(x, y,
   min_features_required <- if (regularized) 2L else 1L
 
   evaluate_candidate <- function(decision_vec) {
-    # Threshold-based selection: include features with weight > 0.5
-    # This allows variable panel sizes, making num_features objective meaningful
     feature_names_pool <- colnames(x_pool)
-    above_threshold <- which(decision_vec > 0.5)
+    n_pool <- length(feature_names_pool)
 
-    if (length(above_threshold) < min_features_required) {
-      # Fallback: take top min_features_required by weight
-      ord <- order(decision_vec, feature_names_pool, decreasing = c(TRUE, FALSE),
-                   method = "radix")
-      selected_idx <- ord[seq_len(min(min_features_required, length(ord)))]
-    } else if (length(above_threshold) > max_features) {
-      # Cap at max_features, using feature names for reproducible tie-breaking
-      weights_above <- decision_vec[above_threshold]
-      names_above <- feature_names_pool[above_threshold]
-      ord <- order(weights_above, names_above, decreasing = c(TRUE, FALSE),
-                   method = "radix")
-      selected_idx <- above_threshold[ord[seq_len(max_features)]]
+    if (identical(selection_threshold, "adaptive")) {
+      # Adaptive: select based on largest gap in sorted weights
+      # This allows the GA to "encode" panel size in the weight distribution
+      ord <- order(decision_vec, feature_names_pool,
+                   decreasing = c(TRUE, FALSE), method = "radix")
+      sorted_weights <- decision_vec[ord]
+
+      if (n_pool > max_features) {
+        top_n <- min(max_features + 5L, n_pool)
+        weight_diffs <- -diff(sorted_weights[seq_len(top_n)])
+
+        # Find largest gap after min_features_required
+        search_range <- seq(min_features_required, top_n - 1L)
+        if (length(search_range) > 0L) {
+          gap_idx <- which.max(weight_diffs[search_range])
+          natural_cutoff <- min_features_required + gap_idx
+        } else {
+          natural_cutoff <- min_features_required
+        }
+        n_selected <- min(natural_cutoff, max_features)
+        n_selected <- max(n_selected, min_features_required)
+      } else {
+        above_median <- sum(decision_vec > 0.5)
+        n_selected <- max(min_features_required, min(above_median, max_features))
+      }
+      selected_idx <- ord[seq_len(n_selected)]
+
     } else {
-      selected_idx <- above_threshold
+      # Fixed threshold (backward compatible)
+      threshold <- as.numeric(selection_threshold)
+      above_threshold <- which(decision_vec > threshold)
+
+      if (length(above_threshold) < min_features_required) {
+        # Fallback: take top min_features_required by weight
+        ord <- order(decision_vec, feature_names_pool,
+                     decreasing = c(TRUE, FALSE), method = "radix")
+        selected_idx <- ord[seq_len(min(min_features_required, length(ord)))]
+      } else if (length(above_threshold) > max_features) {
+        # Cap at max_features, using feature names for reproducible tie-breaking
+        weights_above <- decision_vec[above_threshold]
+        names_above <- feature_names_pool[above_threshold]
+        ord <- order(weights_above, names_above,
+                     decreasing = c(TRUE, FALSE), method = "radix")
+        selected_idx <- above_threshold[ord[seq_len(max_features)]]
+      } else {
+        selected_idx <- above_threshold
+      }
     }
 
     # Sort by descending weight for consistent output ordering
@@ -402,7 +451,8 @@ optimize_panel <- function(x, y,
 
   # rmoo fitness function: can receive matrix (rows=individuals) or vector (single individual)
   # Must return matrix when receiving matrix input
-  objective_wrapper <- function(x) {
+  # Note: Accept ... to handle rmoo bug that passes reference_dirs to fitness
+  objective_wrapper <- function(x, ...) {
     if (is.null(dim(x))) {
       # Single individual as vector
       return(evaluate_single(x))
@@ -424,6 +474,11 @@ optimize_panel <- function(x, y,
     nsga_args
   )
 
+  # Add reference points for NSGA-III if not user-specified
+  if (algorithm == "NSGA-III" && is.null(nsga_args$n_partitions)) {
+    nsga_params$n_partitions <- .compute_nsga3_partitions(length(objectives))
+  }
+
   # Set random seed for reproducibility if provided
   if (!is.null(seed)) {
     if (!is.numeric(seed) || length(seed) != 1L) {
@@ -432,7 +487,25 @@ optimize_panel <- function(x, y,
     set.seed(as.integer(seed))
   }
 
-  nsga_result <- do.call(rmoo::nsga2, nsga_params)
+  # Generate sparse initialization suggestions to encourage diverse panel sizes
+  # This seeds the initial population with solutions spanning min to max features
+  n_suggestions <- min(20L, nsga_params$popSize %/% 4L)
+  if (n_suggestions >= 2L) {
+    sparse_suggestions <- .generate_sparse_suggestions(
+      n_features = decision_dim,
+      n_suggestions = n_suggestions,
+      min_features = min_features_required,
+      max_features = max_features,
+      seed = seed
+    )
+    nsga_params$suggestions <- sparse_suggestions
+  }
+
+  if (algorithm == "NSGA-II") {
+    nsga_result <- do.call(rmoo::nsga2, nsga_params)
+  } else {
+    nsga_result <- do.call(rmoo::nsga3, nsga_params)
+  }
 
   # Filter to Pareto-optimal solutions (front rank == 1)
   # rmoo returns full population; mco returned only Pareto-optimal
@@ -507,7 +580,8 @@ optimize_panel <- function(x, y,
       max_features = max_features,
       feature_pool = feature_pool,
       base_feature_pool = feature_pool_base,
-      nsga2 = nsga_args,
+      algorithm = algorithm,
+      nsga2 = nsga_args,  # Keep nsga2 name for backward compatibility
       scoring_function = deparse(substitute(scoring_fn)),
       cohort_aggregator = cohort_aggregator,
       feature_alignment = feature_alignment,
@@ -522,6 +596,7 @@ optimize_panel <- function(x, y,
       response_levels = levels(truth),
       # Store seed for reproducibility documentation
       seed = seed,
+      selection_threshold = selection_threshold,
       final_model_cv = final_model_cv,
       cv_folds = if (final_model_cv) cv_folds else NULL,
       regularized = regularized,

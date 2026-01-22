@@ -349,16 +349,19 @@ NULL
   })
 }
 
-#' Get Adaptive NSGA-II Defaults Based on Feature Pool Size
+#' Get Adaptive NSGA Defaults Based on Feature Pool Size and Algorithm
 #'
-#' Computes appropriate NSGA-II hyperparameters based on the dimensionality
-#' of the optimization problem. Larger feature pools require more generations
-#' and larger populations to adequately explore the search space.
+#' Computes appropriate NSGA-II or NSGA-III hyperparameters based on the
+#' dimensionality of the optimization problem and the selected algorithm.
+#' Larger feature pools require more generations and larger populations to
+#' adequately explore the search space. NSGA-III typically benefits from
+#' larger populations for good reference point coverage.
 #'
 #' @param n_features Number of features in the decision space.
-#' @return Named list of NSGA-II parameters.
+#' @param algorithm Algorithm to use: `"NSGA-III"` or `"NSGA-II"`.
+#' @return Named list of NSGA parameters.
 #' @keywords internal
-.get_adaptive_nsga_defaults <- function(n_features) {
+.get_adaptive_nsga_defaults <- function(n_features, algorithm = "NSGA-III") {
   # Base parameters that don't change with problem size
   # Note: rmoo uses SBX crossover (nc=20) and polynomial mutation (nm=0.2) by default
   base_params <- list(
@@ -366,13 +369,24 @@ NULL
     pmutation = 0.2
   )
 
-  # Scale population and generations based on feature pool size
-  if (n_features <= 30) {
-    adaptive_params <- list(popSize = 64, maxiter = 60)
-  } else if (n_features <= 100) {
-    adaptive_params <- list(popSize = 128, maxiter = 150)
+  # NSGA-III typically needs larger populations for good reference point coverage
+  if (algorithm == "NSGA-III") {
+    if (n_features <= 30) {
+      adaptive_params <- list(popSize = 92, maxiter = 80)
+    } else if (n_features <= 100) {
+      adaptive_params <- list(popSize = 156, maxiter = 180)
+    } else {
+      adaptive_params <- list(popSize = 252, maxiter = 350)
+    }
   } else {
-    adaptive_params <- list(popSize = 200, maxiter = 300)
+    # NSGA-II defaults (existing)
+    if (n_features <= 30) {
+      adaptive_params <- list(popSize = 64, maxiter = 60)
+    } else if (n_features <= 100) {
+      adaptive_params <- list(popSize = 128, maxiter = 150)
+    } else {
+      adaptive_params <- list(popSize = 200, maxiter = 300)
+    }
   }
 
   c(adaptive_params, base_params)
@@ -484,4 +498,271 @@ NULL
   })
 
   list(matrices = aligned_matrices, features = ordered_features)
+}
+
+#' Compute NSGA-III Partition Count Based on Number of Objectives
+#'
+#' Determines the appropriate number of partitions for generating reference
+#' points in NSGA-III based on the number of objectives. More objectives
+#' require fewer partitions to avoid exponential growth in reference points.
+#'
+#' @param n_objectives Number of objectives in the optimization problem.
+#' @return Integer number of partitions.
+#' @keywords internal
+.compute_nsga3_partitions <- function(n_objectives) {
+
+  # Rule of thumb: partitions scale inversely with objectives
+  # For 2-3 objectives: 12 partitions
+  # For 4-5 objectives: 6 partitions
+  # For 6+ objectives: 4 partitions
+  if (n_objectives <= 3) 12L
+  else if (n_objectives <= 5) 6L
+  else 4L
+}
+
+#' Generate Sparse Initial Population Suggestions
+#'
+#' Creates a diverse set of initial weight vectors that span different panel
+#' sizes, from `min_features` to `max_features`. This helps NSGA explore
+#' the full range of panel sizes rather than converging only toward max_features.
+#'
+#' @param n_features Number of features in the decision space.
+#' @param n_suggestions Number of suggestion vectors to generate.
+#' @param min_features Minimum number of features to include (active weights).
+#' @param max_features Maximum number of features to include.
+#' @param seed Optional integer seed for reproducibility.
+#' @return Matrix with `n_suggestions` rows and `n_features` columns, where
+#'   each row is a weight vector with varying numbers of high/low values.
+#' @keywords internal
+.generate_sparse_suggestions <- function(n_features,
+                                          n_suggestions = 20L,
+                                          min_features = 2L,
+                                          max_features = 10L,
+                                          seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+
+  target_sizes <- unique(round(seq(min_features, max_features,
+                                    length.out = n_suggestions)))
+  n_suggestions <- length(target_sizes)
+  suggestions <- matrix(0, nrow = n_suggestions, ncol = n_features)
+
+  for (i in seq_len(n_suggestions)) {
+    k <- target_sizes[i]
+    on_idx <- sample(n_features, size = min(k, n_features))
+    suggestions[i, on_idx] <- runif(length(on_idx), 0.7, 0.95)
+    off_idx <- setdiff(seq_len(n_features), on_idx)
+    suggestions[i, off_idx] <- runif(length(off_idx), 0.05, 0.3)
+  }
+  suggestions
+}
+
+#' Validate Partition Ratios for Train/Validation/Held-out Split
+#'
+#' Ensures that train, validation, and held-out ratios satisfy minimum
+#' requirements for meaningful model fitting and evaluation.
+#'
+#' @param train_ratio Proportion of data for training (must be >= 0.5).
+#' @param val_ratio Proportion of data for validation (must be >= 0.1).
+#' @return Invisibly returns TRUE if valid; otherwise throws an error.
+#' @keywords internal
+.validate_partition_ratios <- function(train_ratio, val_ratio) {
+  if (!is.numeric(train_ratio) || length(train_ratio) != 1L ||
+      is.na(train_ratio) || train_ratio < 0 || train_ratio > 1) {
+    stop("`train_ratio` must be a single numeric value between 0 and 1.",
+         call. = FALSE)
+  }
+  if (!is.numeric(val_ratio) || length(val_ratio) != 1L ||
+      is.na(val_ratio) || val_ratio < 0 || val_ratio > 1) {
+    stop("`val_ratio` must be a single numeric value between 0 and 1.",
+         call. = FALSE)
+  }
+
+  heldout_ratio <- 1 - train_ratio - val_ratio
+
+  if (train_ratio < 0.5) {
+    stop("`train_ratio` must be at least 0.5 to ensure sufficient training data.",
+         call. = FALSE)
+  }
+  if (val_ratio < 0.1) {
+    stop("`val_ratio` must be at least 0.1 to ensure meaningful validation.",
+         call. = FALSE)
+  }
+  if (heldout_ratio < 0.05) {
+    stop("Held-out ratio (1 - train_ratio - val_ratio) must be at least 0.05. ",
+         "Current: ", round(heldout_ratio, 3), call. = FALSE)
+  }
+
+  invisible(TRUE)
+}
+
+#' Stratified Partitioning of Multi-Cohort Data
+#'
+#' Partitions each cohort's data into train, validation, and held-out sets
+#' while maintaining class balance within each partition.
+#'
+#' @param x_list List of feature matrices (one per cohort).
+#' @param y_list List of binary response factors (one per cohort).
+#' @param train_ratio Proportion of data for training.
+#' @param val_ratio Proportion of data for validation.
+#' @return List containing:
+#'   \describe{
+#'     \item{train_x}{List of training matrices (one per cohort)}
+#'     \item{train_y}{List of training response factors}
+#'     \item{val_x}{List of validation matrices}
+#'     \item{val_y}{List of validation response factors}
+#'     \item{heldout_x}{List of held-out matrices}
+#'     \item{heldout_y}{List of held-out response factors}
+#'     \item{cohort_names}{Character vector of cohort names}
+#'     \item{partition_info}{Data frame with partition sizes per cohort}
+#'   }
+#' @keywords internal
+.stratified_partition_cohorts <- function(x_list, y_list, train_ratio, val_ratio) {
+  if (!is.list(x_list) || !is.list(y_list)) {
+    stop("`x_list` and `y_list` must be lists.", call. = FALSE)
+  }
+  if (length(x_list) != length(y_list)) {
+    stop("`x_list` and `y_list` must have the same length.", call. = FALSE)
+  }
+
+  n_cohorts <- length(x_list)
+  cohort_names <- names(x_list)
+  if (is.null(cohort_names) || any(cohort_names == "")) {
+    cohort_names <- sprintf("cohort_%02d", seq_len(n_cohorts))
+  }
+
+  train_x <- vector("list", n_cohorts)
+  train_y <- vector("list", n_cohorts)
+  val_x <- vector("list", n_cohorts)
+  val_y <- vector("list", n_cohorts)
+  heldout_x <- vector("list", n_cohorts)
+  heldout_y <- vector("list", n_cohorts)
+
+  partition_info <- data.frame(
+    cohort = cohort_names,
+    n_total = integer(n_cohorts),
+    n_train = integer(n_cohorts),
+    n_val = integer(n_cohorts),
+    n_heldout = integer(n_cohorts),
+    train_yes = integer(n_cohorts),
+    train_no = integer(n_cohorts),
+    val_yes = integer(n_cohorts),
+    val_no = integer(n_cohorts),
+    heldout_yes = integer(n_cohorts),
+    heldout_no = integer(n_cohorts),
+    stringsAsFactors = FALSE
+  )
+
+  for (i in seq_len(n_cohorts)) {
+    x_i <- x_list[[i]]
+    y_i <- ensure_binary_response(y_list[[i]])
+
+    n <- nrow(x_i)
+    if (n != length(y_i)) {
+      stop("Cohort ", i, ": `x` and `y` have different sample sizes.", call. = FALSE)
+    }
+
+    # Stratified sampling within each class
+    yes_idx <- which(y_i == "Yes")
+    no_idx <- which(y_i == "No")
+
+    # Partition each class
+    partition_class <- function(idx) {
+      n_class <- length(idx)
+      if (n_class == 0L) {
+        return(list(train = integer(0), val = integer(0), heldout = integer(0)))
+      }
+
+      shuffled <- sample(idx)
+      n_train <- max(1L, round(n_class * train_ratio))
+      n_val <- max(1L, round(n_class * val_ratio))
+      n_heldout <- n_class - n_train - n_val
+
+      # Ensure at least 1 sample in held-out if possible
+
+      if (n_heldout < 1L && n_class >= 3L) {
+        n_heldout <- 1L
+        if (n_train > n_val) {
+          n_train <- n_train - 1L
+        } else {
+          n_val <- n_val - 1L
+        }
+      }
+
+      list(
+        train = shuffled[seq_len(n_train)],
+        val = if (n_val > 0L) shuffled[(n_train + 1L):min(n_train + n_val, n_class)] else integer(0),
+        heldout = if (n_heldout > 0L) shuffled[(n_train + n_val + 1L):n_class] else integer(0)
+      )
+    }
+
+    yes_parts <- partition_class(yes_idx)
+    no_parts <- partition_class(no_idx)
+
+    train_idx <- c(yes_parts$train, no_parts$train)
+    val_idx <- c(yes_parts$val, no_parts$val)
+    heldout_idx <- c(yes_parts$heldout, no_parts$heldout)
+
+    # Check for small partitions
+    min_per_class <- 2L
+    warn_threshold <- 5L
+
+    check_partition_size <- function(part_name, yes_n, no_n) {
+      if (yes_n < min_per_class || no_n < min_per_class) {
+        stop(
+          "Cohort '", cohort_names[i], "' has insufficient samples in ", part_name, " set. ",
+          "Yes: ", yes_n, ", No: ", no_n, ". Minimum required: ", min_per_class, " per class.",
+          call. = FALSE
+        )
+      }
+      if (yes_n < warn_threshold || no_n < warn_threshold) {
+        warning(
+          "Cohort '", cohort_names[i], "' has few samples in ", part_name, " set. ",
+          "Yes: ", yes_n, ", No: ", no_n, ". Results may be unreliable.",
+          call. = FALSE
+        )
+      }
+    }
+
+    check_partition_size("training", length(yes_parts$train), length(no_parts$train))
+    check_partition_size("validation", length(yes_parts$val), length(no_parts$val))
+    check_partition_size("held-out", length(yes_parts$heldout), length(no_parts$heldout))
+
+    # Store partitions
+    train_x[[i]] <- x_i[train_idx, , drop = FALSE]
+    train_y[[i]] <- y_i[train_idx]
+    val_x[[i]] <- x_i[val_idx, , drop = FALSE]
+    val_y[[i]] <- y_i[val_idx]
+    heldout_x[[i]] <- x_i[heldout_idx, , drop = FALSE]
+    heldout_y[[i]] <- y_i[heldout_idx]
+
+    # Record partition info
+    partition_info$n_total[i] <- n
+    partition_info$n_train[i] <- length(train_idx)
+    partition_info$n_val[i] <- length(val_idx)
+    partition_info$n_heldout[i] <- length(heldout_idx)
+    partition_info$train_yes[i] <- length(yes_parts$train)
+    partition_info$train_no[i] <- length(no_parts$train)
+    partition_info$val_yes[i] <- length(yes_parts$val)
+    partition_info$val_no[i] <- length(no_parts$val)
+    partition_info$heldout_yes[i] <- length(yes_parts$heldout)
+    partition_info$heldout_no[i] <- length(no_parts$heldout)
+  }
+
+  names(train_x) <- cohort_names
+  names(train_y) <- cohort_names
+  names(val_x) <- cohort_names
+  names(val_y) <- cohort_names
+  names(heldout_x) <- cohort_names
+  names(heldout_y) <- cohort_names
+
+  list(
+    train_x = train_x,
+    train_y = train_y,
+    val_x = val_x,
+    val_y = val_y,
+    heldout_x = heldout_x,
+    heldout_y = heldout_y,
+    cohort_names = cohort_names,
+    partition_info = partition_info
+  )
 }

@@ -10,3 +10,4 @@
 ^\.Rproj.user$
 ^src/.*\\.(o|so|dll)$
 ^biomarkerPanels_.*\.tar\.gz$
+^dev$
