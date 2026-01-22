@@ -206,7 +206,7 @@ List score_transferable_features_cpp(NumericMatrix coefficient_matrix) {
       }
     }
   }
-
+  
   return List::create(
     Named("mean_abs") = mean_abs,
     Named("sd") = sd_vals,

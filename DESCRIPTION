@@ -18,6 +18,7 @@ Imports:
     stats,
     utils,
     Matrix,
+    Rcpp,
     SummarizedExperiment,
     S4Vectors,
     rmoo,

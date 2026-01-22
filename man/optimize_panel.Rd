@@ -24,7 +24,8 @@ optimize_panel(
   final_model_cv = FALSE,
   cv_folds = 5L,
   regularized = TRUE,
-  regularized_alpha = 0.5
+  regularized_alpha = 0.5,
+  selection_threshold = "adaptive"
 )
 }
 \arguments{
@@ -118,6 +119,14 @@ performance compared to unregularized logistic regression.}
 \item{regularized_alpha}{Elastic net mixing parameter when \code{regularized = TRUE}.
 \code{alpha = 1} is lasso, \code{alpha = 0} is ridge, and values in between give
 elastic net. Default is 0.5 (elastic net).}
+
+\item{selection_threshold}{Either a fixed numeric threshold in (0,1) for
+feature selection, or \code{"adaptive"} (default) to use gap-based selection
+that allows variable panel sizes in the Pareto front. Fixed thresholds
+(e.g., 0.5) tend to produce panels at \code{max_features} because more features
+improve accuracy. Adaptive selection finds natural breakpoints in the
+weight distribution, enabling the \code{num_features} objective to drive panel
+size diversity.}
 }
 \value{
 A \code{BiomarkerPanelResult} with Pareto-optimal solutions summarised in

@@ -18,7 +18,7 @@ optimize_panel_transferable(
   cohort_aggregator = "pairwise_ratios",
   feature_alignment = "intersection",
   constraints = list(),
-  algorithm = c("NSGA-II", "NSGA-III"),
+  algorithm = c("NSGA-III", "NSGA-II"),
   nsga_control = list(),
   assay = NULL,
   seed = NULL,
@@ -56,8 +56,8 @@ optimize_panel_transferable(
 
 \item{constraints}{Optional list of constraint descriptors.}
 
-\item{algorithm}{Multi-objective algorithm: \code{"NSGA-II"} (default) or
-\code{"NSGA-III"}.}
+\item{algorithm}{Multi-objective algorithm: \code{"NSGA-III"} (default) or
+\code{"NSGA-II"}.}
 
 \item{nsga_control}{Named list of arguments passed to rmoo.}
 
