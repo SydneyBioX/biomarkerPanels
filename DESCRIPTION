@@ -32,7 +32,6 @@ Suggests:
     rmarkdown,
     ggplot2,
     BiocStyle,
-    GA,
     nproc
 LinkingTo:
     Rcpp
