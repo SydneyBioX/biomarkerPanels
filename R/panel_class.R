@@ -1,14 +1,108 @@
+#' Optimization Result Class
+#'
+#' Stores multi-objective optimization results from NSGA-II/III including the
+#' Pareto-optimal solutions, feature pool, and training data. This class is
+#' returned by [optimize_panel()] and serves as input to [fit_panel()] for
+#' model fitting.
+#'
+#' @slot solutions Data frame with one row per Pareto solution. Contains columns:
+#'   `solution_id` (integer), `features` (list-column of character vectors),
+#'   and one column per objective with numeric values.
+#' @slot feature_pool Character vector of features considered during optimization.
+#' @slot control List of optimization control parameters.
+#' @slot training_signature List with metadata about the training dataset.
+#' @slot aggregated_x Aggregated training feature matrix (for use with fit_panel).
+#' @slot aggregated_y Aggregated training response vector (factor).
+#' @slot aggregated_cohort Cohort membership factor for training samples.
+#' @export
+setClass(
+  "OptimizationResult",
+  slots = c(
+    solutions = "data.frame",
+    feature_pool = "character",
+    control = "list",
+    training_signature = "list",
+    aggregated_x = "ANY",
+    aggregated_y = "ANY",
+    aggregated_cohort = "ANY"
+  )
+)
+
+#' Solutions Accessor
+#'
+#' Retrieve the Pareto-optimal solutions from an `OptimizationResult` object.
+#'
+#' @param object An `OptimizationResult`.
+#' @return Data frame with one row per solution containing features and metrics.
+#' @export
+setGeneric("solutions", function(object) standardGeneric("solutions"))
+
+#' @describeIn solutions Return the solutions data frame.
+#' @export
+setMethod(
+  "solutions",
+  signature = "OptimizationResult",
+  definition = function(object) {
+    object@solutions
+  }
+)
+
+#' Number of Solutions
+#'
+#' Get the number of Pareto-optimal solutions in an `OptimizationResult`.
+#'
+#' @param object An `OptimizationResult`.
+#' @return Integer count of solutions.
+#' @export
+setGeneric("n_solutions", function(object) standardGeneric("n_solutions"))
+
+#' @describeIn n_solutions Return the number of solutions.
+#' @export
+setMethod(
+  "n_solutions",
+  signature = "OptimizationResult",
+  definition = function(object) {
+    nrow(object@solutions)
+  }
+)
+
+#' Get Solution Features
+#'
+#' Extract the feature set for a specific Pareto solution.
+#'
+#' @param object An `OptimizationResult`.
+#' @param solution_id Integer ID of the solution (1-based).
+#' @return Character vector of feature names in the solution.
+#' @export
+setGeneric("get_solution_features", function(object, solution_id)
+  standardGeneric("get_solution_features"))
+
+#' @describeIn get_solution_features Return features for the specified solution.
+#' @export
+setMethod(
+  "get_solution_features",
+  signature = c(object = "OptimizationResult", solution_id = "numeric"),
+  definition = function(object, solution_id) {
+    solution_id <- as.integer(solution_id)
+    if (solution_id < 1L || solution_id > nrow(object@solutions)) {
+      stop("solution_id must be between 1 and ", nrow(object@solutions), call. = FALSE)
+    }
+    object@solutions$features[[solution_id]]
+  }
+)
+
 #' Biomarker Panel Result Class
 #'
-#' Stores multi-objective optimization results including selected biomarkers,
-#' performance summaries, and optimization metadata.
+#' Stores a fitted biomarker panel including selected biomarkers,
+#' performance summaries, and the trained model. This class is
+#' returned by [fit_panel()] and serves as input to [evaluate_panel()].
 #'
 #' @slot features Character vector of selected biomarkers.
 #' @slot metrics Named numeric vector summarizing sensitivity, specificity, etc.
 #' @slot objectives Data frame describing objective values per candidate solution.
 #' @slot control List of optimization control parameters.
 #' @slot training_data Signature of the training dataset (e.g., sample and assay info).
-#' @slot model Fitted model object (e.g., glm) trained on the selected features.
+#' @slot model Fitted model object (e.g., glm or cv.glmnet) trained on the selected features.
 #' @export
 setClass(
   "BiomarkerPanelResult",

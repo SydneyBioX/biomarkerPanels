@@ -39,26 +39,29 @@ objectives <- define_objectives(
   losses = c("sensitivity", "specificity", "num_features")
 )
 
-# Enforce minimum sensitivity constraint
-constraints <- list(
-  min_metric_constraint("sensitivity", min_value = 0.85)
-)
-
-# Run NSGA-II optimization
-result <- optimize_panel(
+# Run NSGA-II optimization (returns Pareto front, no model)
+opt_result <- optimize_panel(
   x = train_matrix,
   y = train_response,
   objectives = objectives,
-  constraints = constraints,
   max_features = 10,
   seed = 42
 )
 
-# Select panel with highest sensitivity from Pareto front
-final_panel <- select_panel_top_sensitivity(result)
+# Inspect Pareto-optimal solutions
+summarize_solutions(opt_result)
+#>   solution_id n_features sensitivity specificity num_features
+#> 1           1          4       0.912       0.847            4
+#> 2           2          6       0.934       0.821            6
+#> ...
 
-# Evaluate on held-out data
-eval <- evaluate_panel(final_panel, x = test_matrix, y = test_response)
+# Fit model on chosen solution (or auto-select best)
+panel <- fit_panel(opt_result, solution_id = 1)
+# OR: auto-select best on first objective
+panel <- fit_panel(opt_result)
+
+# Evaluate on held-out data (requires fitted model)
+eval <- evaluate_panel(panel, x = test_matrix, y = test_response)
 eval$metrics
 #>   sensitivity   specificity           auc
 #>         0.912         0.847         0.923
@@ -97,12 +100,14 @@ result <- optimize_panel(x, y, feature_pool = top_de, ...)
 
 | Function | Description |
 |----------|-------------|
-| `optimize_panel()` | Run NSGA-II/III to find Pareto-optimal panels |
-| `evaluate_panel()` | Validate panel performance on held-out data |
+| `optimize_panel()` | Run NSGA-II/III, returns `OptimizationResult` with Pareto front |
+| `summarize_solutions()` | Inspect Pareto solutions with metrics and feature counts |
+| `fit_panel()` | Fit model on selected solution, returns `BiomarkerPanelResult` |
+| `evaluate_panel()` | Validate panel performance on held-out data (requires fitted model) |
 | `define_objectives()` | Configure optimization objectives |
 | `min_metric_constraint()` | Add hard performance constraints |
-| `select_panel_top_sensitivity()` | Select panel from Pareto front by sensitivity |
-| `select_panel_inclusion_frequency()` | Select panel by feature frequency across solutions |
+| `select_panel_top_sensitivity()` | Select solution from Pareto front by sensitivity |
+| `select_panel_inclusion_frequency()` | Select solution by feature frequency across solutions |
 | `get_top_de_features()` | Pre-filter features via differential expression |
 | `select_transferable_features()` | Pre-filter features by cross-cohort stability |
 | `loss_registry()` | View all available objective functions |

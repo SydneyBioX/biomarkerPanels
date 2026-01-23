@@ -126,15 +126,29 @@ evaluate_panel <- function(panel, x, y,
 
   x_selected <- x_mat[, selected, drop = FALSE]
 
-  # Check if panel has a stored model - use it for prediction if available
+  # Determine how to compute scores
   stored_model <- panel@model
-  if (!is.null(stored_model) && is.null(scoring_fn)) {
+  scores <- NULL
+
+  if (!is.null(scoring_fn)) {
+    # User provided custom scoring function - use it
+    if (!is.function(scoring_fn)) {
+      stop("`scoring_fn` must be a function.", call. = FALSE)
+    }
+    score_args <- list(
+      x_selected = x_selected,
+      selected_features = selected,
+      truth = truth,
+      cohort = cohort_vec
+    )
+    scores <- do.call(scoring_fn, score_args)
+  } else if (!is.null(stored_model)) {
     # Use the stored model for prediction (true out-of-sample evaluation)
     scores <- tryCatch({
       # Check if this is a glmnet model (regularized) or glm model (unregularized)
       if (inherits(stored_model, "cv.glmnet")) {
         # Regularized model: use glmnet prediction
-        scores <- .predict_glmnet_model(
+        preds <- .predict_glmnet_model(
           model = stored_model,
           x_selected = x_selected,
           cohort_vec = cohort_vec
@@ -184,13 +198,13 @@ evaluate_panel <- function(panel, x, y,
                                       levels = train_cohort_levels)
           }
         }
-        scores <- stats::predict(stored_model, newdata = newdata, type = "response")
+        preds <- stats::predict(stored_model, newdata = newdata, type = "response")
       }
 
-      if (length(scores) != nrow(x_selected) || anyNA(scores)) {
+      if (length(preds) != nrow(x_selected) || anyNA(preds)) {
         stop("Invalid predictions from stored model.")
       }
-      as.numeric(scores)
+      as.numeric(preds)
     }, error = function(e) {
       stop(
         "Failed to generate predictions from stored model: ",
@@ -201,23 +215,14 @@ evaluate_panel <- function(panel, x, y,
         call. = FALSE
       )
     })
-  } else if (is.null(scoring_fn)) {
-    scoring_fn <- .default_scoring_fn
-  }
-
-  # If scores not yet computed (no stored model or it failed), use scoring_fn
- if (!exists("scores") || is.null(scores)) {
-    if (!is.function(scoring_fn)) {
-      stop("`scoring_fn` must be a function.", call. = FALSE)
-    }
-
-    score_args <- list(
-      x_selected = x_selected,
-      selected_features = selected,
-      truth = truth,
-      cohort = cohort_vec
+  } else {
+    # No model and no scoring function - error
+    stop(
+      "Panel does not have a fitted model. ",
+      "Use fit_panel() to fit a model before calling evaluate_panel(), ",
+      "or provide a custom scoring_fn argument.",
+      call. = FALSE
     )
-    scores <- do.call(scoring_fn, score_args)
   }
 
   if (!is.numeric(scores) || length(scores) != length(truth)) {

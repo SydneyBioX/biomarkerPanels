@@ -5,8 +5,9 @@
 \alias{BiomarkerPanelResult-class}
 \title{Biomarker Panel Result Class}
 \description{
-Stores multi-objective optimization results including selected biomarkers,
-performance summaries, and optimization metadata.
+Stores a fitted biomarker panel including selected biomarkers,
+performance summaries, and the trained model. This class is
+returned by \code{\link[=fit_panel]{fit_panel()}} and serves as input to \code{\link[=evaluate_panel]{evaluate_panel()}}.
 }
 \section{Slots}{
 
@@ -21,6 +22,6 @@ performance summaries, and optimization metadata.
 
 \item{\code{training_data}}{Signature of the training dataset (e.g., sample and assay info).}
 
-\item{\code{model}}{Fitted model object (e.g., glm) trained on the selected features.}
+\item{\code{model}}{Fitted model object (e.g., glm or cv.glmnet) trained on the selected features.}
 }}
 

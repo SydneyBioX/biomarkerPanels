@@ -21,8 +21,6 @@ optimize_panel(
   seed = NULL,
   fitness_cv = TRUE,
   fitness_cv_folds = 5L,
-  final_model_cv = FALSE,
-  cv_folds = 5L,
   regularized = TRUE,
   regularized_alpha = 0.5,
   selection_threshold = "adaptive"
@@ -103,14 +101,6 @@ regularized methods like Lasso.}
 \item{fitness_cv_folds}{Number of cross-validation folds for fitness
 evaluation when \code{fitness_cv = TRUE}. Default is 5.}
 
-\item{final_model_cv}{Logical; if \code{TRUE}, use nested cross-validation when
-fitting the final model to reduce training data contamination. The final
-model coefficients are averaged across CV folds. Default is \code{FALSE} for
-backward compatibility.}
-
-\item{cv_folds}{Number of cross-validation folds when \code{final_model_cv = TRUE}.
-Default is 5.}
-
 \item{regularized}{Logical; if \code{TRUE} (default), use regularized regression
 (elastic net via glmnet) for scoring candidates during optimization. This
 typically produces more stable fitness estimates and better out-of-sample
@@ -129,8 +119,9 @@ weight distribution, enabling the \code{num_features} objective to drive panel
 size diversity.}
 }
 \value{
-A \code{BiomarkerPanelResult} with Pareto-optimal solutions summarised in
-the \code{objectives} slot.
+An \code{OptimizationResult} containing the Pareto-optimal solutions.
+Use \code{\link[=summarize_solutions]{summarize_solutions()}} to inspect solutions and \code{\link[=fit_panel]{fit_panel()}} to
+fit a model on a selected solution.
 }
 \description{
 Wrapper around \code{\link[rmoo:nsga2]{rmoo::nsga2()}} (or \code{\link[rmoo:nsga3]{rmoo::nsga3()}}) that composes registered
@@ -142,4 +133,7 @@ threshold-based selection allows variable panel sizes, making the
 \code{data.frame}, or \code{SummarizedExperiment}) or multiple cohorts supplied as
 lists of such objects. Optimisation should be run on training data only---use
 \code{\link[=evaluate_panel]{evaluate_panel()}} for held-out validation.
+}
+\seealso{
+\code{\link[=fit_panel]{fit_panel()}}, \code{\link[=summarize_solutions]{summarize_solutions()}}, \code{\link[=evaluate_panel]{evaluate_panel()}}
 }

@@ -69,12 +69,6 @@
 #'   regularized methods like Lasso.
 #' @param fitness_cv_folds Number of cross-validation folds for fitness
 #'   evaluation when `fitness_cv = TRUE`. Default is 5.
-#' @param final_model_cv Logical; if `TRUE`, use nested cross-validation when
-#'   fitting the final model to reduce training data contamination. The final
-#'   model coefficients are averaged across CV folds. Default is `FALSE` for
-#'   backward compatibility.
-#' @param cv_folds Number of cross-validation folds when `final_model_cv = TRUE`.
-#'   Default is 5.
 #' @param regularized Logical; if `TRUE` (default), use regularized regression
 #'   (elastic net via glmnet) for scoring candidates during optimization. This
 #'   typically produces more stable fitness estimates and better out-of-sample
@@ -90,9 +84,11 @@
 #'   improve accuracy. Adaptive selection finds natural breakpoints in the
 #'   weight distribution, enabling the `num_features` objective to drive panel
 #'   size diversity.
-#' @return A `BiomarkerPanelResult` with Pareto-optimal solutions summarised in
-#'   the `objectives` slot.
+#' @return An `OptimizationResult` containing the Pareto-optimal solutions.
+#'   Use [summarize_solutions()] to inspect solutions and [fit_panel()] to
+#'   fit a model on a selected solution.
 #' @export
+#' @seealso [fit_panel()], [summarize_solutions()], [evaluate_panel()]
 optimize_panel <- function(x, y,
                            objectives = define_objectives(
                              losses = c("sensitivity", "specificity", "num_features")
@@ -109,8 +105,6 @@ optimize_panel <- function(x, y,
                            seed = NULL,
                            fitness_cv = TRUE,
                            fitness_cv_folds = 5L,
-                           final_model_cv = FALSE,
-                           cv_folds = 5L,
                            regularized = TRUE,
                            regularized_alpha = 0.5,
                            selection_threshold = "adaptive") {
@@ -532,88 +526,68 @@ optimize_panel <- function(x, y,
   metric_matrix <- do.call(rbind, lapply(solutions, `[[`, "metrics"))
   colnames(metric_matrix) <- names(objectives)
 
-  select_primary <- function(idx_vec, direction) {
-    if (direction == "maximize") {
-      which.max(idx_vec)
-    } else {
-      which.min(idx_vec)
-    }
-  }
-
-  primary_obj <- names(objectives)[1]
-  primary_dir <- objective_directions[[primary_obj]]
-  primary_idx <- select_primary(metric_matrix[, primary_obj], primary_dir)
-
-  primary_solution <- solutions[[primary_idx]]
-  primary_metrics <- primary_solution$metrics
-
-  objective_df <- do.call(rbind, lapply(seq_along(solutions), function(i) {
-    data.frame(
-      solution_id = i,
-      objective = names(objectives),
-      value = solutions[[i]]$metrics,
-      direction = objective_directions,
-      features = I(rep(list(solutions[[i]]$features), length(objectives))),
-      constraints = I(rep(list(solutions[[i]]$constraint_results), length(objectives))),
-      stringsAsFactors = FALSE
-    )
-  }))
-
-  # Fit the final model on the selected features for storage
-  selected_features <- primary_solution$features
-  x_selected <- x_pool[, selected_features, drop = FALSE]
-  if (regularized) {
-    final_model <- .fit_final_model_regularized(x_selected, truth, cohort,
-                                                 alpha = regularized_alpha)
-  } else if (final_model_cv) {
-    final_model <- .fit_final_model_cv(x_selected, truth, cohort, cv_folds)
-  } else {
-    final_model <- .fit_final_model(x_selected, truth, cohort)
-  }
-
-  panel <- new(
-    "BiomarkerPanelResult",
-    features = primary_solution$features,
-    metrics = setNames(as.numeric(primary_metrics), names(objectives)),
-    objectives = objective_df,
-    control = list(
-      max_features = max_features,
-      feature_pool = feature_pool,
-      base_feature_pool = feature_pool_base,
-      algorithm = algorithm,
-      nsga2 = nsga_args,  # Keep nsga2 name for backward compatibility
-      scoring_function = deparse(substitute(scoring_fn)),
-      cohort_aggregator = cohort_aggregator,
-      feature_alignment = feature_alignment,
-      constraints = if (length(constraint_specs)) {
-        vapply(constraint_specs, `[[`, character(1), "label")
-      } else {
-        character()
-      },
-      # Store positive class for consistent evaluation
-      # ensure_binary_response() standardizes to levels c("No", "Yes")
-      positive_class = "Yes",
-      response_levels = levels(truth),
-      # Store seed for reproducibility documentation
-      seed = seed,
-      selection_threshold = selection_threshold,
-      final_model_cv = final_model_cv,
-      cv_folds = if (final_model_cv) cv_folds else NULL,
-      regularized = regularized,
-      regularized_alpha = if (regularized) regularized_alpha else NULL
-    ),
-    training_data = list(
-      n = nrow(x_mat),
-      p = ncol(x_mat),
-      class_balance = table(truth),
-      feature_pool_size = length(feature_pool),
-      base_feature_pool_size = length(feature_pool_base),
-      num_cohorts = length(inputs$cohort_names),
-      cohort_labels = inputs$cohort_names,
-      cohort_counts = inputs$cohort_counts
-    ),
-    model = final_model
+  # Build solutions data frame in wide format (one row per solution)
+  solutions_df <- data.frame(
+    solution_id = seq_along(solutions),
+    stringsAsFactors = FALSE
   )
 
-  panel
+  # Add features as list column
+  solutions_df$features <- I(lapply(solutions, `[[`, "features"))
+
+  # Add objective values as separate columns
+  for (obj_name in names(objectives)) {
+    solutions_df[[obj_name]] <- metric_matrix[, obj_name]
+  }
+
+  # Build control parameters to store
+  control <- list(
+    max_features = max_features,
+    feature_pool = feature_pool,
+    base_feature_pool = feature_pool_base,
+    algorithm = algorithm,
+    nsga2 = nsga_args,  # Keep nsga2 name for backward compatibility
+    scoring_function = deparse(substitute(scoring_fn)),
+    cohort_aggregator = cohort_aggregator,
+    feature_alignment = feature_alignment,
+    constraints = if (length(constraint_specs)) {
+      vapply(constraint_specs, `[[`, character(1), "label")
+    } else {
+      character()
+    },
+    # Store positive class for consistent evaluation
+    # ensure_binary_response() standardizes to levels c("No", "Yes")
+    positive_class = "Yes",
+    response_levels = levels(truth),
+    # Store seed for reproducibility documentation
+    seed = seed,
+    selection_threshold = selection_threshold,
+    regularized = regularized,
+    regularized_alpha = if (regularized) regularized_alpha else NULL,
+    objective_directions = objective_directions
+  )
+
+  # Build training signature
+  training_signature <- list(
+    n = nrow(x_mat),
+    p = ncol(x_mat),
+    class_balance = table(truth),
+    feature_pool_size = length(feature_pool),
+    base_feature_pool_size = length(feature_pool_base),
+    num_cohorts = length(inputs$cohort_names),
+    cohort_labels = inputs$cohort_names,
+    cohort_counts = inputs$cohort_counts
+  )
+
+  # Return OptimizationResult (no model fitting)
+  new(
+    "OptimizationResult",
+    solutions = solutions_df,
+    feature_pool = feature_pool,
+    control = control,
+    training_signature = training_signature,
+    aggregated_x = x_pool,
+    aggregated_y = truth,
+    aggregated_cohort = cohort
+  )
 }
