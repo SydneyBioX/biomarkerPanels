@@ -153,6 +153,9 @@ evaluate_panel <- function(panel, x, y,
           x_selected = x_selected,
           cohort_vec = cohort_vec
         )
+      } else if (inherits(stored_model, "npc")) {
+        # NP classifier: use nproc prediction with label inversion
+        preds <- .predict_np_model(stored_model, x_selected)
       } else {
         # Standard GLM model: use standard prediction
         newdata <- as.data.frame(x_selected, check.names = TRUE)

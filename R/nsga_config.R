@@ -73,8 +73,11 @@ NULL
       adaptive_params <- list(popSize = 92, maxiter = 80)
     } else if (n_features <= 100) {
       adaptive_params <- list(popSize = 156, maxiter = 180)
+    } else if (n_features <= 250) {
+      adaptive_params <- list(popSize = 256, maxiter = 350)
     } else {
-      adaptive_params <- list(popSize = 252, maxiter = 350)
+      warning("Feature pool size is very large. NSGA-III may take a long time to run. Consider feature selection to reduce feature pool size.")
+      adaptive_params <- list(popSize = 504, maxiter = 700)
     }
   } else {
     # NSGA-II defaults (existing)
@@ -82,8 +85,11 @@ NULL
       adaptive_params <- list(popSize = 64, maxiter = 60)
     } else if (n_features <= 100) {
       adaptive_params <- list(popSize = 128, maxiter = 150)
+    } else if (n_features <= 250) {
+      adaptive_params <- list(popSize = 192, maxiter = 300)
     } else {
-      adaptive_params <- list(popSize = 200, maxiter = 300)
+      warning("Feature pool size is very large. NSGA-III may take a long time to run. Consider feature selection to reduce feature pool size.")
+      adaptive_params <- list(popSize = 256, maxiter = 500)
     }
   }
 
@@ -100,14 +106,17 @@ NULL
 #' @return Integer number of partitions.
 #' @keywords internal
 .compute_nsga3_partitions <- function(n_objectives) {
-
   # Rule of thumb: partitions scale inversely with objectives
   # For 2-3 objectives: 12 partitions
   # For 4-5 objectives: 6 partitions
   # For 6+ objectives: 4 partitions
-  if (n_objectives <= 3) 12L
-  else if (n_objectives <= 5) 6L
-  else 4L
+  if (n_objectives <= 3) {
+    12L
+  } else if (n_objectives <= 5) {
+    6L
+  } else {
+    4L
+  }
 }
 
 #' Generate Sparse Initial Population Suggestions
@@ -125,14 +134,15 @@ NULL
 #'   each row is a weight vector with varying numbers of high/low values.
 #' @keywords internal
 .generate_sparse_suggestions <- function(n_features,
-                                          n_suggestions = 20L,
-                                          min_features = 2L,
-                                          max_features = 10L,
-                                          seed = NULL) {
+                                         n_suggestions = 20L,
+                                         min_features = 2L,
+                                         max_features = 10L,
+                                         seed = NULL) {
   if (!is.null(seed)) set.seed(seed)
 
   target_sizes <- unique(round(seq(min_features, max_features,
-                                    length.out = n_suggestions)))
+    length.out = n_suggestions
+  )))
   n_suggestions <- length(target_sizes)
   suggestions <- matrix(0, nrow = n_suggestions, ncol = n_features)
 
