@@ -12,16 +12,22 @@ returned by \code{\link[=fit_panel]{fit_panel()}} and serves as input to \code{\
 \section{Slots}{
 
 \describe{
-\item{\code{features}}{Character vector of selected biomarkers.}
+\item{\code{base_features}}{Character vector of original (untransformed) biomarker names.
+These are the features selected by the optimization algorithm before any
+transformation is applied.}
+
+\item{\code{features}}{Character vector of transformed biomarker names used for model
+fitting. For pairwise transforms, these are the ratio names (e.g., "A--B").}
 
 \item{\code{metrics}}{Named numeric vector summarizing sensitivity, specificity, etc.}
 
 \item{\code{objectives}}{Data frame describing objective values per candidate solution.}
 
-\item{\code{control}}{List of optimization control parameters.}
+\item{\code{control}}{List of optimization control parameters including \code{feature_transform}.}
 
 \item{\code{training_data}}{Signature of the training dataset (e.g., sample and assay info).}
 
-\item{\code{model}}{Fitted model object (e.g., glm or cv.glmnet) trained on the selected features.}
+\item{\code{model}}{Fitted model object (e.g., glm or cv.glmnet) trained on the
+transformed features.}
 }}
 

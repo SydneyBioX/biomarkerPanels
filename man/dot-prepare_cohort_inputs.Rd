@@ -8,7 +8,7 @@
   x,
   y,
   assay = NULL,
-  aggregator = "none",
+  transform = "none",
   feature_subset = NULL,
   feature_alignment = "intersection"
 )
@@ -20,7 +20,7 @@
 
 \item{assay}{For SummarizedExperiment inputs, assay name or index.}
 
-\item{aggregator}{Name of the aggregator to apply.}
+\item{transform}{Name of the feature transform to apply.}
 
 \item{feature_subset}{Optional subset of features to keep.}
 
@@ -33,6 +33,6 @@ cohort_names, and cohort_counts.
 \description{
 Main internal function that processes input data (single or multi-cohort)
 and prepares it for NSGA-II optimization. Handles feature extraction,
-alignment, aggregation, and response standardization.
+alignment, transformation, and response standardization.
 }
 \keyword{internal}

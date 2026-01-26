@@ -12,19 +12,19 @@ NULL
 #'
 #' Main internal function that processes input data (single or multi-cohort)
 #' and prepares it for NSGA-II optimization. Handles feature extraction,
-#' alignment, aggregation, and response standardization.
+#' alignment, transformation, and response standardization.
 #'
 #' @param x Matrix-like object, SummarizedExperiment, or list of such objects.
 #' @param y Binary response vector or list of response vectors.
 #' @param assay For SummarizedExperiment inputs, assay name or index.
-#' @param aggregator Name of the aggregator to apply.
+#' @param transform Name of the feature transform to apply.
 #' @param feature_subset Optional subset of features to keep.
 #' @param feature_alignment Alignment strategy for multi-cohort data.
 #' @return List with x (combined matrix), truth (factor), cohort (factor),
 #'   cohort_names, and cohort_counts.
 #' @keywords internal
 .prepare_cohort_inputs <- function(x, y, assay = NULL,
-                                   aggregator = "none",
+                                   transform = "none",
                                    feature_subset = NULL,
                                    feature_alignment = "intersection") {
 
@@ -79,11 +79,11 @@ NULL
       })
     }
 
-    matrices <- .apply_cohort_aggregator(matrices, aggregator)
+    matrices <- .apply_feature_transform(matrices, transform)
 
     feature_sets <- lapply(matrices, colnames)
     if (any(vapply(feature_sets, is.null, logical(1)))) {
-      stop("Aggregator produced matrices without column names.", call. = FALSE)
+      stop("Feature transform produced matrices without column names.", call. = FALSE)
     }
     common_features <- Reduce(intersect, feature_sets)
     if (is.null(common_features) || !length(common_features)) {
@@ -178,7 +178,7 @@ NULL
       }
     }
 
-    x_mat <- .apply_cohort_aggregator(list(x_mat), aggregator)[[1]]
+    x_mat <- .apply_feature_transform(list(x_mat), transform)[[1]]
     if (is.null(colnames(x_mat))) {
       stop("`x` must have column names in order to align with panel features.",
            call. = FALSE)
@@ -221,7 +221,7 @@ NULL
       }
     }
 
-    x_mat <- .apply_cohort_aggregator(list(x_mat), aggregator)[[1]]
+    x_mat <- .apply_feature_transform(list(x_mat), transform)[[1]]
     if (is.null(colnames(x_mat))) {
       stop("`x` must have column names in order to align with panel features.",
            call. = FALSE)

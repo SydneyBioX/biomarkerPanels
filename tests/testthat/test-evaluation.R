@@ -19,6 +19,7 @@
 
   new(
     "BiomarkerPanelResult",
+    base_features = features,
     features = features,
     metrics = metrics,
     objectives = objective_df,
@@ -49,6 +50,7 @@ test_that("evaluate_panel errors when no model and no scoring_fn", {
   # Panel without model
   panel <- new(
     "BiomarkerPanelResult",
+    base_features = panel_features,
     features = panel_features,
     metrics = metrics,
     objectives = objective_df,
@@ -83,6 +85,7 @@ test_that("evaluate_panel works with scoring_fn when no model", {
   # Panel without model
   panel <- new(
     "BiomarkerPanelResult",
+    base_features = panel_features,
     features = panel_features,
     metrics = metrics,
     objectives = objective_df,
@@ -161,6 +164,7 @@ test_that("evaluate_panel requires column names for single-cohort data", {
   objective_df$features <- I(rep(list(panel_features), nrow(objective_df)))
   panel <- new(
     "BiomarkerPanelResult",
+    base_features = panel_features,
     features = panel_features,
     metrics = metrics,
     objectives = objective_df,
@@ -174,7 +178,7 @@ test_that("evaluate_panel requires column names for single-cohort data", {
 
   expect_error(
     evaluate_panel(panel, x, y, scoring_fn = .simple_scoring_fn),
-    "Selected feature\\(s\\) not found"
+    "Base feature\\(s\\) not found"
   )
 })
 

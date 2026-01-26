@@ -1,7 +1,7 @@
-#' Feature Alignment and Aggregation
+#' Feature Alignment and Transformation
 #'
 #' Internal functions for aligning features across cohorts and applying
-#' cohort aggregation transformations.
+#' feature transformations.
 #'
 #' @name feature_alignment
 #' @keywords internal
@@ -36,20 +36,37 @@ NULL
   unique(pool)
 }
 
-#' Apply Cohort Aggregator to Matrices
+#' Apply Feature Transform to Matrices
 #'
-#' Applies the specified aggregation function to each cohort matrix.
+#' Applies the specified transform function to each cohort matrix.
 #'
 #' @param matrices List of feature matrices.
-#' @param aggregator Name of the aggregator.
-#' @return List of aggregated matrices.
+#' @param transform Name of the feature transform.
+#' @return List of transformed matrices.
 #' @keywords internal
-.apply_cohort_aggregator <- function(matrices, aggregator) {
+.apply_feature_transform <- function(matrices, transform) {
   if (!length(matrices)) {
     return(matrices)
   }
-  agg_spec <- .get_aggregator(aggregator)
-  lapply(matrices, agg_spec$fun)
+  transform_spec <- .get_feature_transform(transform)
+  lapply(matrices, transform_spec$fun)
+}
+
+#' Apply Feature Transform to Single Matrix
+#'
+#' Applies the specified transform function to a single matrix.
+#' Used during optimization to transform selected base features on-the-fly.
+#'
+#' @param x A numeric matrix with column names.
+#' @param transform_name Name of the feature transform.
+#' @return Transformed matrix.
+#' @keywords internal
+.apply_feature_transform_single <- function(x, transform_name) {
+  if (transform_name == "none" || ncol(x) < 2L) {
+    return(x)
+  }
+  transform_spec <- .get_feature_transform(transform_name)
+  transform_spec$fun(x)
 }
 
 #' Align Features Across Cohorts Using Specified Strategy

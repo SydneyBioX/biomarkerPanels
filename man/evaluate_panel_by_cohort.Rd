@@ -11,7 +11,7 @@ evaluate_panel_by_cohort(
   metrics = c("sensitivity", "specificity", "auc"),
   cutoff_prob = 0.5,
   positive = NULL,
-  cohort_aggregator = NULL,
+  feature_transform = NULL,
   assay = NULL
 )
 }
@@ -32,8 +32,8 @@ a list.}
 \item{positive}{Label treated as the positive class. Defaults to the value
 stored in the panel, or \code{"Yes"}.}
 
-\item{cohort_aggregator}{Optional aggregator name. Defaults to the aggregator
-stored in the fitted panel.}
+\item{feature_transform}{Optional feature transform name. Defaults to the
+transform stored in the fitted panel.}
 
 \item{assay}{For \code{SummarizedExperiment} inputs, assay name or index.}
 }

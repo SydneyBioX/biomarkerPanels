@@ -11,7 +11,7 @@ optimize_panel(
     "num_features")),
   max_features = 5L,
   feature_pool = NULL,
-  cohort_aggregator = "pairwise_ratios",
+  feature_transform = "pairwise_ratios",
   feature_alignment = "intersection",
   constraints = list(),
   scoring_fn = NULL,
@@ -41,20 +41,21 @@ as an upper bound; actual panel size varies based on how many features have
 weight > 0.5 in the decision vector. Minimum is 2 features when
 \code{regularized = TRUE} (glmnet requirement), or 1 when \code{regularized = FALSE}.}
 
-\item{feature_pool}{Optional subset of feature identifiers (names or integer
-indices) considered during optimization. When a cohort aggregator is used,
-specify the underlying (pre-aggregation) feature names; aggregated labels
-such as \code{"A--B"} are also accepted and will be mapped back to their
-constituents. Defaults to all features.}
+\item{feature_pool}{Optional subset of base feature identifiers (names or
+integer indices) to consider during optimization. These are the original
+feature names before any transformation. When using pairwise transforms,
+transformed labels like \code{"A--B"} are also accepted and will be mapped
+back to their constituent base features. Defaults to all features.}
 
-\item{cohort_aggregator}{Transformation applied to cohort feature matrices
-prior to alignment. Defaults to \code{"pairwise_ratios"}, which generates
-pairwise within-cohort contrasts via \code{\link[=pairwise_col_diff]{pairwise_col_diff()}} to dampen
-distributional shifts across sites. Other built-in options include
-\code{"pairwise_log_ratios"} (log-ratios for compositional data),
-\code{"reference_norm"} (normalize relative to a reference feature), and
-\code{"none"} (no transformation). Use \code{\link[=register_aggregator]{register_aggregator()}} to add custom
-strategies. See \code{\link[=aggregator_registry]{aggregator_registry()}} for available options.}
+\item{feature_transform}{Transformation applied to selected features
+after base feature selection. The NSGA algorithm selects base features,
+then this transform is applied on-the-fly. Defaults to \code{"pairwise_ratios"},
+which generates pairwise contrasts via \code{\link[=pairwise_col_diff]{pairwise_col_diff()}} to dampen
+batch effects. Other options include \code{"pairwise_log_ratios"} (log-ratios
+for compositional data), \code{"reference_norm"} (normalize relative to a
+reference feature), and \code{"none"} (no transformation). Use
+\code{\link[=register_feature_transform]{register_feature_transform()}} to add custom strategies. See
+\code{\link[=feature_transform_registry]{feature_transform_registry()}} for available options.}
 
 \item{feature_alignment}{Strategy for aligning features across cohorts:
 \describe{

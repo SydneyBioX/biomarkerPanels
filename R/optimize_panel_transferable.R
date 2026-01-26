@@ -17,8 +17,8 @@
 #' @param val_ratio Proportion of each cohort for validation (default 0.2).
 #' @param np_alpha Type I error rate for Neyman-Pearson threshold (default 0.15).
 #' @param np_delta Tolerance for NP threshold selection (default 0.05).
-#' @param cohort_aggregator Transformation applied to cohort matrices (default
-#'   `"pairwise_ratios"`).
+#' @param feature_transform Transformation applied to selected features (default
+#'   `"pairwise_ratios"`). See [feature_transform_registry()] for options.
 #' @param feature_alignment Strategy for aligning features across cohorts
 #'   (default `"intersection"`).
 #' @param constraints Optional list of constraint descriptors.
@@ -46,7 +46,7 @@ optimize_panel_transferable <- function(
   val_ratio = 0.2,
   np_alpha = 0.15,
   np_delta = 0.05,
-  cohort_aggregator = "pairwise_ratios",
+  feature_transform = "pairwise_ratios",
   feature_alignment = "intersection",
   constraints = list(),
   algorithm = c("NSGA-III", "NSGA-II"),
@@ -92,21 +92,21 @@ optimize_panel_transferable <- function(
   train_inputs <- .prepare_cohort_inputs(
     partitions$train_x, partitions$train_y,
     assay = assay,
-    aggregator = cohort_aggregator,
+    transform = feature_transform,
     feature_subset = feature_pool,
     feature_alignment = feature_alignment
   )
   val_inputs <- .prepare_cohort_inputs(
     partitions$val_x, partitions$val_y,
     assay = assay,
-    aggregator = cohort_aggregator,
+    transform = feature_transform,
     feature_subset = feature_pool,
     feature_alignment = feature_alignment
   )
   heldout_inputs <- .prepare_cohort_inputs(
     partitions$heldout_x, partitions$heldout_y,
     assay = assay,
-    aggregator = cohort_aggregator,
+    transform = feature_transform,
     feature_subset = feature_pool,
     feature_alignment = feature_alignment
   )
@@ -265,7 +265,7 @@ optimize_panel_transferable <- function(
       base_feature_pool = feature_pool,
       algorithm = algorithm,
       nsga2 = nsga_args,
-      cohort_aggregator = cohort_aggregator,
+      feature_transform = feature_transform,
       feature_alignment = feature_alignment,
       train_ratio = train_ratio,
       val_ratio = val_ratio,

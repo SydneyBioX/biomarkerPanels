@@ -123,7 +123,7 @@ test_that("fit_panel selects solution automatically", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 12, maxiter = 10)
   )
 
@@ -151,7 +151,7 @@ test_that("fit_panel selects specified solution", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 12, maxiter = 10)
   )
 
@@ -179,7 +179,7 @@ test_that("fit_panel accepts explicit features", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 12, maxiter = 10)
   )
 
@@ -205,7 +205,7 @@ test_that("fit_panel with regularized = TRUE produces cv.glmnet model", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 12, maxiter = 10)
   )
 
@@ -229,7 +229,7 @@ test_that("fit_panel with regularized = FALSE produces glm model", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     regularized = FALSE,
     nsga_control = list(popSize = 12, maxiter = 10)
   )
@@ -317,7 +317,7 @@ test_that("new workflow: optimize_panel -> fit_panel -> evaluate_panel", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(10)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 12, maxiter = 10)
   )
   expect_s4_class(opt, "OptimizationResult")

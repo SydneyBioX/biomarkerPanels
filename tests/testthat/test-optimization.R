@@ -12,7 +12,7 @@ test_that("optimize_panel returns an OptimizationResult", {
     objectives = define_objectives(losses = c("sensitivity", "specificity", "num_features")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 12, maxiter = 10)
   )
 
@@ -55,7 +55,7 @@ test_that("num_features objective allows variable panel sizes", {
     objectives = define_objectives(losses = c("sensitivity", "num_features")),
     max_features = 8,
     feature_pool = colnames(x),
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 16, maxiter = 15)
   )
 
@@ -96,7 +96,7 @@ test_that("all Pareto solutions have consistent feature counts", {
     y = y,
     objectives = define_objectives(losses = c("sensitivity", "num_features")),
     max_features = 4,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 8, maxiter = 5)
   )
 
@@ -126,7 +126,7 @@ test_that("optimize_panel handles multiple cohorts", {
     objectives = define_objectives(losses = c("sensitivity", "specificity", "num_features")),
     max_features = 4,
     feature_pool = colnames(fixture$x_list[[1]])[seq_len(12)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 16, maxiter = 15)
   )
 
@@ -161,7 +161,7 @@ test_that("optimize_panel intersects feature sets across cohorts", {
     y = list(c1$y, c2$y),
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 12, maxiter = 8)
   )
 
@@ -198,7 +198,7 @@ test_that("optimize_panel enforces minimum metric constraints", {
     max_features = 1,
     feature_pool = colnames(x),
     constraints = list(min_metric_constraint("sensitivity", threshold = 0.9)),
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 16, maxiter = 15)
   )
 
@@ -227,7 +227,7 @@ test_that("optimize_panel errors when constraints infeasible", {
       max_features = 2,
       feature_pool = colnames(x),
       constraints = list(min_metric_constraint("sensitivity", threshold = 1.01)),
-      cohort_aggregator = "none",
+      feature_transform = "none",
       nsga_control = list(popSize = 12, maxiter = 10)
     ),
     "No solutions satisfied the supplied constraints"
@@ -251,12 +251,12 @@ test_that("pairwise cohort aggregator produces contrast features", {
     y = y_list,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "pairwise_ratios",
+    feature_transform = "pairwise_ratios",
     nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(res, "OptimizationResult")
-  expect_equal(res@control$cohort_aggregator, "pairwise_ratios")
+  expect_equal(res@control$feature_transform, "pairwise_ratios")
   expect_true(all(grepl("--", res@control$feature_pool)))
 })
 
@@ -273,7 +273,7 @@ test_that("feature_pool accepts base features with pairwise aggregator", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 1,
     feature_pool = c("GeneA", "GeneC"),
-    cohort_aggregator = "pairwise_ratios",
+    feature_transform = "pairwise_ratios",
     nsga_control = list(popSize = 12, maxiter = 5)
   )
 
@@ -301,12 +301,12 @@ test_that("optimize_panel works with pairwise_log_ratios aggregator", {
     y = y,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "pairwise_log_ratios",
+    feature_transform = "pairwise_log_ratios",
     nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(res, "OptimizationResult")
-  expect_equal(res@control$cohort_aggregator, "pairwise_log_ratios")
+  expect_equal(res@control$feature_transform, "pairwise_log_ratios")
   expect_true(all(grepl("--", res@control$feature_pool)))
 })
 
@@ -325,12 +325,12 @@ test_that("optimize_panel works with reference_norm aggregator", {
     y = y,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "reference_norm",
+    feature_transform = "reference_norm",
     nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(res, "OptimizationResult")
-  expect_equal(res@control$cohort_aggregator, "reference_norm")
+  expect_equal(res@control$feature_transform, "reference_norm")
 })
 
 test_that("optimize_panel rejects unregistered aggregator", {
@@ -344,7 +344,7 @@ test_that("optimize_panel rejects unregistered aggregator", {
       y = sim$y_list[[1]],
       objectives = define_objectives(losses = c("sensitivity", "specificity")),
       max_features = 2,
-      cohort_aggregator = "nonexistent_aggregator",
+      feature_transform = "nonexistent_transform",
       nsga_control = list(popSize = 8, maxiter = 5)
     ),
     "Unknown aggregator"
@@ -360,7 +360,7 @@ test_that("custom aggregator can be registered and used", {
     colnames(result) <- colnames(x)
     result
   }
-  register_aggregator("center_features", custom_agg, "Center each feature", overwrite = TRUE)
+  register_feature_transform("center_features", custom_agg, "Center each feature", overwrite = TRUE)
 
   set.seed(321)
   sim <- simulate_expression_data(p = 10, n = 20, k = 1, seed = 46)
@@ -370,15 +370,15 @@ test_that("custom aggregator can be registered and used", {
     y = sim$y_list[[1]],
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "center_features",
+    feature_transform = "center_features",
     nsga_control = list(popSize = 12, maxiter = 6)
   )
 
   expect_s4_class(res, "OptimizationResult")
-  expect_equal(res@control$cohort_aggregator, "center_features")
+  expect_equal(res@control$feature_transform, "center_features")
 
   # Clean up
-  rm("center_features", envir = .aggregator_registry)
+  rm("center_features", envir = .transform_registry)
 })
 
 # Adaptive NSGA defaults
@@ -454,7 +454,7 @@ test_that("optimize_panel uses adaptive defaults without explicit nsga_control",
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(35)],
-    cohort_aggregator = "none"
+    feature_transform = "none"
   )
 
   expect_s4_class(res, "OptimizationResult")
@@ -495,7 +495,7 @@ test_that("feature_alignment = 'majority' keeps features in >= 50% cohorts", {
     y = y_list,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     feature_alignment = "majority",
     nsga_control = list(popSize = 12, maxiter = 8)
   )
@@ -534,7 +534,7 @@ test_that("feature_alignment = 'intersection' is default and drops partial featu
     y = y_list,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     feature_alignment = "intersection",
     nsga_control = list(popSize = 12, maxiter = 5)
   )
@@ -557,7 +557,7 @@ test_that("regularized = TRUE uses regularized scoring during optimization", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(10)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     regularized = TRUE,
     regularized_alpha = 0.5,
     nsga_control = list(popSize = 16, maxiter = 10)
@@ -581,7 +581,7 @@ test_that("regularized = FALSE uses unregularized scoring", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(10)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     regularized = FALSE,
     nsga_control = list(popSize = 16, maxiter = 10)
   )
@@ -605,7 +605,7 @@ test_that("optimize_panel uses NSGA-II by default", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 12, maxiter = 10)
   )
 
@@ -628,7 +628,7 @@ test_that("optimize_panel respects explicit NSGA-III algorithm selection", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     algorithm = "NSGA-III",
     nsga_control = list(popSize = 12, maxiter = 10)
   )
@@ -679,7 +679,7 @@ test_that("adaptive threshold produces variable panel sizes", {
     y = y,
     objectives = define_objectives(losses = c("balanced_accuracy", "num_features")),
     max_features = 15,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     regularized = FALSE,
     selection_threshold = "adaptive",
     nsga_control = list(popSize = 40, maxiter = 30)
@@ -713,7 +713,7 @@ test_that("fixed threshold 0.5 is backward compatible", {
     y = y,
     objectives = define_objectives(losses = c("sensitivity", "num_features")),
     max_features = 8,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     regularized = FALSE,
     selection_threshold = 0.5,
     nsga_control = list(popSize = 20, maxiter = 15)
@@ -744,7 +744,7 @@ test_that("selection_threshold stored in control slot", {
     y = y,
     objectives = define_objectives(losses = c("sensitivity", "num_features")),
     max_features = 4,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     selection_threshold = "adaptive",
     nsga_control = list(popSize = 8, maxiter = 5)
   )
@@ -756,7 +756,7 @@ test_that("selection_threshold stored in control slot", {
     y = y,
     objectives = define_objectives(losses = c("sensitivity", "num_features")),
     max_features = 4,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     selection_threshold = 0.6,
     nsga_control = list(popSize = 8, maxiter = 5)
   )

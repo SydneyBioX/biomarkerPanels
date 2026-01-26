@@ -15,7 +15,7 @@ optimize_panel_transferable(
   val_ratio = 0.2,
   np_alpha = 0.15,
   np_delta = 0.05,
-  cohort_aggregator = "pairwise_ratios",
+  feature_transform = "pairwise_ratios",
   feature_alignment = "intersection",
   constraints = list(),
   algorithm = c("NSGA-III", "NSGA-II"),
@@ -48,8 +48,8 @@ optimize_panel_transferable(
 
 \item{np_delta}{Tolerance for NP threshold selection (default 0.05).}
 
-\item{cohort_aggregator}{Transformation applied to cohort matrices (default
-\code{"pairwise_ratios"}).}
+\item{feature_transform}{Transformation applied to selected features (default
+\code{"pairwise_ratios"}). See \code{\link[=feature_transform_registry]{feature_transform_registry()}} for options.}
 
 \item{feature_alignment}{Strategy for aligning features across cohorts
 (default \code{"intersection"}).}

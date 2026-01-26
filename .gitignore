@@ -26,3 +26,6 @@ inst/benchmarks/
 
 # R markdowns
 *.Rmd
+
+# Installation
+*.tar.gz

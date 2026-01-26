@@ -14,18 +14,21 @@ model fitting.
 
 \describe{
 \item{\code{solutions}}{Data frame with one row per Pareto solution. Contains columns:
-\code{solution_id} (integer), \code{features} (list-column of character vectors),
-and one column per objective with numeric values.}
+\code{solution_id} (integer), \code{base_features} (list-column of character vectors
+with original feature names), \code{features} (list-column with transformed
+feature names used for model fitting), and one column per objective with
+numeric values.}
 
-\item{\code{feature_pool}}{Character vector of features considered during optimization.}
+\item{\code{feature_pool}}{Character vector of base features considered during optimization.}
 
-\item{\code{control}}{List of optimization control parameters.}
+\item{\code{control}}{List of optimization control parameters including \code{feature_transform}.}
 
 \item{\code{training_signature}}{List with metadata about the training dataset.}
 
-\item{\code{aggregated_x}}{Aggregated training feature matrix (for use with fit_panel).}
+\item{\code{aggregated_x}}{Raw (untransformed) training feature matrix containing base
+features. The feature transform is applied on-the-fly during \code{\link[=fit_panel]{fit_panel()}}.}
 
-\item{\code{aggregated_y}}{Aggregated training response vector (factor).}
+\item{\code{aggregated_y}}{Training response vector (factor).}
 
 \item{\code{aggregated_cohort}}{Cohort membership factor for training samples.}
 }}

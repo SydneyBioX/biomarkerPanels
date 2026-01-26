@@ -23,8 +23,8 @@ NULL
 #' @param cutoff_prob Classification probability threshold. Defaults to `0.5`.
 #' @param positive Label treated as the positive class. Defaults to the value
 #'   stored in the panel, or `"Yes"`.
-#' @param cohort_aggregator Optional aggregator name. Defaults to the aggregator
-#'   stored in the fitted panel.
+#' @param feature_transform Optional feature transform name. Defaults to the
+#'   transform stored in the fitted panel.
 #' @param assay For `SummarizedExperiment` inputs, assay name or index.
 #' @return A `data.frame` with columns:
 #'   \describe{
@@ -48,11 +48,17 @@ evaluate_panel_by_cohort <- function(panel,
                                      metrics = c("sensitivity", "specificity", "auc"),
                                      cutoff_prob = 0.5,
                                      positive = NULL,
-                                     cohort_aggregator = NULL,
+                                     feature_transform = NULL,
                                      assay = NULL) {
   stopifnot(inherits(panel, "BiomarkerPanelResult"))
 
+  # Get base and transformed features from panel
+  base_features <- panel@base_features
   features <- panel@features
+  if (is.null(base_features) || length(base_features) == 0L) {
+    # Backward compatibility
+    base_features <- features
+  }
   if (length(features) == 0L) {
     stop("Panel has no selected features.", call. = FALSE)
   }
@@ -64,9 +70,9 @@ evaluate_panel_by_cohort <- function(panel,
     positive <- if (!is.null(stored_positive)) stored_positive else "Yes"
   }
 
-  stored_aggregator <- panel@control$cohort_aggregator
-  if (is.null(cohort_aggregator)) {
-    cohort_aggregator <- if (is.null(stored_aggregator)) "none" else stored_aggregator
+  stored_transform <- panel@control$feature_transform
+  if (is.null(feature_transform)) {
+    feature_transform <- if (is.null(stored_transform)) "none" else stored_transform
   }
 
   # Normalize single-cohort input to list format
@@ -99,16 +105,21 @@ evaluate_panel_by_cohort <- function(panel,
       colnames(xi) <- sprintf("feature_%04d", seq_len(ncol(xi)))
     }
 
-    xi <- .apply_cohort_aggregator(list(xi), cohort_aggregator)[[1]]
-
-    if (!all(features %in% colnames(xi))) {
-      missing <- setdiff(features, colnames(xi))
-      stop(sprintf("Cohort '%s': Feature(s) not found: %s",
+    # Validate base features are present
+    if (!all(base_features %in% colnames(xi))) {
+      missing <- setdiff(base_features, colnames(xi))
+      stop(sprintf("Cohort '%s': Base feature(s) not found: %s",
                    cohort_names[i], paste(missing, collapse = ", ")),
            call. = FALSE)
     }
 
-    x_selected <- xi[, features, drop = FALSE]
+    # Extract base features and apply transform
+    x_base <- xi[, base_features, drop = FALSE]
+    if (feature_transform != "none" && length(base_features) >= 2L) {
+      x_selected <- .apply_feature_transform_single(x_base, feature_transform)
+    } else {
+      x_selected <- x_base
+    }
 
     # Generate scores using stored model
     cohort_vec <- factor(rep(cohort_names[i], nrow(x_selected)))

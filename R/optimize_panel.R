@@ -20,19 +20,20 @@
 #'   as an upper bound; actual panel size varies based on how many features have
 #'   weight > 0.5 in the decision vector. Minimum is 2 features when
 #'   `regularized = TRUE` (glmnet requirement), or 1 when `regularized = FALSE`.
-#' @param feature_pool Optional subset of feature identifiers (names or integer
-#'   indices) considered during optimization. When a cohort aggregator is used,
-#'   specify the underlying (pre-aggregation) feature names; aggregated labels
-#'   such as `"A--B"` are also accepted and will be mapped back to their
-#'   constituents. Defaults to all features.
-#' @param cohort_aggregator Transformation applied to cohort feature matrices
-#'   prior to alignment. Defaults to `"pairwise_ratios"`, which generates
-#'   pairwise within-cohort contrasts via [`pairwise_col_diff()`] to dampen
-#'   distributional shifts across sites. Other built-in options include
-#'   `"pairwise_log_ratios"` (log-ratios for compositional data),
-#'   `"reference_norm"` (normalize relative to a reference feature), and
-#'   `"none"` (no transformation). Use [`register_aggregator()`] to add custom
-#'   strategies. See [`aggregator_registry()`] for available options.
+#' @param feature_pool Optional subset of base feature identifiers (names or
+#'   integer indices) to consider during optimization. These are the original
+#'   feature names before any transformation. When using pairwise transforms,
+#'   transformed labels like `"A--B"` are also accepted and will be mapped
+#'   back to their constituent base features. Defaults to all features.
+#' @param feature_transform Transformation applied to selected features
+#'   after base feature selection. The NSGA algorithm selects base features,
+#'   then this transform is applied on-the-fly. Defaults to `"pairwise_ratios"`,
+#'   which generates pairwise contrasts via [`pairwise_col_diff()`] to dampen
+#'   batch effects. Other options include `"pairwise_log_ratios"` (log-ratios
+#'   for compositional data), `"reference_norm"` (normalize relative to a
+#'   reference feature), and `"none"` (no transformation). Use
+#'   [`register_feature_transform()`] to add custom strategies. See
+#'   [`feature_transform_registry()`] for available options.
 #' @param feature_alignment Strategy for aligning features across cohorts:
 #'   \describe{
 #'     \item{"intersection"}{(Default) Keep only features present in ALL cohorts.
@@ -95,7 +96,7 @@ optimize_panel <- function(x, y,
                            ),
                            max_features = 5L,
                            feature_pool = NULL,
-                           cohort_aggregator = "pairwise_ratios",
+                           feature_transform = "pairwise_ratios",
                            feature_alignment = "intersection",
                            constraints = list(),
                            scoring_fn = NULL,
@@ -115,21 +116,21 @@ optimize_panel <- function(x, y,
          call. = FALSE)
   }
 
-  if (!is.character(cohort_aggregator) || length(cohort_aggregator) != 1L ||
-      !nzchar(cohort_aggregator)) {
-    stop("`cohort_aggregator` must be a single non-empty character string.", call. = FALSE)
+  if (!is.character(feature_transform) || length(feature_transform) != 1L ||
+      !nzchar(feature_transform)) {
+    stop("`feature_transform` must be a single non-empty character string.", call. = FALSE)
   }
-  if (!exists(cohort_aggregator, envir = .aggregator_registry, inherits = FALSE)) {
-    available <- ls(.aggregator_registry)
+  if (!exists(feature_transform, envir = .transform_registry, inherits = FALSE)) {
+    available <- ls(.transform_registry)
     stop(
-      "Unknown aggregator '", cohort_aggregator, "'. ",
+      "Unknown feature transform '", feature_transform, "'. ",
       "Available: ", paste(available, collapse = ", "), ". ",
-      "Use register_aggregator() to add custom aggregators.",
+      "Use register_feature_transform() to add custom transforms.",
       call. = FALSE
     )
   }
 
-  inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, aggregator = "none",
+  inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, transform = "none",
                                        feature_alignment = feature_alignment)
   raw_x_mat <- inputs_raw$x
   raw_feature_names <- colnames(raw_x_mat)
@@ -151,7 +152,7 @@ optimize_panel <- function(x, y,
       if (!length(missing_raw)) {
         feature_pool_base <- feature_pool_arg
       } else if (
-        cohort_aggregator != "none" &&
+        feature_transform != "none" &&
         all(grepl("--", feature_pool_arg, fixed = TRUE))
       ) {
         components <- unique(unlist(strsplit(feature_pool_arg, "--", fixed = TRUE)))
@@ -176,64 +177,60 @@ optimize_panel <- function(x, y,
     }
   }
 
-  # Warn about memory usage BEFORE aggregation for pairwise aggregators
-  if (cohort_aggregator %in% c("pairwise_ratios", "pairwise_log_ratios")) {
+  # Note about pairwise transforms (no longer causes O(n^2) search space)
+  # With base-feature-first selection, search space is O(n), not O(n^2)
+  if (feature_transform %in% c("pairwise_ratios", "pairwise_log_ratios")) {
     n_base_features <- length(feature_pool_base)
-    if (n_base_features > 100) {
-      n_pairs <- (as.numeric(n_base_features) * (n_base_features - 1)) / 2
+    if (n_base_features > 200) {
       message(
         sprintf(
-          "Note: Pairwise aggregation of %d base features will create %.0f pairs.",
-          n_base_features, n_pairs
+          "Note: Searching %d base features with pairwise transform.",
+          n_base_features
         )
       )
-      if (n_pairs > 10000) {
-        warning(
-          sprintf(
-            "Large feature pool (%d features -> %.0f pairs) may cause slow ",
-            n_base_features, n_pairs
-          ),
-          "optimization. Consider reducing feature_pool via get_top_de_features() ",
-          "or select_transferable_features().",
-          call. = FALSE
-        )
-      }
     }
   }
 
+  # Prepare raw (untransformed) data - transform is applied on-the-fly during fitness evaluation
   inputs <- .prepare_cohort_inputs(
     x,
     y,
     assay = assay,
-    aggregator = cohort_aggregator,
+    transform = "none",  # Always raw - transform applied after feature selection
     feature_subset = feature_pool_base,
     feature_alignment = feature_alignment
   )
-  x_mat <- inputs$x
+  x_raw <- inputs$x
   truth <- inputs$truth
   cohort <- inputs$cohort
 
-  feature_names <- colnames(x_mat)
-  if (is.null(feature_names)) {
-    feature_names <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
-    colnames(x_mat) <- feature_names
-  }
-
-  if (is.null(feature_pool_final)) {
-    feature_pool <- feature_names
-  } else {
-    feature_pool <- .resolve_feature_pool(feature_pool_final, feature_names)
-  }
+  # Feature pool is now BASE features (not aggregated)
+  feature_pool <- feature_pool_base
 
   if (!length(feature_pool)) {
     stop("`feature_pool` produced zero features.", call. = FALSE)
   }
 
-  min_features_for_regularized <- 2L
-  if (regularized && max_features < min_features_for_regularized) {
+  # Minimum features required depends on transform and regularization
+
+  # With pairwise transforms: n base features -> n*(n-1)/2 ratios
+  # For regularized fitting: need >= 2 transformed features
+  # 2 base features -> 1 ratio (not enough for glmnet)
+  # 3 base features -> 3 ratios (sufficient for glmnet)
+  if (regularized && feature_transform %in% c("pairwise_ratios", "pairwise_log_ratios")) {
+    min_features_for_regularized <- 3L
+  } else if (regularized) {
+    min_features_for_regularized <- 2L
+  } else {
+    min_features_for_regularized <- 1L
+  }
+
+  if (max_features < min_features_for_regularized) {
     stop("`max_features` must be at least ", min_features_for_regularized,
-         " when `regularized = TRUE` (glmnet requirement). ",
-         "Either increase `max_features` or set `regularized = FALSE`.",
+         " when `regularized = TRUE`",
+         if (feature_transform %in% c("pairwise_ratios", "pairwise_log_ratios"))
+           paste0(" with feature_transform = '", feature_transform, "'") else "",
+         ". Either increase `max_features` or set `regularized = FALSE`.",
          call. = FALSE)
   }
 
@@ -245,8 +242,9 @@ optimize_panel <- function(x, y,
     max_features <- length(feature_pool)
   }
 
-  x_pool <- x_mat[, feature_pool, drop = FALSE]
-  decision_dim <- ncol(x_pool)
+  # x_pool contains RAW (base) features - transform applied on-the-fly
+  x_pool <- x_raw[, feature_pool, drop = FALSE]
+  decision_dim <- ncol(x_pool)  # Decision dimension = number of BASE features
 
   if (decision_dim > 200) {
     warning("Optimizing over more than 200 features may be slow; consider ",
@@ -283,14 +281,16 @@ optimize_panel <- function(x, y,
     }
   }
 
-  # Minimum features needed: glmnet requires >= 2 features when regularized
-
-  min_features_required <- if (regularized) 2L else 1L
+  # Minimum base features required depends on transform and regularization
+  # min_features_for_regularized is already computed above
+  min_features_required <- min_features_for_regularized
 
   evaluate_candidate <- function(decision_vec) {
+    # feature_names_pool contains BASE feature names
     feature_names_pool <- colnames(x_pool)
     n_pool <- length(feature_names_pool)
 
+    # Step 1: Select BASE features using decision weights
     if (identical(selection_threshold, "adaptive")) {
       # Adaptive: select based on largest gap in sorted weights
       # This allows the GA to "encode" panel size in the weight distribution
@@ -342,10 +342,21 @@ optimize_panel <- function(x, y,
 
     # Sort by descending weight for consistent output ordering
     selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
-    selected_features <- feature_names_pool[selected_idx]
-    x_selected <- x_pool[, selected_features, drop = FALSE]
+    selected_base_features <- feature_names_pool[selected_idx]
+    x_base_selected <- x_pool[, selected_base_features, drop = FALSE]
 
-    # Compute scores using CV (out-of-fold predictions) or in-sample
+    # Step 2: Apply feature transform ON-THE-FLY to selected base features
+    if (feature_transform != "none" && ncol(x_base_selected) >= 2L) {
+      x_transformed <- .apply_feature_transform_single(x_base_selected, feature_transform)
+      selected_features <- colnames(x_transformed)  # e.g., "A--B" for pairwise
+      x_selected <- x_transformed
+    } else {
+      # No transform or single feature - use base features directly
+      x_selected <- x_base_selected
+      selected_features <- selected_base_features
+    }
+
+    # Step 3: Compute scores using CV (out-of-fold predictions) or in-sample
     if (fitness_cv && !is.null(cv_fold_ids)) {
       # Cross-validation based scoring: prevents overfitting
       scores <- .compute_cv_scores(
@@ -385,6 +396,8 @@ optimize_panel <- function(x, y,
       stop("Scoring must return a numeric vector matching the number of samples.",
            call. = FALSE)
     }
+
+    # Step 4: Evaluate constraints on TRANSFORMED features
     constraint_results <- if (length(constraint_specs)) {
       setNames(vapply(seq_along(constraint_specs), function(j) {
         res <- constraint_specs[[j]]$fun(
@@ -400,6 +413,8 @@ optimize_panel <- function(x, y,
       logical(0)
     }
     feasible <- if (length(constraint_results)) all(constraint_results) else TRUE
+
+    # Step 5: Evaluate objectives on TRANSFORMED features
     metrics <- vapply(objectives, function(obj) {
       obj$fun(
         truth,
@@ -409,8 +424,11 @@ optimize_panel <- function(x, y,
         x = x_selected
       )
     }, numeric(1))
+
+    # Return BOTH base features and transformed features
     list(
-      features = selected_features,
+      base_features = selected_base_features,  # Original genes selected
+      features = selected_features,             # Transformed features (for model)
       scores = scores,
       metrics = metrics,
       constraint_results = constraint_results,
@@ -532,7 +550,8 @@ optimize_panel <- function(x, y,
     stringsAsFactors = FALSE
   )
 
-  # Add features as list column
+  # Add base_features and features as list columns
+  solutions_df$base_features <- I(lapply(solutions, `[[`, "base_features"))
   solutions_df$features <- I(lapply(solutions, `[[`, "features"))
 
   # Add objective values as separate columns
@@ -548,7 +567,7 @@ optimize_panel <- function(x, y,
     algorithm = algorithm,
     nsga2 = nsga_args,  # Keep nsga2 name for backward compatibility
     scoring_function = deparse(substitute(scoring_fn)),
-    cohort_aggregator = cohort_aggregator,
+    feature_transform = feature_transform,
     feature_alignment = feature_alignment,
     constraints = if (length(constraint_specs)) {
       vapply(constraint_specs, `[[`, character(1), "label")
@@ -569,8 +588,8 @@ optimize_panel <- function(x, y,
 
   # Build training signature
   training_signature <- list(
-    n = nrow(x_mat),
-    p = ncol(x_mat),
+    n = nrow(x_raw),
+    p = ncol(x_raw),
     class_balance = table(truth),
     feature_pool_size = length(feature_pool),
     base_feature_pool_size = length(feature_pool_base),
@@ -580,13 +599,15 @@ optimize_panel <- function(x, y,
   )
 
   # Return OptimizationResult (no model fitting)
+  # Note: aggregated_x now stores RAW (untransformed) base features
+  # Transform is applied on-the-fly during fit_panel() and evaluate_panel()
   new(
     "OptimizationResult",
     solutions = solutions_df,
     feature_pool = feature_pool,
     control = control,
     training_signature = training_signature,
-    aggregated_x = x_pool,
+    aggregated_x = x_pool,  # Raw base features (transform applied later)
     aggregated_y = truth,
     aggregated_cohort = cohort
   )

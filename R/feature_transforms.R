@@ -1,107 +1,107 @@
-#' Cohort Aggregator Registry
+#' Feature Transform Registry
 #'
-#' Functions for registering and retrieving cohort aggregation strategies
-#' used to transform feature matrices before optimization.
+#' Functions for registering and retrieving feature transformation strategies
+#' used to transform feature matrices during optimization.
 #'
-#' @name aggregator-registry
+#' @name transform-registry
 NULL
 
 # -----------------------------------------------------------------------------
 # Registry Environment
 # -----------------------------------------------------------------------------
 
-.aggregator_registry <- new.env(parent = emptyenv())
+.transform_registry <- new.env(parent = emptyenv())
 
-.register_default_aggregator <- function(name, fun, description) {
+.register_default_transform <- function(name, fun, description) {
 
   assign(name, list(fun = fun, description = description),
-         envir = .aggregator_registry)
+         envir = .transform_registry)
 }
 
-#' Register a cohort aggregator function
+#' Register a feature transform function
 #'
-#' Add a custom aggregation strategy to the registry for use with
+#' Add a custom transformation strategy to the registry for use with
 #' [optimize_panel()] and [evaluate_panel()].
 #'
-#' @param name Unique identifier for the aggregator.
-#' @param fun Function implementing the aggregator. Must accept a matrix `x`
+#' @param name Unique identifier for the transform.
+#' @param fun Function implementing the transform. Must accept a matrix `x`
 #'   with column names and return a transformed matrix.
-#' @param description Human-readable description of the aggregator.
+#' @param description Human-readable description of the transform.
 #' @param overwrite Logical; set to `TRUE` to replace an existing registration.
 #' @return Invisibly, the registered name.
 #'
 #' @examples
-#' # Register a custom centering aggregator
-#' register_aggregator(
+#' # Register a custom centering transform
+#' register_feature_transform(
 #'   "center",
 #'   function(x) scale(x, center = TRUE, scale = FALSE),
 #'   "Center each feature (subtract column means)"
 #' )
 #'
-#' # List all registered aggregators
-#' aggregator_registry()
+#' # List all registered transforms
+#' feature_transform_registry()
 #'
-#' @seealso [aggregator_registry()], [optimize_panel()]
+#' @seealso [feature_transform_registry()], [optimize_panel()]
 #' @export
-register_aggregator <- function(name, fun, description = name, overwrite = FALSE) {
+register_feature_transform <- function(name, fun, description = name, overwrite = FALSE) {
   stopifnot(is.character(name), length(name) == 1L, nzchar(name))
   stopifnot(is.function(fun))
-  if (!overwrite && exists(name, envir = .aggregator_registry, inherits = FALSE)) {
-    stop(sprintf("Aggregator '%s' is already registered.", name), call. = FALSE)
+  if (!overwrite && exists(name, envir = .transform_registry, inherits = FALSE)) {
+    stop(sprintf("Feature transform '%s' is already registered.", name), call. = FALSE)
   }
   assign(name, list(fun = fun, description = description),
-         envir = .aggregator_registry)
+         envir = .transform_registry)
   invisible(name)
 }
 
-#' List registered aggregator functions
+#' List registered feature transform functions
 #'
-#' @return Named list of aggregator registrations (`fun`, `description`).
+#' @return Named list of transform registrations (`fun`, `description`).
 #'
 #' @examples
-#' aggregator_registry()
+#' feature_transform_registry()
 #'
-#' @seealso [register_aggregator()]
+#' @seealso [register_feature_transform()]
 #' @export
-aggregator_registry <- function() {
-  if (length(ls(.aggregator_registry)) == 0L) {
+feature_transform_registry <- function() {
+  if (length(ls(.transform_registry)) == 0L) {
     return(list())
   }
-  mget(ls(.aggregator_registry), envir = .aggregator_registry)
+  mget(ls(.transform_registry), envir = .transform_registry)
 }
 
 #' @keywords internal
-.get_aggregator <- function(name) {
-  if (!exists(name, envir = .aggregator_registry, inherits = FALSE)) {
+.get_feature_transform <- function(name) {
+  if (!exists(name, envir = .transform_registry, inherits = FALSE)) {
     stop(
-      "Aggregator '", name, "' is not registered. ",
-      "Available: ", paste(ls(.aggregator_registry), collapse = ", "), ". ",
-      "Use register_aggregator() to add custom aggregators.",
+      "Feature transform '", name, "' is not registered. ",
+      "Available: ", paste(ls(.transform_registry), collapse = ", "), ". ",
+      "Use register_feature_transform() to add custom transforms.",
       call. = FALSE
     )
   }
-  get(name, envir = .aggregator_registry, inherits = FALSE)
+  get(name, envir = .transform_registry, inherits = FALSE)
 }
 
 # -----------------------------------------------------------------------------
-# Aggregator Implementations
+# Transform Implementations
 # -----------------------------------------------------------------------------
 
-#' Identity aggregator (no transformation)
+#' Identity transform (no transformation)
 #'
 #' Returns the input matrix unchanged.
 #'
 #' @param x A numeric matrix with column names.
 #' @return The input matrix unchanged.
 #' @keywords internal
-aggregator_none <- function(x) {
+transform_none <- function(x) {
   x
 }
 
-#' Pairwise difference aggregator
+#' Pairwise difference transform
 #'
 #' Computes pairwise differences between all feature pairs. This is the default
-#' aggregator that helps dampen batch effects across cohorts by generating
+#' transform that helps dampen batch effects across cohorts by generating
 #' within-sample normalized differences.
 #'
 #' @details
@@ -113,19 +113,19 @@ aggregator_none <- function(x) {
 #' @return Matrix of pairwise differences with (p choose 2) columns.
 #'   Column names follow the pattern "FeatureA--FeatureB".
 #' @keywords internal
-aggregator_pairwise_ratios <- function(x) {
+transform_pairwise_ratios <- function(x) {
   if (ncol(x) < 2L) {
     stop(
-      "Aggregator 'pairwise_ratios' requires at least two features. ",
+      "Transform 'pairwise_ratios' requires at least two features. ",
       "Input matrix has ", ncol(x), " column(s). ",
-      "Use aggregator = 'none' if pairwise ratios are not needed.",
+      "Use feature_transform = 'none' if pairwise ratios are not needed.",
       call. = FALSE
     )
   }
   pairwise_col_diff(x)
 }
 
-#' Pairwise log-ratio aggregator
+#' Pairwise log-ratio transform
 #'
 #' Computes pairwise log-ratios between all feature pairs. Useful for
 #' compositional data or when multiplicative relationships are expected.
@@ -134,12 +134,12 @@ aggregator_pairwise_ratios <- function(x) {
 #' @return Matrix of log-ratios with (p choose 2) columns.
 #'   Column names follow the pattern "FeatureA--FeatureB".
 #' @keywords internal
-aggregator_pairwise_log_ratios <- function(x) {
+transform_pairwise_log_ratios <- function(x) {
   if (ncol(x) < 2L) {
     stop(
-      "Aggregator 'pairwise_log_ratios' requires at least two features. ",
+      "Transform 'pairwise_log_ratios' requires at least two features. ",
       "Input matrix has ", ncol(x), " column(s). ",
-      "Use aggregator = 'none' if pairwise log-ratios are not needed.",
+      "Use feature_transform = 'none' if pairwise log-ratios are not needed.",
       call. = FALSE
     )
   }
@@ -164,7 +164,7 @@ aggregator_pairwise_log_ratios <- function(x) {
   pairwise_col_diff(log(x))
 }
 
-#' Reference normalization aggregator
+#' Reference normalization transform
 #'
 #' Normalizes all features relative to a specified reference feature (e.g., a
 #' housekeeping gene). The reference feature must be specified via the
@@ -180,15 +180,15 @@ aggregator_pairwise_log_ratios <- function(x) {
 #' x <- matrix(rnorm(30), nrow = 10, ncol = 3)
 #' colnames(x) <- c("GeneA", "GeneB", "Housekeeping")
 #' attr(x, "reference_feature") <- "Housekeeping"
-#' result <- aggregator_reference_norm(x)
+#' result <- transform_reference_norm(x)
 #' }
 #'
 #' @keywords internal
-aggregator_reference_norm <- function(x) {
+transform_reference_norm <- function(x) {
   ref_feature <- attr(x, "reference_feature")
   if (is.null(ref_feature)) {
     stop(
-      "Aggregator 'reference_norm' requires 'reference_feature' attribute. ",
+      "Transform 'reference_norm' requires 'reference_feature' attribute. ",
       "Set via: attr(x, 'reference_feature') <- 'FeatureName'",
       call. = FALSE
     )
@@ -207,7 +207,7 @@ aggregator_reference_norm <- function(x) {
 
   if (length(other_cols) == 0L) {
     warning(
-      "Aggregator 'reference_norm' requires at least one non-reference feature; ",
+      "Transform 'reference_norm' requires at least one non-reference feature; ",
       "returning original matrix.",
       call. = FALSE
     )
@@ -224,26 +224,26 @@ aggregator_reference_norm <- function(x) {
 # Default Registrations
 # -----------------------------------------------------------------------------
 
-.register_default_aggregator(
+.register_default_transform(
   "none",
-  aggregator_none,
+  transform_none,
 "No transformation (identity)"
 )
 
-.register_default_aggregator(
+.register_default_transform(
   "pairwise_ratios",
-  aggregator_pairwise_ratios,
+  transform_pairwise_ratios,
   "Pairwise differences (A - B) for all feature pairs"
 )
 
-.register_default_aggregator(
+.register_default_transform(
   "pairwise_log_ratios",
-  aggregator_pairwise_log_ratios,
+  transform_pairwise_log_ratios,
   "Pairwise log-ratios log(A / B) for all feature pairs"
 )
 
-.register_default_aggregator(
+.register_default_transform(
   "reference_norm",
-  aggregator_reference_norm,
+  transform_reference_norm,
   "Reference normalization (A - ref) for each feature relative to reference"
 )

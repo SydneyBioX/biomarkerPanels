@@ -30,11 +30,12 @@ NULL
 #' @param scoring_fn Optional custom scoring function. If `NULL`, uses the
 #'   default row-mean aggregation. Must have signature
 #'   `function(x_selected, selected_features, truth, ...)`.
-#' @param cohort_aggregator Optional transformation applied to `x` before
-#'   evaluation. Defaults to the aggregator stored in the fitted panel,
+#' @param feature_transform Optional transformation applied to base features
+#'   before evaluation. Defaults to the transform stored in the fitted panel,
 #'   keeping training and validation pipelines aligned. Must be a registered
-#'   aggregator name (see [`aggregator_registry()`]). Built-in options include
-#'   `"pairwise_ratios"`, `"pairwise_log_ratios"`, `"reference_norm"`, and `"none"`.
+#'   transform name (see [`feature_transform_registry()`]). Built-in options
+#'   include `"pairwise_ratios"`, `"pairwise_log_ratios"`, `"reference_norm"`,
+#'   and `"none"`.
 #' @param cutoff_prob Classification probability threshold used for confusion
 #'   matrix summaries and highlight point on the ROC curve. Defaults to `0.5`.
 #' @param positive Label treated as the positive class when computing confusion
@@ -52,7 +53,7 @@ evaluate_panel <- function(panel, x, y,
                            cohort = NULL,
                            assay = NULL,
                            scoring_fn = NULL,
-                           cohort_aggregator = NULL,
+                           feature_transform = NULL,
                            cutoff_prob = 0.5,
                            positive = NULL) {
   stopifnot(inherits(panel, "BiomarkerPanelResult"))
@@ -63,68 +64,94 @@ evaluate_panel <- function(panel, x, y,
     positive <- if (!is.null(stored_positive)) stored_positive else "Yes"
   }
 
-  stored_aggregator <- panel@control$cohort_aggregator
-  if (is.null(cohort_aggregator)) {
-    cohort_aggregator <- if (is.null(stored_aggregator)) "none" else stored_aggregator
+  # Get feature transform from stored control or use provided value
+  stored_transform <- panel@control$feature_transform
+  if (is.null(feature_transform)) {
+    feature_transform <- if (is.null(stored_transform)) "none" else stored_transform
   } else {
-    if (!is.character(cohort_aggregator) || length(cohort_aggregator) != 1L) {
-      stop("`cohort_aggregator` must be a single character string.", call. = FALSE)
+    if (!is.character(feature_transform) || length(feature_transform) != 1L) {
+      stop("`feature_transform` must be a single character string.", call. = FALSE)
     }
-    if (!exists(cohort_aggregator, envir = .aggregator_registry, inherits = FALSE)) {
-      available <- ls(.aggregator_registry)
+    if (!exists(feature_transform, envir = .transform_registry, inherits = FALSE)) {
+      available <- ls(.transform_registry)
       stop(
-        "Unknown aggregator '", cohort_aggregator, "'. ",
+        "Unknown feature transform '", feature_transform, "'. ",
         "Available: ", paste(available, collapse = ", "),
         call. = FALSE
       )
     }
   }
 
+  # Get base features from panel (original features before transform)
+  base_features <- panel@base_features
+  if (is.null(base_features) || length(base_features) == 0L) {
+    # Backward compatibility: if no base_features, use features directly
+    base_features <- panel@features
+  }
+
+  # Prepare validation data - get RAW features (no transform yet)
   if (is.list(x)) {
     if (!is.null(cohort)) {
       warning("`cohort` argument is ignored when `x` is supplied as a list of cohorts.",
               call. = FALSE)
     }
-    prepared <- .prepare_cohort_inputs(x, y, assay = assay, aggregator = cohort_aggregator)
-    x_mat <- prepared$x
+    prepared <- .prepare_cohort_inputs(x, y, assay = assay, transform = "none")
+    x_raw <- prepared$x
     truth <- prepared$truth
     cohort_vec <- prepared$cohort
   } else {
-    x_mat <- .extract_feature_matrix(x, assay = assay)
+    x_raw <- .extract_feature_matrix(x, assay = assay)
     truth <- ensure_binary_response(y)
-    if (nrow(x_mat) != length(truth)) {
+    if (nrow(x_raw) != length(truth)) {
       stop("`x` and `y` must have matching sample sizes.", call. = FALSE)
     }
-    if (is.null(colnames(x_mat))) {
-      colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
-    }
-    x_mat <- .apply_cohort_aggregator(list(x_mat), cohort_aggregator)[[1]]
-    if (is.null(colnames(x_mat))) {
-      stop("`x` must have column names in order to align with panel features.",
-           call. = FALSE)
+    if (is.null(colnames(x_raw))) {
+      colnames(x_raw) <- sprintf("feature_%04d", seq_len(ncol(x_raw)))
     }
     if (is.null(cohort)) {
-      cohort_vec <- factor(rep("cohort_01", nrow(x_mat)), levels = "cohort_01")
+      cohort_vec <- factor(rep("cohort_01", nrow(x_raw)), levels = "cohort_01")
     } else {
-      if (length(cohort) != nrow(x_mat)) {
+      if (length(cohort) != nrow(x_raw)) {
         stop("Length of `cohort` must match the number of samples in `x`.", call. = FALSE)
       }
       cohort_vec <- factor(cohort)
     }
   }
 
-  selected <- panel@features
+  # Validate base features are present in validation data
+  if (!all(base_features %in% colnames(x_raw))) {
+    missing <- setdiff(base_features, colnames(x_raw))
+    stop("Base feature(s) not found in validation data: ",
+         paste(missing, collapse = ", "), call. = FALSE)
+  }
+
+  # Extract base features from validation data
+  x_base_selected <- x_raw[, base_features, drop = FALSE]
+
+  # Apply feature transform to get transformed features
+  if (feature_transform != "none" && length(base_features) >= 2L) {
+    x_selected <- .apply_feature_transform_single(x_base_selected, feature_transform)
+    selected <- colnames(x_selected)
+  } else {
+    x_selected <- x_base_selected
+    selected <- base_features
+  }
+
+  # Validate transformed features match what the model expects
   if (length(selected) == 0L) {
     stop("Panel has no selected features.", call. = FALSE)
   }
 
-  if (!all(selected %in% colnames(x_mat))) {
-    missing <- setdiff(selected, colnames(x_mat))
-    stop("Selected feature(s) not found in validation data: ",
-         paste(missing, collapse = ", "), call. = FALSE)
+  # Verify feature names match model expectations
+  expected_features <- panel@features
+  if (!setequal(selected, expected_features)) {
+    warning(
+      "Transformed feature names differ from model training. ",
+      "Expected: ", paste(expected_features, collapse = ", "), ". ",
+      "Got: ", paste(selected, collapse = ", "), ".",
+      call. = FALSE
+    )
   }
-
-  x_selected <- x_mat[, selected, drop = FALSE]
 
   # Determine how to compute scores
   stored_model <- panel@model

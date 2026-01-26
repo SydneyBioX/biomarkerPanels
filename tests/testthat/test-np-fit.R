@@ -99,7 +99,7 @@ test_that("fit_np_panel with minimize_FPR = TRUE returns TransferablePanelResult
     x = sim$x_list,
     y = sim$y_list,
     feature_pool = feature_pool,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     objectives = define_objectives(
       losses = c("sensitivity", "specificity")
     ),
@@ -139,7 +139,7 @@ test_that("fit_np_panel with minimize_FPR = FALSE flips labels correctly", {
     x = sim$x_list,
     y = sim$y_list,
     feature_pool = feature_pool,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     objectives = define_objectives(
       losses = c("sensitivity", "specificity")
     ),
@@ -179,7 +179,7 @@ test_that("fit_np_panel with explicit features works", {
     x = sim$x_list,
     y = sim$y_list,
     feature_pool = feature_pool,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     objectives = define_objectives(
       losses = c("sensitivity", "specificity")
     ),
@@ -223,7 +223,7 @@ test_that("evaluate_panel works with npc model", {
     x = x_train_list,
     y = y_train_list,
     feature_pool = feature_pool,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     objectives = define_objectives(
       losses = c("sensitivity", "specificity")
     ),

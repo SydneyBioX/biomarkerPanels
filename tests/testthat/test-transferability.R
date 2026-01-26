@@ -188,7 +188,7 @@ test_that("optimize_panel_transferable returns TransferablePanelResult", {
     val_ratio = 0.2,
     np_alpha = 0.15,
     np_delta = 0.05,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 12, maxiter = 8),
     n_top_features = 15
   )
@@ -235,7 +235,7 @@ test_that("feature selection uses training data only (no leakage)",
     max_features = 3,
     train_ratio = 0.7,
     val_ratio = 0.2,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 10, maxiter = 6),
     n_top_features = 10,
     seed = 42
@@ -265,7 +265,7 @@ test_that("NP threshold is in valid range", {
     val_ratio = 0.2,
     np_alpha = 0.2,
     np_delta = 0.1,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 8, maxiter = 5),
     n_top_features = 8
   )
@@ -288,7 +288,7 @@ test_that("per-cohort metrics are populated for all cohorts", {
     max_features = 3,
     train_ratio = 0.7,
     val_ratio = 0.2,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 8, maxiter = 5),
     n_top_features = 8
   )
@@ -312,7 +312,7 @@ test_that("evaluate_panel works with TransferablePanelResult", {
     max_features = 3,
     train_ratio = 0.7,
     val_ratio = 0.2,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 8, maxiter = 5),
     n_top_features = 8
   )
@@ -326,7 +326,7 @@ test_that("evaluate_panel works with TransferablePanelResult", {
     result,
     x = sim_new$x_list[[1]],
     y = sim_new$y_list[[1]],
-    cohort_aggregator = "none"
+    feature_transform = "none"
   )
 
   expect_true(is.list(eval_result))
@@ -347,7 +347,7 @@ test_that("single cohort is handled gracefully", {
     max_features = 3,
     train_ratio = 0.7,
     val_ratio = 0.2,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     nsga_control = list(popSize = 8, maxiter = 5),
     n_top_features = 8
   )

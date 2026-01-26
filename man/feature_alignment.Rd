@@ -2,9 +2,9 @@
 % Please edit documentation in R/feature_alignment.R
 \name{feature_alignment}
 \alias{feature_alignment}
-\title{Feature Alignment and Aggregation}
+\title{Feature Alignment and Transformation}
 \description{
 Internal functions for aligning features across cohorts and applying
-cohort aggregation transformations.
+feature transformations.
 }
 \keyword{internal}

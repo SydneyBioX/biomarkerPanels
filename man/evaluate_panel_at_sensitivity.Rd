@@ -11,7 +11,7 @@ evaluate_panel_at_sensitivity(
   target_sensitivity = 0.9,
   objectives = define_objectives(losses = c("sensitivity", "specificity", "auc")),
   positive = NULL,
-  cohort_aggregator = NULL,
+  feature_transform = NULL,
   assay = NULL
 )
 }
@@ -33,8 +33,8 @@ specificity, and auc.}
 \item{positive}{Label treated as the positive class. Defaults to the value
 stored in the panel, or \code{"Yes"}.}
 
-\item{cohort_aggregator}{Optional aggregator name. Defaults to the aggregator
-stored in the fitted panel.}
+\item{feature_transform}{Optional feature transform name. Defaults to the
+transform stored in the fitted panel.}
 
 \item{assay}{For \code{SummarizedExperiment} inputs, assay name or index.}
 }

@@ -23,8 +23,8 @@ NULL
 #'   Must be between 0 and 1.
 #' @param positive Label treated as the positive class. Defaults to the value
 #'   stored in the panel, or `"Yes"`.
-#' @param cohort_aggregator Optional aggregator name. Defaults to the aggregator
-#'   stored in the fitted panel.
+#' @param feature_transform Optional feature transform name. Defaults to the
+#'   transform stored in the fitted panel.
 #' @param assay For `SummarizedExperiment` inputs, assay name or index.
 #' @return A list with:
 #'   \describe{
@@ -54,7 +54,7 @@ find_threshold_for_sensitivity <- function(panel,
                                             y,
                                             target_sensitivity = 0.90,
                                             positive = NULL,
-                                            cohort_aggregator = NULL,
+                                            feature_transform = NULL,
                                             assay = NULL) {
   if (!requireNamespace("pROC", quietly = TRUE)) {
     stop("The 'pROC' package is required. Install it via install.packages('pROC').",
@@ -80,7 +80,7 @@ find_threshold_for_sensitivity <- function(panel,
     y = y,
     cohort = NULL,
     assay = assay,
-    cohort_aggregator = cohort_aggregator,
+    feature_transform = feature_transform,
     cutoff_prob = 0.5,  # Doesn't matter for ROC computation
     positive = positive
   )
@@ -175,7 +175,7 @@ evaluate_panel_at_sensitivity <- function(panel,
                                              losses = c("sensitivity", "specificity", "auc")
                                            ),
                                            positive = NULL,
-                                           cohort_aggregator = NULL,
+                                           feature_transform = NULL,
                                            assay = NULL) {
   # Find the optimal threshold
   thresh_info <- find_threshold_for_sensitivity(
@@ -184,7 +184,7 @@ evaluate_panel_at_sensitivity <- function(panel,
     y = y,
     target_sensitivity = target_sensitivity,
     positive = positive,
-    cohort_aggregator = cohort_aggregator,
+    feature_transform = feature_transform,
     assay = assay
   )
 
@@ -196,7 +196,7 @@ evaluate_panel_at_sensitivity <- function(panel,
     objectives = objectives,
     cohort = NULL,
     assay = assay,
-    cohort_aggregator = cohort_aggregator,
+    feature_transform = feature_transform,
     cutoff_prob = thresh_info$threshold,
     positive = positive
   )

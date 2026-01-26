@@ -6,13 +6,16 @@
 #' model fitting.
 #'
 #' @slot solutions Data frame with one row per Pareto solution. Contains columns:
-#'   `solution_id` (integer), `features` (list-column of character vectors),
-#'   and one column per objective with numeric values.
-#' @slot feature_pool Character vector of features considered during optimization.
-#' @slot control List of optimization control parameters.
+#'   `solution_id` (integer), `base_features` (list-column of character vectors
+#'   with original feature names), `features` (list-column with transformed
+#'   feature names used for model fitting), and one column per objective with
+#'   numeric values.
+#' @slot feature_pool Character vector of base features considered during optimization.
+#' @slot control List of optimization control parameters including `feature_transform`.
 #' @slot training_signature List with metadata about the training dataset.
-#' @slot aggregated_x Aggregated training feature matrix (for use with fit_panel).
-#' @slot aggregated_y Aggregated training response vector (factor).
+#' @slot aggregated_x Raw (untransformed) training feature matrix containing base
+#'   features. The feature transform is applied on-the-fly during [fit_panel()].
+#' @slot aggregated_y Training response vector (factor).
 #' @slot aggregated_cohort Cohort membership factor for training samples.
 #' @export
 setClass(
@@ -91,22 +94,55 @@ setMethod(
   }
 )
 
+#' Get Solution Base Features
+#'
+#' Extract the base (untransformed) feature set for a specific Pareto solution.
+#' These are the original feature names before any transformation (e.g., pairwise
+#' ratios) is applied.
+#'
+#' @param object An `OptimizationResult`.
+#' @param solution_id Integer ID of the solution (1-based).
+#' @return Character vector of base feature names in the solution.
+#' @export
+setGeneric("get_solution_base_features", function(object, solution_id)
+  standardGeneric("get_solution_base_features"))
+
+#' @describeIn get_solution_base_features Return base features for the specified solution.
+#' @export
+setMethod(
+  "get_solution_base_features",
+  signature = c(object = "OptimizationResult", solution_id = "numeric"),
+  definition = function(object, solution_id) {
+    solution_id <- as.integer(solution_id)
+    if (solution_id < 1L || solution_id > nrow(object@solutions)) {
+      stop("solution_id must be between 1 and ", nrow(object@solutions), call. = FALSE)
+    }
+    object@solutions$base_features[[solution_id]]
+  }
+)
+
 #' Biomarker Panel Result Class
 #'
 #' Stores a fitted biomarker panel including selected biomarkers,
 #' performance summaries, and the trained model. This class is
 #' returned by [fit_panel()] and serves as input to [evaluate_panel()].
 #'
-#' @slot features Character vector of selected biomarkers.
+#' @slot base_features Character vector of original (untransformed) biomarker names.
+#'   These are the features selected by the optimization algorithm before any
+#'   transformation is applied.
+#' @slot features Character vector of transformed biomarker names used for model
+#'   fitting. For pairwise transforms, these are the ratio names (e.g., "A--B").
 #' @slot metrics Named numeric vector summarizing sensitivity, specificity, etc.
 #' @slot objectives Data frame describing objective values per candidate solution.
-#' @slot control List of optimization control parameters.
+#' @slot control List of optimization control parameters including `feature_transform`.
 #' @slot training_data Signature of the training dataset (e.g., sample and assay info).
-#' @slot model Fitted model object (e.g., glm or cv.glmnet) trained on the selected features.
+#' @slot model Fitted model object (e.g., glm or cv.glmnet) trained on the
+#'   transformed features.
 #' @export
 setClass(
   "BiomarkerPanelResult",
   slots = c(
+    base_features = "character",
     features = "character",
     metrics = "numeric",
     objectives = "data.frame",
@@ -114,6 +150,47 @@ setClass(
     training_data = "list",
     model = "ANY"
   )
+)
+
+#' Panel Base Features Accessor
+#'
+#' Retrieve the original (untransformed) feature names from a `BiomarkerPanelResult`
+#' object. These are the features selected by the optimization before any
+#' transformation was applied.
+#'
+#' @param object A `BiomarkerPanelResult`.
+#' @return Character vector of base feature names.
+#' @export
+setGeneric("panel_base_features", function(object) standardGeneric("panel_base_features"))
+
+#' @describeIn panel_base_features Return the base feature names.
+#' @export
+setMethod(
+  "panel_base_features",
+  signature = "BiomarkerPanelResult",
+  definition = function(object) {
+    object@base_features
+  }
+)
+
+#' Panel Features Accessor
+#'
+#' Retrieve the transformed feature names from a `BiomarkerPanelResult` object.
+#' For pairwise transforms, these are ratio names like "GeneA--GeneB".
+#'
+#' @param object A `BiomarkerPanelResult`.
+#' @return Character vector of transformed feature names.
+#' @export
+setGeneric("panel_features", function(object) standardGeneric("panel_features"))
+
+#' @describeIn panel_features Return the transformed feature names.
+#' @export
+setMethod(
+  "panel_features",
+  signature = "BiomarkerPanelResult",
+  definition = function(object) {
+    object@features
+  }
 )
 
 #' Panel Metrics Accessor
