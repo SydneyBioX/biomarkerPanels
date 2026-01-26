@@ -91,7 +91,8 @@ fit_np_panel <- function(optimization_result,
 
   # Determine which features to use (same pattern as fit_panel)
   if (!is.null(features)) {
-    selected_features <- features
+    # User provided explicit base features
+    selected_base_features <- features
     if (!all(features %in% optimization_result@feature_pool)) {
       missing <- setdiff(features, optimization_result@feature_pool)
       stop("Feature(s) not in feature pool: ", paste(missing, collapse = ", "),
@@ -103,7 +104,7 @@ fit_np_panel <- function(optimization_result,
   } else {
     if (is.null(solution_id)) {
       # Auto-select: best on first objective
-      objective_cols <- setdiff(names(solutions_df), c("solution_id", "features"))
+      objective_cols <- setdiff(names(solutions_df), c("solution_id", "base_features", "features"))
       if (length(objective_cols) == 0L) {
         stop("No objective columns found in solutions.", call. = FALSE)
       }
@@ -130,10 +131,10 @@ fit_np_panel <- function(optimization_result,
     }
 
     row_idx <- which(solutions_df$solution_id == solution_id)
-    selected_features <- solutions_df$features[[row_idx]]
+    selected_base_features <- solutions_df$base_features[[row_idx]]
     selected_solution_id <- solution_id
 
-    objective_cols <- setdiff(names(solutions_df), c("solution_id", "features"))
+    objective_cols <- setdiff(names(solutions_df), c("solution_id", "base_features", "features"))
     solution_metrics <- as.numeric(solutions_df[row_idx, objective_cols])
     names(solution_metrics) <- objective_cols
   }
@@ -162,15 +163,31 @@ fit_np_panel <- function(optimization_result,
     stop("Training data not available. Provide x and y arguments.", call. = FALSE)
   }
 
-  if (!all(selected_features %in% colnames(x_mat))) {
-    missing <- setdiff(selected_features, colnames(x_mat))
-    stop("Selected feature(s) not found in training data: ",
+  # Validate base features exist in training data
+  if (!all(selected_base_features %in% colnames(x_mat))) {
+    missing <- setdiff(selected_base_features, colnames(x_mat))
+    stop("Selected base feature(s) not found in training data: ",
       paste(missing, collapse = ", "),
       call. = FALSE
     )
   }
 
-  x_selected <- x_mat[, selected_features, drop = FALSE]
+  # Extract selected base features
+  x_base_selected <- x_mat[, selected_base_features, drop = FALSE]
+
+  # Apply feature transform (same pattern as fit_panel)
+  feature_transform <- optimization_result@control$feature_transform
+  if (is.null(feature_transform)) {
+    feature_transform <- "none"  # Backward compatibility
+  }
+
+  if (feature_transform != "none" && length(selected_base_features) >= 2L) {
+    x_selected <- .apply_feature_transform_single(x_base_selected, feature_transform)
+    selected_features <- colnames(x_selected)
+  } else {
+    x_selected <- x_base_selected
+    selected_features <- selected_base_features
+  }
 
   # Prepare labels for NP classification
   label_info <- .prepare_np_labels(truth, minimize_FPR)
@@ -297,6 +314,7 @@ fit_np_panel <- function(optimization_result,
   # Create TransferablePanelResult
   new(
     "TransferablePanelResult",
+    base_features = selected_base_features,
     features = selected_features,
     metrics = metrics,
     objectives = objective_df,
