@@ -1,24 +1,31 @@
 #' Optimize Biomarker Panels with Transferability Focus
 #'
-#' Wrapper implementing a train/validation/held-out split strategy with
-#' Neyman-Pearson threshold selection for cross-cohort generalizability.
-#' Unlike [optimize_panel()], this function partitions each cohort into
-#' three sets: training (for NSGA optimization), validation (for solution
-#' selection), and held-out (for NP threshold calibration and final metrics).
+#' Wrapper implementing a train/validation/held-out split strategy for
+#' cross-cohort generalizability. Partitions each cohort into training
+#' (for NSGA optimization), validation (for solution selection), and
+#' held-out (stored for downstream NP threshold calibration via
+#' [calibrate_panel()]).
+#'
+#' Uses base-feature-first selection: NSGA searches over base features
+#' (O(n) search space), then feature transforms (e.g., pairwise ratios) are
+#' applied on-the-fly during fitness evaluation.
 #'
 #' @param x List of matrix-like objects representing cohorts.
 #' @param y List of binary response vectors aligned with `x`.
 #' @param objectives Named list of objective descriptors as returned by
 #'   [define_objectives()].
-#' @param max_features Maximum number of biomarkers permitted in a panel.
+#' @param max_features Maximum number of base biomarkers permitted in a panel.
 #' @param feature_pool Optional subset of feature identifiers. If `NULL`,
 #'   `select_transferable_features()` is run on training data only.
 #' @param train_ratio Proportion of each cohort for training (default 0.7).
 #' @param val_ratio Proportion of each cohort for validation (default 0.2).
 #' @param np_alpha Type I error rate for Neyman-Pearson threshold (default 0.15).
+#'   Stored in the result for use by [calibrate_panel()].
 #' @param np_delta Tolerance for NP threshold selection (default 0.05).
-#' @param feature_transform Transformation applied to selected features (default
-#'   `"pairwise_ratios"`). See [feature_transform_registry()] for options.
+#'   Stored in the result for use by [calibrate_panel()].
+#' @param feature_transform Transformation applied to selected base features
+#'   on-the-fly during optimization (default `"pairwise_ratios"`). See
+#'   [feature_transform_registry()] for options.
 #' @param feature_alignment Strategy for aligning features across cohorts
 #'   (default `"intersection"`).
 #' @param constraints Optional list of constraint descriptors.
@@ -31,10 +38,13 @@
 #' @param regularized_alpha Elastic net mixing parameter (default 0.5).
 #' @param n_top_features Number of top features to select via
 #'   `select_transferable_features()` when `feature_pool` is NULL (default 50).
-#' @return A `TransferablePanelResult` with Pareto-optimal solutions, NP
-#'
-#'   threshold, per-cohort metrics, and weighted variance.
+#' @return An `OptimizationResult` containing Pareto-optimal solutions and
+#'   held-out data for downstream calibration. Use [summarize_solutions()] to
+#'   inspect solutions, [fit_panel()] to fit a model, [calibrate_panel()] for
+#'   NP threshold calibration, and [evaluate_panel()] for validation.
 #' @export
+#' @seealso [fit_panel()], [calibrate_panel()], [evaluate_panel()],
+#'   [summarize_solutions()]
 optimize_panel_transferable <- function(
   x, y,
   objectives = define_objectives(
@@ -88,33 +98,42 @@ optimize_panel_transferable <- function(
     message("Selected ", length(feature_pool), " features for optimization.")
   }
 
-  # 4. Prepare combined datasets with aggregation
+  # 4. Prepare combined datasets with NO transform (base features only)
   train_inputs <- .prepare_cohort_inputs(
     partitions$train_x, partitions$train_y,
     assay = assay,
-    transform = feature_transform,
+    transform = "none",
     feature_subset = feature_pool,
     feature_alignment = feature_alignment
   )
   val_inputs <- .prepare_cohort_inputs(
     partitions$val_x, partitions$val_y,
     assay = assay,
-    transform = feature_transform,
+    transform = "none",
     feature_subset = feature_pool,
     feature_alignment = feature_alignment
   )
   heldout_inputs <- .prepare_cohort_inputs(
     partitions$heldout_x, partitions$heldout_y,
     assay = assay,
-    transform = feature_transform,
+    transform = "none",
     feature_subset = feature_pool,
     feature_alignment = feature_alignment
   )
 
-  # Get aggregated feature names
-  agg_feature_pool <- colnames(train_inputs$x)
+  # Base feature pool (O(n) search space, not O(n^2))
+  base_feature_pool <- colnames(train_inputs$x)
 
-  # 5. Create validation-based fitness function
+  # Minimum base features required depends on transform and regularization
+  if (regularized && feature_transform %in% c("pairwise_ratios", "pairwise_log_ratios")) {
+    min_features_required <- 3L
+  } else if (regularized) {
+    min_features_required <- 2L
+  } else {
+    min_features_required <- 1L
+  }
+
+  # 5. Create validation-based fitness function (base-feature-first)
   fitness_fn <- .make_validation_fitness(
     train_x = train_inputs$x,
     train_y = train_inputs$truth,
@@ -122,16 +141,18 @@ optimize_panel_transferable <- function(
     val_x = val_inputs$x,
     val_y = val_inputs$truth,
     val_cohort = val_inputs$cohort,
-    feature_pool = agg_feature_pool,
+    feature_pool = base_feature_pool,
     max_features = max_features,
     objectives = objectives,
     constraints = constraints,
     regularized = regularized,
-    alpha = regularized_alpha
+    alpha = regularized_alpha,
+    feature_transform = feature_transform,
+    min_features_required = min_features_required
   )
 
   # 6. Get NSGA defaults and run optimization
-  decision_dim <- length(agg_feature_pool)
+  decision_dim <- length(base_feature_pool)
   nsga_defaults <- .get_adaptive_nsga_defaults(decision_dim, algorithm)
   nsga_args <- utils::modifyList(nsga_defaults, nsga_control)
 
@@ -159,14 +180,13 @@ optimize_panel_transferable <- function(
     nsga_result <- do.call(rmoo::nsga3, nsga_params)
   }
 
-  # 7. Select best solution from Pareto front
+  # 7. Extract Pareto front and build solutions
   optimal_idx <- which(nsga_result@front == 1)
   pareto_pop <- nsga_result@population[optimal_idx, , drop = FALSE]
   if (is.null(dim(pareto_pop))) {
     pareto_pop <- matrix(pareto_pop, nrow = 1)
   }
 
-  # Evaluate all Pareto solutions
   solutions <- lapply(seq_len(nrow(pareto_pop)), function(i) {
     decision_vec <- pareto_pop[i, ]
     fitness_fn$evaluate(decision_vec)
@@ -178,23 +198,22 @@ optimize_panel_transferable <- function(
   }
   solutions <- solutions[feasible_vec]
 
-  # Select primary solution based on first objective
   objective_directions <- vapply(objectives, `[[`, character(1), "direction")
   metric_matrix <- do.call(rbind, lapply(solutions, `[[`, "metrics"))
   colnames(metric_matrix) <- names(objectives)
 
-  primary_obj <- names(objectives)[1]
-  primary_dir <- objective_directions[[primary_obj]]
-  if (primary_dir == "maximize") {
-    primary_idx <- which.max(metric_matrix[, primary_obj])
-  } else {
-    primary_idx <- which.min(metric_matrix[, primary_obj])
+  # Build solutions data frame (all Pareto solutions)
+  solutions_df <- data.frame(
+    solution_id = seq_along(solutions),
+    stringsAsFactors = FALSE
+  )
+  solutions_df$base_features <- I(lapply(solutions, `[[`, "base_features"))
+  solutions_df$features <- I(lapply(solutions, `[[`, "features"))
+  for (obj_name in names(objectives)) {
+    solutions_df[[obj_name]] <- metric_matrix[, obj_name]
   }
 
-  primary_solution <- solutions[[primary_idx]]
-  selected_features <- primary_solution$features
-
-  # 8. Fit final model on train+val combined
+  # 8. Combine train + val raw base features for fit_panel()
   combined_x <- rbind(train_inputs$x, val_inputs$x)
   combined_y <- factor(
     c(as.character(train_inputs$truth), as.character(val_inputs$truth)),
@@ -205,91 +224,27 @@ optimize_panel_transferable <- function(
     levels = unique(c(levels(train_inputs$cohort), levels(val_inputs$cohort)))
   )
 
-  x_selected <- combined_x[, selected_features, drop = FALSE]
-  final_model <- .fit_final_model_regularized(
-    x_selected, combined_y, combined_cohort,
-    alpha = regularized_alpha
-  )
-
-  # 9. Compute scores on held-out data
-  heldout_x_selected <- heldout_inputs$x[, selected_features, drop = FALSE]
-  heldout_scores <- .predict_from_model(final_model, heldout_x_selected)
-
-  # 10. NP threshold selection on held-out data
-  np_result <- .select_np_threshold(
-    scores = heldout_scores,
-    truth = heldout_inputs$truth,
-    alpha = np_alpha,
-    delta = np_delta
-  )
-
-  # 11. Per-cohort metrics using NP threshold
-  per_cohort_df <- .compute_per_cohort_metrics(
-    scores = heldout_scores,
-    truth = heldout_inputs$truth,
-    cohort = heldout_inputs$cohort,
-    threshold = np_result$threshold
-  )
-
-  # 12. Weighted variance
-  weighted_var <- .compute_weighted_variance(per_cohort_df)
-
-  # Build objective data frame
-  objective_df <- do.call(rbind, lapply(seq_along(solutions), function(i) {
-    data.frame(
-      solution_id = i,
-      objective = names(objectives),
-      value = solutions[[i]]$metrics,
-      direction = objective_directions,
-      features = I(rep(list(solutions[[i]]$features), length(objectives))),
-      stringsAsFactors = FALSE
-    )
-  }))
-
-  # Validation metrics
-  validation_metrics <- list(
-    sensitivity = primary_solution$metrics["sensitivity"],
-    specificity = primary_solution$metrics["specificity"],
-    num_features = length(selected_features)
-  )
-
-  # Construct result
-  panel <- new(
-    "TransferablePanelResult",
-    features = selected_features,
-    metrics = setNames(as.numeric(primary_solution$metrics), names(objectives)),
-    objectives = objective_df,
-    control = list(
-      max_features = max_features,
-      feature_pool = agg_feature_pool,
-      base_feature_pool = feature_pool,
-      algorithm = algorithm,
-      nsga2 = nsga_args,
-      feature_transform = feature_transform,
-      feature_alignment = feature_alignment,
-      train_ratio = train_ratio,
-      val_ratio = val_ratio,
-      positive_class = "Yes",
-      response_levels = levels(train_inputs$truth),
-      seed = seed,
-      regularized = regularized,
-      regularized_alpha = regularized_alpha
-    ),
-    training_data = list(
-      n = nrow(combined_x),
-      p = ncol(combined_x),
-      class_balance = table(combined_y),
-      feature_pool_size = length(agg_feature_pool),
-      num_cohorts = length(partitions$cohort_names),
-      cohort_labels = partitions$cohort_names
-    ),
-    model = final_model,
-    np_threshold = np_result$threshold,
+  # Build control parameters
+  control <- list(
+    max_features = max_features,
+    feature_pool = base_feature_pool,
+    algorithm = algorithm,
+    nsga2 = nsga_args,
+    feature_transform = feature_transform,
+    feature_alignment = feature_alignment,
+    positive_class = "Yes",
+    response_levels = levels(train_inputs$truth),
+    seed = seed,
+    selection_threshold = 0.5,
+    regularized = regularized,
+    regularized_alpha = if (regularized) regularized_alpha else NULL,
+    objective_directions = objective_directions,
+    # Transferable-specific: held-out data for calibrate_panel()
+    heldout_x = heldout_inputs$x,
+    heldout_y = heldout_inputs$truth,
+    heldout_cohort = heldout_inputs$cohort,
     np_alpha = np_alpha,
     np_delta = np_delta,
-    per_cohort_metrics = per_cohort_df,
-    weighted_variance = weighted_var,
-    validation_metrics = validation_metrics,
     partition_info = list(
       train_ratio = train_ratio,
       val_ratio = val_ratio,
@@ -298,7 +253,24 @@ optimize_panel_transferable <- function(
     )
   )
 
-  panel
+  # Build training signature
+  training_signature <- list(
+    n = nrow(combined_x),
+    p = ncol(combined_x),
+    class_balance = table(combined_y),
+    feature_pool_size = length(base_feature_pool),
+    num_cohorts = length(partitions$cohort_names),
+    cohort_labels = partitions$cohort_names
+  )
+
+  new("OptimizationResult",
+      solutions = solutions_df,
+      feature_pool = base_feature_pool,
+      control = control,
+      training_signature = training_signature,
+      aggregated_x = combined_x,
+      aggregated_y = combined_y,
+      aggregated_cohort = combined_cohort)
 }
 
 
@@ -306,34 +278,42 @@ optimize_panel_transferable <- function(
 # Helper Functions
 # -----------------------------------------------------------------------------
 
-#' Create Validation-Based Fitness Function
+#' Create Validation-Based Fitness Function (Base-Feature-First)
 #'
-#' Factory that returns a fitness function for rmoo that trains on training
-#' data and evaluates objectives on validation data.
+#' Factory that returns a fitness function for rmoo that selects base features,
+#' applies feature transforms on-the-fly, trains on training data, and
+#' evaluates objectives on validation data.
 #'
-#' @param train_x Training feature matrix.
+#' @param train_x Training feature matrix (base features).
 #' @param train_y Training response factor.
 #' @param train_cohort Training cohort factor.
-#' @param val_x Validation feature matrix.
+#' @param val_x Validation feature matrix (base features).
 #' @param val_y Validation response factor.
 #' @param val_cohort Validation cohort factor.
-#' @param feature_pool Character vector of feature names.
-#' @param max_features Maximum features to include.
+#' @param feature_pool Character vector of base feature names.
+#' @param max_features Maximum base features to include.
 #' @param objectives Objective list from define_objectives().
 #' @param constraints Constraint list.
 #' @param regularized Whether to use regularized regression.
 #' @param alpha Elastic net mixing parameter.
+#' @param feature_transform Name of the feature transform to apply.
+#' @param min_features_required Minimum number of base features.
 #' @return List with `wrapper` (fitness for rmoo) and `evaluate` (full eval).
 #' @keywords internal
 .make_validation_fitness <- function(
   train_x, train_y, train_cohort,
   val_x, val_y, val_cohort,
   feature_pool, max_features, objectives, constraints,
-  regularized, alpha
+  regularized, alpha,
+  feature_transform = "none",
+  min_features_required = NULL
 ) {
   objective_directions <- vapply(objectives, `[[`, character(1), "direction")
   constraint_specs <- .normalize_constraints(constraints)
-  min_features_required <- if (regularized) 2L else 1L
+
+  if (is.null(min_features_required)) {
+    min_features_required <- if (regularized) 2L else 1L
+  }
 
   evaluate_candidate <- function(decision_vec) {
     feature_names_pool <- feature_pool
@@ -358,10 +338,22 @@ optimize_panel_transferable <- function(
     }
 
     selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
-    selected_features <- feature_names_pool[selected_idx]
+    selected_base_features <- feature_names_pool[selected_idx]
 
-    # Train model on training data
-    x_train_sel <- train_x[, selected_features, drop = FALSE]
+    # Extract base features from both sets
+    x_train_base <- train_x[, selected_base_features, drop = FALSE]
+    x_val_base <- val_x[, selected_base_features, drop = FALSE]
+
+    # Apply transform on-the-fly (mirrors optimize_panel.R)
+    if (feature_transform != "none" && ncol(x_train_base) >= 2L) {
+      x_train_sel <- .apply_feature_transform_single(x_train_base, feature_transform)
+      x_val_sel <- .apply_feature_transform_single(x_val_base, feature_transform)
+      selected_features <- colnames(x_train_sel)
+    } else {
+      x_train_sel <- x_train_base
+      x_val_sel <- x_val_base
+      selected_features <- selected_base_features
+    }
 
     tryCatch(
       {
@@ -375,10 +367,9 @@ optimize_panel_transferable <- function(
         }
 
         # Predict on validation data
-        x_val_sel <- val_x[, selected_features, drop = FALSE]
         val_scores <- .predict_from_model(fit, x_val_sel)
 
-        # Compute objectives on validation data
+        # Compute constraints on validation data
         constraint_results <- if (length(constraint_specs)) {
           setNames(vapply(seq_along(constraint_specs), function(j) {
             res <- constraint_specs[[j]]$fun(
@@ -407,6 +398,7 @@ optimize_panel_transferable <- function(
         }, numeric(1))
 
         list(
+          base_features = selected_base_features,
           features = selected_features,
           scores = val_scores,
           metrics = metrics,
@@ -416,25 +408,30 @@ optimize_panel_transferable <- function(
       },
       error = function(e) {
         list(
+          base_features = selected_base_features,
           features = selected_features,
           scores = rep(0.5, nrow(val_x)),
           metrics = setNames(rep(Inf, length(objectives)), names(objectives)),
           constraint_results = logical(0),
-          feasible = FALSE
+          feasible = length(constraint_specs) == 0L
         )
       }
     )
   }
 
+  # Large finite penalty instead of Inf -- NSGA-III normalization produces NaN
+  # from Inf values, causing "missing value where TRUE/FALSE needed" errors
+  .PENALTY <- 1e6
+
   evaluate_single <- function(decision_vec) {
     evaluated <- evaluate_candidate(decision_vec)
     if (length(constraint_specs) && !evaluated$feasible) {
-      return(rep(Inf, length(objectives)))
+      return(rep(.PENALTY, length(objectives)))
     }
     metrics <- evaluated$metrics
     converted <- mapply(function(val, dir) {
       if (is.na(val) || is.infinite(val)) {
-        return(Inf)
+        return(.PENALTY)
       }
       if (dir == "maximize") {
         return(-val)
@@ -456,4 +453,3 @@ optimize_panel_transferable <- function(
     evaluate = evaluate_candidate
   )
 }
-

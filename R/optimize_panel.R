@@ -436,22 +436,24 @@ optimize_panel <- function(x, y,
     )
   }
 
+  # Large finite penalty instead of Inf — NSGA-III normalization produces NaN
+  # from Inf values, causing "missing value where TRUE/FALSE needed" errors
+  .PENALTY <- 1e6
+
   # Evaluate a single decision vector and return converted objective values
   evaluate_single <- function(decision_vec) {
     evaluated <- evaluate_candidate(decision_vec)
     if (length(constraint_specs) && !evaluated$feasible) {
-      return(rep(Inf, length(objectives)))
+      return(rep(.PENALTY, length(objectives)))
     }
     metrics <- evaluated$metrics
     converted <- mapply(function(val, dir) {
       # Handle NA, Inf, and -Inf explicitly
       if (is.na(val)) {
-        return(Inf)  # Treat NA as infeasible
+        return(.PENALTY)  # Treat NA as infeasible
       }
       if (is.infinite(val)) {
-        # For infinite values, always return +Inf to indicate infeasibility
-        # This prevents issues with NSGA-II when mixing +Inf and -Inf
-        return(Inf)
+        return(.PENALTY)
       }
       if (dir == "maximize") {
         return(-val)

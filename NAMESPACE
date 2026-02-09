@@ -2,6 +2,7 @@
 
 export(analyze_feature_stability)
 export(build_objectives)
+export(calibrate_panel)
 export(compute_inclusion_frequencies)
 export(construct_dual_stream_ratios)
 export(define_objectives)

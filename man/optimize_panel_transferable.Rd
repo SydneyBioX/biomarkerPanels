@@ -35,7 +35,7 @@ optimize_panel_transferable(
 \item{objectives}{Named list of objective descriptors as returned by
 \code{\link[=define_objectives]{define_objectives()}}.}
 
-\item{max_features}{Maximum number of biomarkers permitted in a panel.}
+\item{max_features}{Maximum number of base biomarkers permitted in a panel.}
 
 \item{feature_pool}{Optional subset of feature identifiers. If \code{NULL},
 \code{select_transferable_features()} is run on training data only.}
@@ -44,12 +44,15 @@ optimize_panel_transferable(
 
 \item{val_ratio}{Proportion of each cohort for validation (default 0.2).}
 
-\item{np_alpha}{Type I error rate for Neyman-Pearson threshold (default 0.15).}
+\item{np_alpha}{Type I error rate for Neyman-Pearson threshold (default 0.15).
+Stored in the result for use by \code{\link[=calibrate_panel]{calibrate_panel()}}.}
 
-\item{np_delta}{Tolerance for NP threshold selection (default 0.05).}
+\item{np_delta}{Tolerance for NP threshold selection (default 0.05).
+Stored in the result for use by \code{\link[=calibrate_panel]{calibrate_panel()}}.}
 
-\item{feature_transform}{Transformation applied to selected features (default
-\code{"pairwise_ratios"}). See \code{\link[=feature_transform_registry]{feature_transform_registry()}} for options.}
+\item{feature_transform}{Transformation applied to selected base features
+on-the-fly during optimization (default \code{"pairwise_ratios"}). See
+\code{\link[=feature_transform_registry]{feature_transform_registry()}} for options.}
 
 \item{feature_alignment}{Strategy for aligning features across cohorts
 (default \code{"intersection"}).}
@@ -73,14 +76,24 @@ optimize_panel_transferable(
 \code{select_transferable_features()} when \code{feature_pool} is NULL (default 50).}
 }
 \value{
-A \code{TransferablePanelResult} with Pareto-optimal solutions, NP
-
-threshold, per-cohort metrics, and weighted variance.
+An \code{OptimizationResult} containing Pareto-optimal solutions and
+held-out data for downstream calibration. Use \code{\link[=summarize_solutions]{summarize_solutions()}} to
+inspect solutions, \code{\link[=fit_panel]{fit_panel()}} to fit a model, \code{\link[=calibrate_panel]{calibrate_panel()}} for
+NP threshold calibration, and \code{\link[=evaluate_panel]{evaluate_panel()}} for validation.
 }
 \description{
-Wrapper implementing a train/validation/held-out split strategy with
-Neyman-Pearson threshold selection for cross-cohort generalizability.
-Unlike \code{\link[=optimize_panel]{optimize_panel()}}, this function partitions each cohort into
-three sets: training (for NSGA optimization), validation (for solution
-selection), and held-out (for NP threshold calibration and final metrics).
+Wrapper implementing a train/validation/held-out split strategy for
+cross-cohort generalizability. Partitions each cohort into training
+(for NSGA optimization), validation (for solution selection), and
+held-out (stored for downstream NP threshold calibration via
+\code{\link[=calibrate_panel]{calibrate_panel()}}).
+}
+\details{
+Uses base-feature-first selection: NSGA searches over base features
+(O(n) search space), then feature transforms (e.g., pairwise ratios) are
+applied on-the-fly during fitness evaluation.
+}
+\seealso{
+\code{\link[=fit_panel]{fit_panel()}}, \code{\link[=calibrate_panel]{calibrate_panel()}}, \code{\link[=evaluate_panel]{evaluate_panel()}},
+\code{\link[=summarize_solutions]{summarize_solutions()}}
 }

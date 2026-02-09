@@ -172,7 +172,7 @@ test_that("NP threshold fallback works without nproc", {
 # Slow tests (full optimization pipeline)
 # -----------------------------------------------------------------------------
 
-test_that("optimize_panel_transferable returns TransferablePanelResult", {
+test_that("optimize_panel_transferable returns OptimizationResult", {
   skip_slow_tests()
   set.seed(789)
 
@@ -193,39 +193,38 @@ test_that("optimize_panel_transferable returns TransferablePanelResult", {
     n_top_features = 15
   )
 
-  expect_s4_class(result, "TransferablePanelResult")
-  expect_s4_class(result, "BiomarkerPanelResult")
+  expect_s4_class(result, "OptimizationResult")
 
-  # Check that it has the extended slots
-  expect_true(length(result@np_threshold) == 1)
-  expect_true(result@np_threshold >= 0 && result@np_threshold <= 1)
-  expect_equal(result@np_alpha, 0.15)
-  expect_equal(result@np_delta, 0.05)
+  # Check solutions data frame has expected columns
+  sols <- solutions(result)
+  expect_true("base_features" %in% names(sols))
+  expect_true("features" %in% names(sols))
+  expect_true("solution_id" %in% names(sols))
+  expect_true(nrow(sols) >= 1)
 
-  # Check per-cohort metrics
-  pcm <- per_cohort_metrics(result)
-  expect_s3_class(pcm, "data.frame")
-  expect_equal(nrow(pcm), 3)  # 3 cohorts
-  expect_true(all(c("cohort", "sensitivity", "specificity") %in% names(pcm)))
+  # Check held-out data is stored in control
+  expect_true(!is.null(result@control$heldout_x))
+  expect_true(!is.null(result@control$heldout_y))
+  expect_true(!is.null(result@control$heldout_cohort))
+  expect_equal(result@control$np_alpha, 0.15)
+  expect_equal(result@control$np_delta, 0.05)
 
-  # Check weighted variance
-  wv <- weighted_variance(result)
-  expect_true(is.list(wv))
-  expect_named(wv, c("sensitivity", "specificity"))
+  # Check partition info is stored
+  pi <- result@control$partition_info
+  expect_equal(pi$train_ratio, 0.7)
+  expect_equal(pi$val_ratio, 0.2)
 
-  # Check partition info
-  expect_true("partition_info" %in% slotNames(result))
-  expect_equal(result@partition_info$train_ratio, 0.7)
-  expect_equal(result@partition_info$val_ratio, 0.2)
+  # fit_panel() works on the result
+  panel <- fit_panel(result)
+  expect_s4_class(panel, "BiomarkerPanelResult")
+  expect_true(length(panel@base_features) >= 1)
+  expect_true(length(panel@features) >= 1)
 })
 
-test_that("feature selection uses training data only (no leakage)",
-{
+test_that("feature selection uses training data only (no leakage)", {
   skip_slow_tests()
   set.seed(101)
 
-  # Create data where held-out has different feature names to catch leakage
-  # (This is a conceptual test - in practice we verify via the partition structure)
   sim <- simulate_expression_data(p = 25, n = 50, k = 2, seed = 42)
 
   # Run with automatic feature selection (feature_pool = NULL)
@@ -241,23 +240,26 @@ test_that("feature selection uses training data only (no leakage)",
     seed = 42
   )
 
-  expect_s4_class(result, "TransferablePanelResult")
-  expect_true(length(result@features) <= 3)
+  expect_s4_class(result, "OptimizationResult")
+
+  # Fit panel and check feature count
+  panel <- fit_panel(result)
+  expect_true(length(panel@base_features) <= 3)
 
   # Verify partition_info shows expected split proportions
-  pi <- result@partition_info
+  pi <- result@control$partition_info
   expect_equal(pi$train_ratio, 0.7)
   expect_equal(pi$val_ratio, 0.2)
   expect_equal(pi$heldout_ratio, 0.1)
 })
 
-test_that("NP threshold is in valid range", {
+test_that("full pipeline: optimize -> fit -> calibrate -> evaluate", {
   skip_slow_tests()
   set.seed(202)
 
   sim <- simulate_expression_data(p = 20, n = 50, k = 2, seed = 42)
 
-  result <- optimize_panel_transferable(
+  opt <- optimize_panel_transferable(
     x = sim$x_list,
     y = sim$y_list,
     max_features = 3,
@@ -270,9 +272,52 @@ test_that("NP threshold is in valid range", {
     n_top_features = 8
   )
 
-  threshold <- np_threshold(result)
+  expect_s4_class(opt, "OptimizationResult")
+
+  # Fit panel
+  panel <- fit_panel(opt)
+  expect_s4_class(panel, "BiomarkerPanelResult")
+
+  # Calibrate with held-out data
+  calibrated <- calibrate_panel(
+    panel,
+    x_heldout = opt@control$heldout_x,
+    y_heldout = opt@control$heldout_y,
+    cohort_heldout = opt@control$heldout_cohort,
+    np_alpha = opt@control$np_alpha,
+    np_delta = opt@control$np_delta
+  )
+
+  expect_s4_class(calibrated, "TransferablePanelResult")
+  expect_s4_class(calibrated, "BiomarkerPanelResult")
+
+  # NP threshold should be valid
+  threshold <- np_threshold(calibrated)
   expect_true(threshold >= 0 && threshold <= 1,
               info = sprintf("NP threshold %.3f outside [0,1]", threshold))
+
+  # Per-cohort metrics populated
+  pcm <- per_cohort_metrics(calibrated)
+  expect_s3_class(pcm, "data.frame")
+  expect_equal(nrow(pcm), 2)  # 2 cohorts
+  expect_true(all(c("cohort", "sensitivity", "specificity") %in% names(pcm)))
+
+  # Weighted variance
+  wv <- weighted_variance(calibrated)
+  expect_true(is.list(wv))
+  expect_named(wv, c("sensitivity", "specificity"))
+
+  # Evaluate on new data
+  sim_new <- simulate_expression_data(p = 20, n = 30, k = 1, seed = 99)
+  eval_result <- evaluate_panel(
+    calibrated,
+    x = sim_new$x_list[[1]],
+    y = sim_new$y_list[[1]],
+    feature_transform = "none"
+  )
+
+  expect_true(is.list(eval_result))
+  expect_true("metrics" %in% names(eval_result))
 })
 
 test_that("per-cohort metrics are populated for all cohorts", {
@@ -282,7 +327,7 @@ test_that("per-cohort metrics are populated for all cohorts", {
   n_cohorts <- 4
   sim <- simulate_expression_data(p = 20, n = 40, k = n_cohorts, seed = 42)
 
-  result <- optimize_panel_transferable(
+  opt <- optimize_panel_transferable(
     x = sim$x_list,
     y = sim$y_list,
     max_features = 3,
@@ -293,20 +338,26 @@ test_that("per-cohort metrics are populated for all cohorts", {
     n_top_features = 8
   )
 
-  pcm <- per_cohort_metrics(result)
-  expect_equal(nrow(pcm), n_cohorts)
+  panel <- fit_panel(opt)
+  calibrated <- calibrate_panel(
+    panel,
+    x_heldout = opt@control$heldout_x,
+    y_heldout = opt@control$heldout_y,
+    cohort_heldout = opt@control$heldout_cohort
+  )
 
-  # All cohorts should have computed metrics (might be NA for tiny partitions)
+  pcm <- per_cohort_metrics(calibrated)
+  expect_equal(nrow(pcm), n_cohorts)
   expect_true(all(pcm$n > 0))
 })
 
-test_that("evaluate_panel works with TransferablePanelResult", {
+test_that("evaluate_panel works with calibrated TransferablePanelResult", {
   skip_slow_tests()
   set.seed(404)
 
   sim <- simulate_expression_data(p = 20, n = 50, k = 2, seed = 42)
 
-  result <- optimize_panel_transferable(
+  opt <- optimize_panel_transferable(
     x = sim$x_list,
     y = sim$y_list,
     max_features = 3,
@@ -317,31 +368,35 @@ test_that("evaluate_panel works with TransferablePanelResult", {
     n_top_features = 8
   )
 
+  panel <- fit_panel(opt)
+  calibrated <- calibrate_panel(
+    panel,
+    x_heldout = opt@control$heldout_x,
+    y_heldout = opt@control$heldout_y,
+    cohort_heldout = opt@control$heldout_cohort
+  )
+
   # Create new validation data
   sim_new <- simulate_expression_data(p = 20, n = 30, k = 1, seed = 99)
 
-  # evaluate_panel should work with the inherited structure
-  # (This tests backward compatibility)
   eval_result <- evaluate_panel(
-    result,
+    calibrated,
     x = sim_new$x_list[[1]],
     y = sim_new$y_list[[1]],
     feature_transform = "none"
   )
 
   expect_true(is.list(eval_result))
-  expect_true("sensitivity" %in% names(eval_result) ||
-                "metrics" %in% names(eval_result))
+  expect_true("metrics" %in% names(eval_result))
 })
 
 test_that("single cohort is handled gracefully", {
   skip_slow_tests()
   set.seed(505)
 
-  # Single cohort case
   sim <- simulate_expression_data(p = 20, n = 60, k = 1, seed = 42)
 
-  result <- optimize_panel_transferable(
+  opt <- optimize_panel_transferable(
     x = sim$x_list,
     y = sim$y_list,
     max_features = 3,
@@ -352,15 +407,25 @@ test_that("single cohort is handled gracefully", {
     n_top_features = 8
   )
 
-  expect_s4_class(result, "TransferablePanelResult")
+  expect_s4_class(opt, "OptimizationResult")
+
+  panel <- fit_panel(opt)
+  calibrated <- calibrate_panel(
+    panel,
+    x_heldout = opt@control$heldout_x,
+    y_heldout = opt@control$heldout_y,
+    cohort_heldout = opt@control$heldout_cohort
+  )
+
+  expect_s4_class(calibrated, "TransferablePanelResult")
 
   # Single cohort: weighted variance should be 0
-  wv <- weighted_variance(result)
+  wv <- weighted_variance(calibrated)
   expect_equal(wv$sensitivity, 0)
   expect_equal(wv$specificity, 0)
 
   # Per-cohort metrics should have 1 row
-  expect_equal(nrow(per_cohort_metrics(result)), 1)
+  expect_equal(nrow(per_cohort_metrics(calibrated)), 1)
 })
 
 test_that("invalid ratios are rejected by optimize_panel_transferable", {
@@ -409,5 +474,13 @@ test_that("warning for small partitions during stratified split", {
   expect_warning(
     .stratified_partition_cohorts(x_list, y_list, train_ratio = 0.7, val_ratio = 0.2),
     "few samples"
+  )
+})
+
+test_that("calibrate_panel validates inputs", {
+  # Should error on non-BiomarkerPanelResult input
+  expect_error(
+    calibrate_panel("not_a_panel", matrix(1:4, 2, 2), factor(c("No", "Yes"))),
+    "BiomarkerPanelResult"
   )
 })

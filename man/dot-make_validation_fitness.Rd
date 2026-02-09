@@ -2,7 +2,7 @@
 % Please edit documentation in R/optimize_panel_transferable.R
 \name{.make_validation_fitness}
 \alias{.make_validation_fitness}
-\title{Create Validation-Based Fitness Function}
+\title{Create Validation-Based Fitness Function (Base-Feature-First)}
 \usage{
 .make_validation_fitness(
   train_x,
@@ -16,25 +16,27 @@
   objectives,
   constraints,
   regularized,
-  alpha
+  alpha,
+  feature_transform = "none",
+  min_features_required = NULL
 )
 }
 \arguments{
-\item{train_x}{Training feature matrix.}
+\item{train_x}{Training feature matrix (base features).}
 
 \item{train_y}{Training response factor.}
 
 \item{train_cohort}{Training cohort factor.}
 
-\item{val_x}{Validation feature matrix.}
+\item{val_x}{Validation feature matrix (base features).}
 
 \item{val_y}{Validation response factor.}
 
 \item{val_cohort}{Validation cohort factor.}
 
-\item{feature_pool}{Character vector of feature names.}
+\item{feature_pool}{Character vector of base feature names.}
 
-\item{max_features}{Maximum features to include.}
+\item{max_features}{Maximum base features to include.}
 
 \item{objectives}{Objective list from define_objectives().}
 
@@ -43,12 +45,17 @@
 \item{regularized}{Whether to use regularized regression.}
 
 \item{alpha}{Elastic net mixing parameter.}
+
+\item{feature_transform}{Name of the feature transform to apply.}
+
+\item{min_features_required}{Minimum number of base features.}
 }
 \value{
 List with \code{wrapper} (fitness for rmoo) and \code{evaluate} (full eval).
 }
 \description{
-Factory that returns a fitness function for rmoo that trains on training
-data and evaluates objectives on validation data.
+Factory that returns a fitness function for rmoo that selects base features,
+applies feature transforms on-the-fly, trains on training data, and
+evaluates objectives on validation data.
 }
 \keyword{internal}

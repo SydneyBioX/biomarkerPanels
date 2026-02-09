@@ -178,6 +178,109 @@ NULL
   )
 }
 
+#' Calibrate a Panel with Neyman-Pearson Threshold
+#'
+#' Performs NP threshold calibration on a fitted panel using held-out data,
+#' computing per-cohort metrics and weighted variance for transferability
+#' assessment. Returns a `TransferablePanelResult` extending the input panel.
+#'
+#' @param panel A `BiomarkerPanelResult` from [fit_panel()].
+#' @param x_heldout Held-out feature matrix (raw base features).
+#' @param y_heldout Held-out response vector (factor with levels `"No"`, `"Yes"`).
+#' @param cohort_heldout Optional cohort factor for held-out samples.
+#' @param np_alpha Type I error rate for NP threshold (default 0.15).
+#' @param np_delta Tolerance parameter (default 0.05).
+#' @return A `TransferablePanelResult` with NP threshold, per-cohort metrics,
+#'   and weighted variance.
+#' @export
+#' @seealso [fit_panel()], [optimize_panel_transferable()], [evaluate_panel()]
+calibrate_panel <- function(panel, x_heldout, y_heldout,
+                            cohort_heldout = NULL,
+                            np_alpha = 0.15, np_delta = 0.05) {
+  if (!inherits(panel, "BiomarkerPanelResult")) {
+    stop("`panel` must be a BiomarkerPanelResult from fit_panel().", call. = FALSE)
+  }
+
+  # Get base features and feature transform from panel
+  base_features <- panel@base_features
+  if (is.null(base_features) || length(base_features) == 0L) {
+    base_features <- panel@features
+  }
+  feature_transform <- panel@control$feature_transform
+  if (is.null(feature_transform)) feature_transform <- "none"
+
+  # Prepare held-out matrix
+  x_ho <- as.matrix(x_heldout)
+  if (!all(base_features %in% colnames(x_ho))) {
+    missing <- setdiff(base_features, colnames(x_ho))
+    stop("Base feature(s) not found in held-out data: ",
+         paste(missing, collapse = ", "), call. = FALSE)
+  }
+  x_base <- x_ho[, base_features, drop = FALSE]
+
+  # Apply feature transform
+  if (feature_transform != "none" && length(base_features) >= 2L) {
+    x_selected <- .apply_feature_transform_single(x_base, feature_transform)
+  } else {
+    x_selected <- x_base
+  }
+
+  # Ensure response is properly formatted
+  y_ho <- ensure_binary_response(y_heldout)
+
+  # Set up cohort factor
+  if (is.null(cohort_heldout)) {
+    cohort_ho <- factor(rep("cohort_01", nrow(x_ho)), levels = "cohort_01")
+  } else {
+    cohort_ho <- factor(cohort_heldout)
+  }
+
+  # Generate predictions using stored model
+  heldout_scores <- .predict_from_model(panel@model, x_selected)
+
+  # NP threshold selection
+  np_result <- .select_np_threshold(
+    scores = heldout_scores,
+    truth = y_ho,
+    alpha = np_alpha,
+    delta = np_delta
+  )
+
+  # Per-cohort metrics
+  per_cohort_df <- .compute_per_cohort_metrics(
+    scores = heldout_scores,
+    truth = y_ho,
+    cohort = cohort_ho,
+    threshold = np_result$threshold
+  )
+
+  # Weighted variance
+  weighted_var <- .compute_weighted_variance(per_cohort_df)
+
+  # Construct TransferablePanelResult inheriting from panel
+  new(
+    "TransferablePanelResult",
+    base_features = panel@base_features,
+    features = panel@features,
+    metrics = panel@metrics,
+    objectives = panel@objectives,
+    control = panel@control,
+    training_data = panel@training_data,
+    model = panel@model,
+    np_threshold = np_result$threshold,
+    np_alpha = np_alpha,
+    np_delta = np_delta,
+    per_cohort_metrics = per_cohort_df,
+    weighted_variance = weighted_var,
+    validation_metrics = list(),
+    partition_info = if (!is.null(panel@control$partition_info)) {
+      panel@control$partition_info
+    } else {
+      list()
+    }
+  )
+}
+
 #' Predict from Fitted Model
 #'
 #' Internal helper to get predictions from either glmnet or glm model.
