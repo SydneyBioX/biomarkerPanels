@@ -13,13 +13,18 @@ test_that("plot_pareto_front rejects non-OptimizationResult input", {
 # Build once, reuse across tests. Uses simulate_expression_data() from helper.
 
 .make_pareto_fixture <- function() {
-  sim <- simulate_expression_data(p = 200L, n = 50L, k = 3L, seed = 42L)
-  x_train <- sim$x_list[1:2]
-  y_train <- sim$y_list[1:2]
-  x_test  <- sim$x_list[[3]]
-  y_test  <- sim$y_list[[3]]
+  sim <- simulate_expression_data(p = 200L, n = 60L, k = 2L, seed = 42L)
+  # Use single matrix (no cohort dummies) so held-out eval works cleanly
+  x_all <- sim$x_list[[1]]
+  y_all <- sim$y_list[[1]]
+  n <- nrow(x_all)
+  train_idx <- seq_len(floor(n * 0.7))
+  x_train <- x_all[train_idx, , drop = FALSE]
+  y_train <- y_all[train_idx]
+  x_test  <- x_all[-train_idx, , drop = FALSE]
+  y_test  <- y_all[-train_idx]
 
-  top_feats <- get_top_de_features(x_train, y_train, n_features = 30)
+  top_feats <- get_top_de_features(list(x_train), list(y_train), n_features = 30)
   objectives <- define_objectives(
     losses = c("num_features", "sensitivity", "specificity")
   )
