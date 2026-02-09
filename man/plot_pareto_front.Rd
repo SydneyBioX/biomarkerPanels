@@ -2,18 +2,93 @@
 % Please edit documentation in R/visualization.R
 \name{plot_pareto_front}
 \alias{plot_pareto_front}
-\title{Plot Pareto Fronts}
+\title{Plot Pareto Front on Held-Out Data}
 \usage{
-plot_pareto_front(results, xlab = "Objective X", ylab = "Objective Y")
+plot_pareto_front(
+  optimization_result,
+  x,
+  y,
+  x_metric = "sensitivity",
+  y_metric = "specificity",
+  color_by = "n_features",
+  point_size = 4,
+  point_alpha = 0.7,
+  viridis_option = "plasma",
+  connect = FALSE,
+  title = NULL,
+  xlab = NULL,
+  ylab = NULL,
+  color_label = NULL,
+  regularized = TRUE,
+  on_error = c("warn", "stop"),
+  verbose = interactive(),
+  ...
+)
 }
 \arguments{
-\item{results}{Data frame with columns \code{objective_x}, \code{objective_y}, \code{label}.}
+\item{optimization_result}{An \code{OptimizationResult} from \code{\link[=optimize_panel]{optimize_panel()}}.}
 
-\item{xlab, ylab}{Axis labels.}
+\item{x}{Held-out validation data: a matrix, data.frame,
+\code{SummarizedExperiment}, or list of such objects.}
+
+\item{y}{Held-out validation labels: a factor (or list of factors when \code{x}
+is a list).}
+
+\item{x_metric}{Character; metric name for the x-axis. Default
+\code{"sensitivity"}.}
+
+\item{y_metric}{Character; metric name for the y-axis. Default
+\code{"specificity"}.}
+
+\item{color_by}{Character or \code{NULL}; metric name (or \code{"n_features"} /
+\code{"n_base_features"}) for point colour. \code{NULL} disables colour mapping.
+Default \code{"n_features"}.}
+
+\item{point_size}{Numeric; point size passed to \code{\link[ggplot2:geom_point]{ggplot2::geom_point()}}.
+Default \code{4}.}
+
+\item{point_alpha}{Numeric; point transparency. Default \code{0.7}.}
+
+\item{viridis_option}{Character; viridis palette name. Default \code{"plasma"}.}
+
+\item{connect}{Logical; if \code{TRUE}, connect points with a grey line sorted
+by \code{x_metric}. Default \code{FALSE}.}
+
+\item{title}{Character or \code{NULL}; plot title. Auto-generated when \code{NULL}.}
+
+\item{xlab, ylab}{Character or \code{NULL}; axis labels. Default to metric names.}
+
+\item{color_label}{Character or \code{NULL}; colour legend title. Defaults to
+\code{color_by}.}
+
+\item{regularized}{Logical; passed to \code{\link[=fit_panel]{fit_panel()}}. Default \code{TRUE}.}
+
+\item{on_error}{One of \code{"warn"} (skip failed solutions with a warning) or
+\code{"stop"} (abort on first failure). Default \code{"warn"}.}
+
+\item{verbose}{Logical; print progress messages. Default
+\code{interactive()}.}
+
+\item{...}{Additional arguments passed to \code{\link[=evaluate_panel]{evaluate_panel()}}.}
 }
 \value{
-A \code{ggplot} object.
+A \code{ggplot} object. The underlying metrics data frame is accessible
+via \verb{$data}.
 }
 \description{
-Visualize trade-offs between two objectives for candidate biomarker panels.
+Fits and evaluates every Pareto-optimal solution from \code{\link[=optimize_panel]{optimize_panel()}} on
+held-out validation data and displays the trade-off between two metrics as a
+scatter plot. The underlying data frame is accessible via \verb{$data} on the
+returned ggplot object.
+}
+\examples{
+\dontrun{
+opt <- optimize_panel(x_train, y_train, objectives = define_objectives())
+p <- plot_pareto_front(opt, x_test, y_test)
+p          # display plot
+p$data     # access metrics data.frame
+}
+}
+\seealso{
+\code{\link[=optimize_panel]{optimize_panel()}}, \code{\link[=fit_panel]{fit_panel()}}, \code{\link[=evaluate_panel]{evaluate_panel()}}
 }

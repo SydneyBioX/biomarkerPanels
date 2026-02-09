@@ -44,7 +44,7 @@ summarize_solutions <- function(optimization_result) {
   n_features <- vapply(solutions_df$features, length, integer(1))
 
   # Get objective columns (everything except solution_id and features)
-  objective_cols <- setdiff(names(solutions_df), c("solution_id", "features"))
+  objective_cols <- setdiff(names(solutions_df), c("solution_id", "features", "base_features"))
 
   # Build result data frame
   result <- data.frame(
