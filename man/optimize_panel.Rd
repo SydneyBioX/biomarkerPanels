@@ -11,19 +11,19 @@ optimize_panel(
     "num_features")),
   max_features = 5L,
   feature_pool = NULL,
-  cohort_aggregator = "pairwise_ratios",
+  feature_transform = "pairwise_ratios",
   feature_alignment = "intersection",
   constraints = list(),
   scoring_fn = NULL,
+  algorithm = c("NSGA-II", "NSGA-III"),
   nsga_control = list(),
   assay = NULL,
   seed = NULL,
   fitness_cv = TRUE,
   fitness_cv_folds = 5L,
-  final_model_cv = FALSE,
-  cv_folds = 5L,
   regularized = TRUE,
-  regularized_alpha = 0.5
+  regularized_alpha = 0.5,
+  selection_threshold = "adaptive"
 )
 }
 \arguments{
@@ -36,22 +36,26 @@ experiments representing one or more cohorts.}
 \item{objectives}{Named list of objective descriptors as returned by
 \code{\link[=define_objectives]{define_objectives()}}.}
 
-\item{max_features}{Maximum number of biomarkers permitted in a panel.}
+\item{max_features}{Maximum number of biomarkers permitted in a panel. Acts
+as an upper bound; actual panel size varies based on how many features have
+weight > 0.5 in the decision vector. Minimum is 2 features when
+\code{regularized = TRUE} (glmnet requirement), or 1 when \code{regularized = FALSE}.}
 
-\item{feature_pool}{Optional subset of feature identifiers (names or integer
-indices) considered during optimization. When a cohort aggregator is used,
-specify the underlying (pre-aggregation) feature names; aggregated labels
-such as \code{"A--B"} are also accepted and will be mapped back to their
-constituents. Defaults to all features.}
+\item{feature_pool}{Optional subset of base feature identifiers (names or
+integer indices) to consider during optimization. These are the original
+feature names before any transformation. When using pairwise transforms,
+transformed labels like \code{"A--B"} are also accepted and will be mapped
+back to their constituent base features. Defaults to all features.}
 
-\item{cohort_aggregator}{Transformation applied to cohort feature matrices
-prior to alignment. Defaults to \code{"pairwise_ratios"}, which generates
-pairwise within-cohort contrasts via \code{\link[=pairwise_col_diff]{pairwise_col_diff()}} to dampen
-distributional shifts across sites. Other built-in options include
-\code{"pairwise_log_ratios"} (log-ratios for compositional data),
-\code{"reference_norm"} (normalize relative to a reference feature), and
-\code{"none"} (no transformation). Use \code{\link[=register_aggregator]{register_aggregator()}} to add custom
-strategies. See \code{\link[=aggregator_registry]{aggregator_registry()}} for available options.}
+\item{feature_transform}{Transformation applied to selected features
+after base feature selection. The NSGA algorithm selects base features,
+then this transform is applied on-the-fly. Defaults to \code{"pairwise_ratios"},
+which generates pairwise contrasts via \code{\link[=pairwise_col_diff]{pairwise_col_diff()}} to dampen
+batch effects. Other options include \code{"pairwise_log_ratios"} (log-ratios
+for compositional data), \code{"reference_norm"} (normalize relative to a
+reference feature), and \code{"none"} (no transformation). Use
+\code{\link[=register_feature_transform]{register_feature_transform()}} to add custom strategies. See
+\code{\link[=feature_transform_registry]{feature_transform_registry()}} for available options.}
 
 \item{feature_alignment}{Strategy for aligning features across cohorts:
 \describe{
@@ -71,8 +75,16 @@ solution to be considered feasible.}
 features. Signature:
 \verb{function(x_selected, selected_features, truth, cohort = NULL, ...)}.}
 
-\item{nsga_control}{Named list of arguments passed to \code{\link[mco:nsga2]{mco::nsga2()}}. Defaults
-to \code{list(popsize = 64, generations = 60, cprob = 0.7, cdist = 5, mprob = 0.2, mdist = 10)}.}
+\item{algorithm}{Multi-objective optimization algorithm. \code{"NSGA-II"} (default)
+uses crowding distance for diversity preservation. \code{"NSGA-III"} uses
+reference-point-based selection for many-objective problems but has a bug
+in rmoo 0.3.0 (use NSGA-II as workaround).}
+
+\item{nsga_control}{Named list of arguments passed to \code{\link[rmoo:nsga2]{rmoo::nsga2()}} (or
+\code{\link[rmoo:nsga3]{rmoo::nsga3()}}). For NSGA-III, \code{n_partitions} controls reference point
+density (default computed from number of objectives). Defaults to adaptive
+values based on feature pool size. Note: \code{parallel = TRUE} is not recommended
+as it is slower than sequential execution due to overhead.}
 
 \item{assay}{For \code{SummarizedExperiment} inputs, assay name or index to use.}
 
@@ -90,14 +102,6 @@ regularized methods like Lasso.}
 \item{fitness_cv_folds}{Number of cross-validation folds for fitness
 evaluation when \code{fitness_cv = TRUE}. Default is 5.}
 
-\item{final_model_cv}{Logical; if \code{TRUE}, use nested cross-validation when
-fitting the final model to reduce training data contamination. The final
-model coefficients are averaged across CV folds. Default is \code{FALSE} for
-backward compatibility.}
-
-\item{cv_folds}{Number of cross-validation folds when \code{final_model_cv = TRUE}.
-Default is 5.}
-
 \item{regularized}{Logical; if \code{TRUE} (default), use regularized regression
 (elastic net via glmnet) for scoring candidates during optimization. This
 typically produces more stable fitness estimates and better out-of-sample
@@ -106,18 +110,31 @@ performance compared to unregularized logistic regression.}
 \item{regularized_alpha}{Elastic net mixing parameter when \code{regularized = TRUE}.
 \code{alpha = 1} is lasso, \code{alpha = 0} is ridge, and values in between give
 elastic net. Default is 0.5 (elastic net).}
+
+\item{selection_threshold}{Either a fixed numeric threshold in (0,1) for
+feature selection, or \code{"adaptive"} (default) to use gap-based selection
+that allows variable panel sizes in the Pareto front. Fixed thresholds
+(e.g., 0.5) tend to produce panels at \code{max_features} because more features
+improve accuracy. Adaptive selection finds natural breakpoints in the
+weight distribution, enabling the \code{num_features} objective to drive panel
+size diversity.}
 }
 \value{
-A \code{BiomarkerPanelResult} with Pareto-optimal solutions summarised in
-the \code{objectives} slot.
+An \code{OptimizationResult} containing the Pareto-optimal solutions.
+Use \code{\link[=summarize_solutions]{summarize_solutions()}} to inspect solutions and \code{\link[=fit_panel]{fit_panel()}} to
+fit a model on a selected solution.
 }
 \description{
-Wrapper around \code{\link[mco:nsga2]{mco::nsga2()}} that composes registered loss functions into a
-multi-objective search for compact biomarker panels. Candidate solutions are
-represented as weights over a feature pool; the top \code{max_features} features
-define a panel whose performance is evaluated via the selected losses.
-Inputs may be a single cohort (\code{matrix}, \code{data.frame}, or
-\code{SummarizedExperiment}) or multiple cohorts supplied as lists of such objects.
-Optimisation should be run on training data only---use \code{\link[=evaluate_panel]{evaluate_panel()}} for
-held-out validation.
+Wrapper around \code{\link[rmoo:nsga2]{rmoo::nsga2()}} (or \code{\link[rmoo:nsga3]{rmoo::nsga3()}}) that composes registered
+loss functions into a multi-objective search for compact biomarker panels.
+Candidate solutions are represented as weights over a feature pool; features
+with weight > 0.5 are included in the panel (up to \code{max_features}). This
+threshold-based selection allows variable panel sizes, making the
+\code{num_features} objective meaningful. Inputs may be a single cohort (\code{matrix},
+\code{data.frame}, or \code{SummarizedExperiment}) or multiple cohorts supplied as
+lists of such objects. Optimisation should be run on training data only---use
+\code{\link[=evaluate_panel]{evaluate_panel()}} for held-out validation.
+}
+\seealso{
+\code{\link[=fit_panel]{fit_panel()}}, \code{\link[=summarize_solutions]{summarize_solutions()}}, \code{\link[=evaluate_panel]{evaluate_panel()}}
 }

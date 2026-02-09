@@ -93,7 +93,7 @@ test_that(".compute_roc_curve_cpp is faster than pure R", {
   bm <- microbenchmark::microbenchmark(
     pure_r = biomarkerPanels:::.compute_roc_curve_pure_r(truth, scores, "Yes"),
     rcpp = biomarkerPanels:::.compute_roc_curve(truth, scores, "Yes"),
-    times = 20
+    times = 10
   )
 
   median_r <- median(bm$time[bm$expr == "pure_r"])

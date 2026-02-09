@@ -1,11 +1,10 @@
 Package: biomarkerPanels
 Type: Package
-Title: Multi-objective Optimization for Compact Biomarker Panels
+Title: Multi-objective Optimization for Biomarker Panel Discovery
 Version: 0.0.0.9000
 Authors@R: c(
-    person(given = "First", family = "Last", role = c("aut", "cre"),
-           email = "first.last@example.com"),
-    person(given = "Contributors", family = "TBD", role = "ctb")
+    person(given = "Harry", family = "Robertson", role = c("aut", "cre"),
+           email = "harry.robertson@sydney.edu.au")
   )
 Description: Tools to construct and evaluate small biomarker panels via
     multi-objective optimization with user-specified performance targets such as
@@ -19,9 +18,10 @@ Imports:
     stats,
     utils,
     Matrix,
+    Rcpp,
     SummarizedExperiment,
     S4Vectors,
-    mco,
+    rmoo,
     limma,
     glmnet,
     pROC
@@ -32,7 +32,7 @@ Suggests:
     rmarkdown,
     ggplot2,
     BiocStyle,
-    GA
+    nproc
 LinkingTo:
     Rcpp
 biocViews: Software, Classification, FeatureExtraction, ROC, Biomarker
@@ -40,5 +40,5 @@ LazyData: true
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-URL: https://github.com/your-org/biomarkerPanels
-BugReports: https://github.com/your-org/biomarkerPanels/issues
+URL: https://github.com/SydneyBioX/biomarkerPanels
+BugReports: https://github.com/SydneyBioX/biomarkerPanels/issues

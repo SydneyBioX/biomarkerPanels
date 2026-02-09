@@ -202,3 +202,247 @@ NULL
     )
   })
 }
+
+#' Fit a Panel Model from Optimization Results
+#'
+#' Takes an `OptimizationResult` from [optimize_panel()] and fits a model on
+#' a selected Pareto solution. Returns a `BiomarkerPanelResult` with the
+#' fitted model ready for evaluation.
+#'
+#' @param optimization_result An `OptimizationResult` from [optimize_panel()].
+#' @param solution_id Integer specifying which Pareto solution to use. If
+#'   `NULL` (default), automatically selects the solution with the best
+#'   value on the first objective.
+#' @param features Character vector of features to use. If provided, overrides
+#'   the features from `solution_id`. Must be a subset of the feature pool.
+#' @param x Optional training feature matrix. If `NULL`, uses the stored
+#'   aggregated training data from the optimization result.
+#' @param y Optional training response vector. If `NULL`, uses the stored
+#'   response from the optimization result.
+#' @param cohort Optional cohort factor. If `NULL`, uses the stored cohort
+#'   from the optimization result.
+#' @param regularized Logical; if `TRUE` (default), use regularized regression
+#'   (elastic net via glmnet). If `FALSE`, use standard logistic regression.
+#' @param regularized_alpha Elastic net mixing parameter when `regularized = TRUE`.
+#'   `alpha = 1` is lasso, `alpha = 0` is ridge. Default is 0.5 (elastic net).
+#' @param cv Logical; if `TRUE`, use cross-validation when fitting the final
+#'   model (only applies when `regularized = FALSE`). Default is `FALSE`.
+#' @param cv_folds Number of cross-validation folds when `cv = TRUE`.
+#'   Default is 5.
+#' @param validate_fitness Logical; if `TRUE` (default), recomputes metrics on
+#'   the training data after model fitting to verify consistency with the
+#'   optimization results. Issues a warning if metrics differ substantially.
+#' @return A `BiomarkerPanelResult` with the fitted model.
+#' @export
+#' @seealso [optimize_panel()], [evaluate_panel()]
+#' @examples
+#' \dontrun{
+#' # Run optimization
+#' opt <- optimize_panel(x, y, objectives = define_objectives())
+#'
+#' # Inspect solutions
+#' summarize_solutions(opt)
+#'
+#' # Fit model on best solution (auto-selected)
+#' panel <- fit_panel(opt)
+#'
+#' # Or specify a particular solution
+#' panel <- fit_panel(opt, solution_id = 3)
+#'
+#' # Evaluate on held-out data
+#' evaluate_panel(panel, x_test, y_test)
+#' }
+fit_panel <- function(optimization_result,
+                      solution_id = NULL,
+                      features = NULL,
+                      x = NULL,
+                      y = NULL,
+                      cohort = NULL,
+                      regularized = TRUE,
+                      regularized_alpha = 0.5,
+                      cv = FALSE,
+                      cv_folds = 5L,
+                      validate_fitness = TRUE) {
+
+  if (!inherits(optimization_result, "OptimizationResult")) {
+    stop("`optimization_result` must be an OptimizationResult from optimize_panel().",
+         call. = FALSE)
+  }
+
+  solutions_df <- optimization_result@solutions
+  if (nrow(solutions_df) == 0L) {
+    stop("OptimizationResult contains no solutions.", call. = FALSE)
+  }
+
+  # Determine which features to use
+  if (!is.null(features)) {
+    # User provided explicit base features
+    selected_base_features <- features
+    if (!all(features %in% optimization_result@feature_pool)) {
+      missing <- setdiff(features, optimization_result@feature_pool)
+      stop("Feature(s) not in feature pool: ", paste(missing, collapse = ", "),
+           call. = FALSE)
+    }
+    selected_solution_id <- NA_integer_
+    solution_metrics <- NULL
+  } else {
+    # Select from Pareto solutions
+    if (is.null(solution_id)) {
+      # Auto-select: best on first objective
+      objective_cols <- setdiff(names(solutions_df),
+                                c("solution_id", "base_features", "features"))
+      if (length(objective_cols) == 0L) {
+        stop("No objective columns found in solutions.", call. = FALSE)
+      }
+      first_obj <- objective_cols[1]
+      control <- optimization_result@control
+      # Determine direction from control
+      direction <- if (!is.null(control$objective_directions)) {
+        control$objective_directions[[first_obj]]
+      } else {
+        "maximize"  # Default to maximize
+      }
+      if (direction == "maximize") {
+        best_idx <- which.max(solutions_df[[first_obj]])
+      } else {
+        best_idx <- which.min(solutions_df[[first_obj]])
+      }
+      solution_id <- solutions_df$solution_id[best_idx]
+    }
+
+    # Validate solution_id
+    if (!solution_id %in% solutions_df$solution_id) {
+      stop("solution_id ", solution_id, " not found. Valid IDs: ",
+           paste(solutions_df$solution_id, collapse = ", "), call. = FALSE)
+    }
+
+    row_idx <- which(solutions_df$solution_id == solution_id)
+    selected_base_features <- solutions_df$base_features[[row_idx]]
+    selected_solution_id <- solution_id
+
+    # Get solution metrics
+    objective_cols <- setdiff(names(solutions_df),
+                              c("solution_id", "base_features", "features"))
+    solution_metrics <- as.numeric(solutions_df[row_idx, objective_cols])
+    names(solution_metrics) <- objective_cols
+  }
+
+  # Get training data (raw/untransformed base features)
+  if (is.null(x)) {
+    x_raw <- optimization_result@aggregated_x
+  } else {
+    x_raw <- as.matrix(x)
+  }
+
+  if (is.null(y)) {
+    truth <- optimization_result@aggregated_y
+  } else {
+    truth <- ensure_binary_response(y)
+  }
+
+  if (is.null(cohort)) {
+    cohort_vec <- optimization_result@aggregated_cohort
+  } else {
+    cohort_vec <- factor(cohort)
+  }
+
+  # Validate data
+  if (is.null(x_raw) || is.null(truth)) {
+    stop("Training data not available. Provide x and y arguments.", call. = FALSE)
+  }
+
+  if (!all(selected_base_features %in% colnames(x_raw))) {
+    missing <- setdiff(selected_base_features, colnames(x_raw))
+    stop("Selected base feature(s) not found in training data: ",
+         paste(missing, collapse = ", "), call. = FALSE)
+  }
+
+  # Extract selected base features
+  x_base_selected <- x_raw[, selected_base_features, drop = FALSE]
+
+  # Apply feature transform
+  feature_transform <- optimization_result@control$feature_transform
+  if (is.null(feature_transform)) {
+    feature_transform <- "none"  # Backward compatibility
+  }
+
+  if (feature_transform != "none" && length(selected_base_features) >= 2L) {
+    x_selected <- .apply_feature_transform_single(x_base_selected, feature_transform)
+    selected_features <- colnames(x_selected)
+  } else {
+    x_selected <- x_base_selected
+    selected_features <- selected_base_features
+  }
+
+  # Fit the model
+  if (regularized) {
+    model <- .fit_final_model_regularized(
+      x_selected, truth, cohort_vec,
+      alpha = regularized_alpha
+    )
+  } else if (cv) {
+    model <- .fit_final_model_cv(
+      x_selected, truth, cohort_vec,
+      cv_folds = cv_folds
+    )
+  } else {
+    model <- .fit_final_model(x_selected, truth, cohort_vec)
+  }
+
+  if (is.null(model)) {
+    stop("Model fitting failed. Check the data and parameters.", call. = FALSE)
+  }
+
+  # Build metrics from solution or recompute
+  if (!is.null(solution_metrics)) {
+    metrics <- solution_metrics
+  } else {
+    # For custom features, set metrics to NA (user should evaluate)
+    metrics <- numeric(0)
+  }
+
+  # Build objectives data frame for compatibility
+  objective_df <- data.frame(
+    solution_id = if (is.na(selected_solution_id)) 1L else selected_solution_id,
+    stringsAsFactors = FALSE
+  )
+  if (length(metrics) > 0L) {
+    for (nm in names(metrics)) {
+      objective_df[[nm]] <- metrics[[nm]]
+    }
+  }
+  objective_df$features <- I(list(selected_features))
+
+  # Compute training data signature
+  control <- optimization_result@control
+  training_data <- list(
+    n = nrow(x_raw),
+    p = ncol(x_raw),
+    class_balance = table(truth),
+    feature_pool_size = length(optimization_result@feature_pool),
+    num_cohorts = if (!is.null(cohort_vec)) length(unique(cohort_vec)) else 1L
+  )
+
+  # Create BiomarkerPanelResult with both base and transformed features
+  panel <- new(
+    "BiomarkerPanelResult",
+    base_features = selected_base_features,
+    features = selected_features,
+    metrics = metrics,
+    objectives = objective_df,
+    control = c(
+      control,
+      list(
+        regularized = regularized,
+        regularized_alpha = if (regularized) regularized_alpha else NULL,
+        cv = cv,
+        cv_folds = if (cv && !regularized) cv_folds else NULL,
+        fitted_solution_id = selected_solution_id
+      )
+    ),
+    training_data = training_data,
+    model = model
+  )
+
+  panel
+}

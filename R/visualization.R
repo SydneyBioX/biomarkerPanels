@@ -1,23 +1,209 @@
-#' Plot Pareto Fronts
+#' Plot Pareto Front on Held-Out Data
 #'
-#' Visualize trade-offs between two objectives for candidate biomarker panels.
+#' Fits and evaluates every Pareto-optimal solution from [optimize_panel()] on
+#' held-out validation data and displays the trade-off between two metrics as a
+#' scatter plot. The underlying data frame is accessible via `$data` on the
+#' returned ggplot object.
 #'
-#' @param results Data frame with columns `objective_x`, `objective_y`, `label`.
-#' @param xlab,ylab Axis labels.
-#' @return A `ggplot` object.
+#' @param optimization_result An `OptimizationResult` from [optimize_panel()].
+#' @param x Held-out validation data: a matrix, data.frame,
+#'   `SummarizedExperiment`, or list of such objects.
+#' @param y Held-out validation labels: a factor (or list of factors when `x`
+#'   is a list).
+#' @param x_metric Character; metric name for the x-axis. Default
+#'   `"sensitivity"`.
+#' @param y_metric Character; metric name for the y-axis. Default
+#'   `"specificity"`.
+#' @param color_by Character or `NULL`; metric name (or `"n_features"` /
+#'   `"n_base_features"`) for point colour. `NULL` disables colour mapping.
+#'   Default `"n_features"`.
+#' @param point_size Numeric; point size passed to [ggplot2::geom_point()].
+#'   Default `4`.
+#' @param point_alpha Numeric; point transparency. Default `0.7`.
+#' @param viridis_option Character; viridis palette name. Default `"plasma"`.
+#' @param connect Logical; if `TRUE`, connect points with a grey line sorted
+#'   by `x_metric`. Default `FALSE`.
+#' @param title Character or `NULL`; plot title. Auto-generated when `NULL`.
+#' @param xlab,ylab Character or `NULL`; axis labels. Default to metric names.
+#' @param color_label Character or `NULL`; colour legend title. Defaults to
+#'   `color_by`.
+#' @param regularized Logical; passed to [fit_panel()]. Default `TRUE`.
+#' @param on_error One of `"warn"` (skip failed solutions with a warning) or
+#'   `"stop"` (abort on first failure). Default `"warn"`.
+#' @param verbose Logical; print progress messages. Default
+#'   `interactive()`.
+#' @param ... Additional arguments passed to [evaluate_panel()].
+#' @return A `ggplot` object. The underlying metrics data frame is accessible
+#'   via `$data`.
 #' @export
-plot_pareto_front <- function(results,
-                              xlab = "Objective X",
-                              ylab = "Objective Y") {
+#' @seealso [optimize_panel()], [fit_panel()], [evaluate_panel()]
+#' @examples
+#' \dontrun{
+#' opt <- optimize_panel(x_train, y_train, objectives = define_objectives())
+#' p <- plot_pareto_front(opt, x_test, y_test)
+#' p          # display plot
+#' p$data     # access metrics data.frame
+#' }
+plot_pareto_front <- function(optimization_result,
+                              x,
+                              y,
+                              x_metric = "sensitivity",
+                              y_metric = "specificity",
+                              color_by = "n_features",
+                              point_size = 4,
+                              point_alpha = 0.7,
+                              viridis_option = "plasma",
+                              connect = FALSE,
+                              title = NULL,
+                              xlab = NULL,
+                              ylab = NULL,
+                              color_label = NULL,
+                              regularized = TRUE,
+                              on_error = c("warn", "stop"),
+                              verbose = interactive(),
+                              ...) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 is required for plot_pareto_front()", call. = FALSE)
   }
+  if (!inherits(optimization_result, "OptimizationResult")) {
+    stop("`optimization_result` must be an OptimizationResult from optimize_panel().",
+         call. = FALSE)
+  }
+  on_error <- match.arg(on_error)
 
-  ggplot2::ggplot(results, ggplot2::aes(x = objective_x, y = objective_y, label = label)) +
-    ggplot2::geom_point(color = "#005B96") +
-    ggplot2::geom_text(vjust = -0.4, size = 3) +
-    ggplot2::labs(x = xlab, y = ylab) +
-    ggplot2::theme_minimal(base_size = 12)
+  n_sol <- n_solutions(optimization_result)
+  if (n_sol == 0L) {
+    stop("OptimizationResult contains no solutions.", call. = FALSE)
+  }
+
+  # Collect the unique set of metrics we need to extract
+  eval_metrics <- unique(c(x_metric, y_metric))
+  builtin_cols <- c("n_features", "n_base_features")
+  if (!is.null(color_by) && !color_by %in% builtin_cols) {
+    eval_metrics <- unique(c(eval_metrics, color_by))
+  }
+
+  sol_ids <- solutions(optimization_result)$solution_id
+
+  # --- evaluate each solution ---
+  rows <- vector("list", n_sol)
+  for (i in seq_len(n_sol)) {
+    sid <- sol_ids[i]
+    if (verbose) {
+      message(sprintf("[%d/%d] Evaluating solution %d...", i, n_sol, sid))
+    }
+
+    row <- tryCatch({
+      panel <- fit_panel(optimization_result, solution_id = sid,
+                         regularized = regularized, validate_fitness = FALSE)
+
+      eval_result <- evaluate_panel(panel, x, y, ...)
+
+      # Start with bookkeeping columns
+      r <- data.frame(
+        solution_id = sid,
+        n_features = length(panel@features),
+        n_base_features = length(panel@base_features),
+        stringsAsFactors = FALSE
+      )
+
+      # Add requested evaluation metrics
+      for (m in eval_metrics) {
+        if (m %in% builtin_cols) next
+        if (m %in% names(eval_result$metrics)) {
+          r[[m]] <- eval_result$metrics[[m]]
+        } else {
+          r[[m]] <- NA_real_
+        }
+      }
+      r
+    }, error = function(e) {
+      if (on_error == "stop") {
+        stop("Failed on solution ", sid, ": ", conditionMessage(e), call. = FALSE)
+      }
+      warning("Solution ", sid, " failed: ", conditionMessage(e), call. = FALSE)
+      NULL
+    })
+
+    rows[[i]] <- row
+  }
+
+  # Combine into data.frame, dropping failed solutions
+  rows <- rows[!vapply(rows, is.null, logical(1))]
+  if (length(rows) == 0L) {
+    stop("All solutions failed evaluation. Check data and panel compatibility.",
+         call. = FALSE)
+  }
+  plot_df <- do.call(rbind, rows)
+
+  # Validate that requested metrics exist
+  if (!x_metric %in% names(plot_df)) {
+    stop("x_metric '", x_metric, "' not found in evaluation results.", call. = FALSE)
+  }
+  if (!y_metric %in% names(plot_df)) {
+    stop("y_metric '", y_metric, "' not found in evaluation results.", call. = FALSE)
+  }
+
+  # --- build ggplot ---
+  if (is.null(xlab)) xlab <- x_metric
+  if (is.null(ylab)) ylab <- y_metric
+  if (is.null(title)) {
+    title <- sprintf("Pareto Front: %s vs %s (%d solutions)",
+                     x_metric, y_metric, nrow(plot_df))
+  }
+
+  if (!is.null(color_by)) {
+    if (!color_by %in% names(plot_df)) {
+      stop("color_by '", color_by, "' not found in evaluation results.", call. = FALSE)
+    }
+    if (is.null(color_label)) color_label <- color_by
+
+    p <- ggplot2::ggplot(
+      plot_df,
+      ggplot2::aes(
+        x = .data[[x_metric]],
+        y = .data[[y_metric]],
+        color = .data[[color_by]]
+      )
+    )
+  } else {
+    p <- ggplot2::ggplot(
+      plot_df,
+      ggplot2::aes(x = .data[[x_metric]], y = .data[[y_metric]])
+    )
+  }
+
+  # Optional connecting line (behind points)
+  if (connect) {
+    p <- p + ggplot2::geom_line(
+      data = plot_df[order(plot_df[[x_metric]]), ],
+      color = "grey60", linewidth = 0.5
+    )
+  }
+
+  p <- p + ggplot2::geom_point(size = point_size, alpha = point_alpha)
+
+  # Colour scale
+  if (!is.null(color_by)) {
+    if (is.numeric(plot_df[[color_by]])) {
+      p <- p + ggplot2::scale_color_viridis_c(option = viridis_option, name = color_label)
+    } else {
+      p <- p + ggplot2::scale_color_viridis_d(option = viridis_option, name = color_label)
+    }
+  }
+
+  # Axis limits: use [0,1] when both axes are bounded metrics
+  bounded_metrics <- c("sensitivity", "specificity", "auc", "pauc",
+                       "precision", "npv", "f1", "balanced_accuracy")
+  if (x_metric %in% bounded_metrics && y_metric %in% bounded_metrics) {
+    p <- p + ggplot2::coord_cartesian(xlim = c(0, 1), ylim = c(0, 1))
+  }
+
+  p <- p +
+    ggplot2::labs(x = xlab, y = ylab, title = title) +
+    ggplot2::theme_bw(base_size = 12)
+
+  p
 }
 
 #' Plot Feature Inclusion Frequencies

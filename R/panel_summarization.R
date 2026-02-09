@@ -6,6 +6,61 @@
 #' at a fixed specificity, prioritising biomarkers with high selection
 #' frequency, and incorporating pathway-level biological priors.
 
+#' Summarize Pareto-Optimal Solutions
+#'
+#' Returns a wide-format data frame with one row per Pareto solution,
+#' showing all objective values and feature count for easy inspection.
+#'
+#' @param optimization_result An `OptimizationResult` from [optimize_panel()].
+#' @return A data frame with columns:
+#'   \describe{
+#'     \item{solution_id}{Integer ID of the solution.}
+#'     \item{n_features}{Number of features in the solution.}
+#'     \item{...}{One column per objective with numeric values.}
+#'   }
+#' @export
+#' @seealso [optimize_panel()], [fit_panel()], [get_solution_features()]
+#' @examples
+#' \dontrun{
+#' opt <- optimize_panel(x, y, objectives = define_objectives())
+#' summarize_solutions(opt)
+#' }
+summarize_solutions <- function(optimization_result) {
+  if (!inherits(optimization_result, "OptimizationResult")) {
+    stop("`optimization_result` must be an OptimizationResult from optimize_panel().",
+         call. = FALSE)
+  }
+
+  solutions_df <- optimization_result@solutions
+  if (nrow(solutions_df) == 0L) {
+    return(data.frame(
+      solution_id = integer(),
+      n_features = integer(),
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  # Calculate number of features per solution
+  n_features <- vapply(solutions_df$features, length, integer(1))
+
+  # Get objective columns (everything except solution_id and features)
+  objective_cols <- setdiff(names(solutions_df), c("solution_id", "features", "base_features"))
+
+  # Build result data frame
+  result <- data.frame(
+    solution_id = solutions_df$solution_id,
+    n_features = n_features,
+    stringsAsFactors = FALSE
+  )
+
+  # Add objective columns
+ for (col in objective_cols) {
+    result[[col]] <- solutions_df[[col]]
+  }
+
+  result
+}
+
 #' Extract solution-level feature sets from a `BiomarkerPanelResult`.
 #'
 #' @param panel_result A [`BiomarkerPanelResult`].

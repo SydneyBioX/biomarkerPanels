@@ -1,32 +1,172 @@
 # biomarkerPanels <img src="src/moo_hexsticker.png" alt="biomarkerPanels hex sticker" align="right" width="150"/>
 
-Multi-objective optimization for discovering biomarker panels
-with constrained performance targets. This package is designed for integration
-with Bioconductor ecosystems and supports high-dimensional datasets.
+[Documentation](https://sydneybiox.github.io/biomarkerPanels/) | [Issues](https://github.com/SydneyBioX/biomarkerPanels/issues) | [License](LICENSE)
+
+Multi-objective optimization for discovering compact biomarker panels from high-dimensional data.
+
+> **Note**
+> Contributions are welcome! Please report any issues. You may also contribute by opening a pull request.
 
 ## Key Features
-- Multi-objective search balancing sensitivity, specificity, and custom costs.
-- Support for gene-expression inputs via `SummarizedExperiment`.
-- Panel evaluation utilities including ROC curves and calibration diagnostics.
-- Transferability diagnostics baked into the loss registry (minimum cohort
-  sensitivity/specificity, cohort gaps, calibration, and distribution-shift
-  penalties).
-- Hard constraints on optimisation via metric thresholds (e.g., enforce minimum
-  sensitivity before maximising specificity).
-- Extensible architecture compatible with Rcpp acceleration.
 
-## Repository Guide
-- `R/`: package source modules (simulation, objectives, optimization engines).
-- `data-raw/`: scripts used to prepare package datasets and fixtures.
-- `inst/extdata/`: example datasets bundled with the package.
-- `tests/`: testthat suite and reusable fixtures.
-- `vignettes/`: R Markdown tutorials for end-to-end workflows.
-- `src/`: C++ code for certain components.
+- **Multi-objective optimization**: NSGA-II/NSGA-III genetic algorithms balance sensitivity, specificity, AUC, panel size, and custom objectives simultaneously
+- **Hard constraints**: Enforce minimum performance thresholds (e.g., sensitivity >= 0.90) during optimization
+- **Multi-cohort support**: Built-in transferability objectives penalize cross-site performance gaps
+- **Batch effect mitigation**: Pairwise feature ratios dampen distributional shifts across cohorts
+- **Extensible loss registry**: Add custom objectives with `register_loss_function()`
+- **Bioconductor integration**: Native support for `SummarizedExperiment` inputs
+- **Pareto front selection**: Choose final panels by sensitivity, feature frequency, or pathway enrichment
 
-## Getting Started
-Development installation will use:
+## 🔨 Installation
 
 ```r
+# Install from GitHub
 # install.packages("remotes")
-remotes::install_github("SydneyBioX/moo")
+remotes::install_github("SydneyBioX/biomarkerPanels")
+```
+
+**Requirements**: R >= 4.4, plus dependencies (rmoo, glmnet, limma, pROC, SummarizedExperiment)
+
+## 🚀 Quick Start
+
+### Single cohort optimization
+
+```r
+library(biomarkerPanels)
+
+# Define objectives to optimize
+objectives <- define_objectives(
+  losses = c("sensitivity", "specificity", "num_features")
+)
+
+# Run NSGA-II optimization (returns Pareto front, no model)
+opt_result <- optimize_panel(
+  x = train_matrix,
+  y = train_response,
+  objectives = objectives,
+  max_features = 10,
+  seed = 42
+)
+
+# Inspect Pareto-optimal solutions
+summarize_solutions(opt_result)
+#>   solution_id n_features sensitivity specificity num_features
+#> 1           1          4       0.912       0.847            4
+#> 2           2          6       0.934       0.821            6
+#> ...
+
+# Fit model on chosen solution (or auto-select best)
+panel <- fit_panel(opt_result, solution_id = 1)
+# OR: auto-select best on first objective
+panel <- fit_panel(opt_result)
+
+# Evaluate on held-out data (requires fitted model)
+eval <- evaluate_panel(panel, x = test_matrix, y = test_response)
+eval$metrics
+#>   sensitivity   specificity           auc
+#>         0.912         0.847         0.923
+```
+
+### Multi-cohort optimization
+
+For multi-site studies, pass data as named lists. Use cohort-aware objectives like `min_cohort_sensitivity` to ensure the panel generalizes:
+
+```r
+result <- optimize_panel(
+  x = list(site_A = mat1, site_B = mat2, site_C = mat3),
+  y = list(site_A = y1, site_B = y2, site_C = y3),
+  objectives = define_objectives(
+    losses = c("sensitivity", "min_cohort_sensitivity", "num_features")
+  ),
+  max_features = 8
+)
+```
+
+### Feature pre-filtering
+
+Reduce the search space before optimization:
+
+```r
+# Via differential expression
+top_de <- get_top_de_features(x, y, n = 50)
+
+# Via cross-cohort transferability
+transferable <- select_transferable_features(x_list, y_list, n = 50)
+
+result <- optimize_panel(x, y, feature_pool = top_de, ...)
+```
+
+## 📋 Main Functions
+
+| Function | Description |
+|----------|-------------|
+| `optimize_panel()` | Run NSGA-II/III, returns `OptimizationResult` with Pareto front |
+| `summarize_solutions()` | Inspect Pareto solutions with metrics and feature counts |
+| `fit_panel()` | Fit model on selected solution, returns `BiomarkerPanelResult` |
+| `evaluate_panel()` | Validate panel performance on held-out data (requires fitted model) |
+| `define_objectives()` | Configure optimization objectives |
+| `min_metric_constraint()` | Add hard performance constraints |
+| `select_panel_top_sensitivity()` | Select solution from Pareto front by sensitivity |
+| `select_panel_inclusion_frequency()` | Select solution by feature frequency across solutions |
+| `get_top_de_features()` | Pre-filter features via differential expression |
+| `select_transferable_features()` | Pre-filter features by cross-cohort stability |
+| `loss_registry()` | View all available objective functions |
+
+## 📊 Available Objectives
+
+| Objective | Description | Direction |
+|-----------|-------------|-----------|
+| `sensitivity` | True positive rate | maximize |
+| `specificity` | True negative rate | maximize |
+| `auc` | Area under ROC curve | maximize |
+| `pauc` | Partial AUC (high-sensitivity region) | maximize |
+| `num_features` | Panel size | minimize |
+| `min_cohort_sensitivity` | Worst-case sensitivity across cohorts | maximize |
+| `min_cohort_specificity` | Worst-case specificity across cohorts | maximize |
+| `cohort_sensitivity_gap` | Max sensitivity difference between cohorts | minimize |
+
+See `loss_registry()` for the complete list.
+
+## 🙋 FAQ
+
+**Q: How do I optimize for rule-out screening (high sensitivity)?**
+
+Use `define_ruleout_objectives()` which enforces a sensitivity constraint and optimizes partial AUC in the high-sensitivity region:
+
+```r
+objectives <- define_ruleout_objectives(min_sensitivity = 0.95)
+```
+
+**Q: Should I use NSGA-II or NSGA-III?**
+
+NSGA-II (default) works well for 2-3 objectives. NSGA-III provides better diversity for many-objective problems (4+).
+
+**Q: How do I add a custom objective?**
+
+```r
+register_loss_function(
+  name = "my_metric",
+  fun = function(truth, scores, selected, ...) { ... },
+  direction = "maximize"
+)
+```
+
+## License
+
+GPL-3
+
+## Issues
+
+Please report bugs and feature requests via [GitHub Issues](https://github.com/SydneyBioX/biomarkerPanels/issues).
+
+## How to Cite
+
+If you use biomarkerPanels in your research, please cite:
+
+```bibtex
+@software{biomarkerPanels,
+  author = {Robertson, Harry},
+  title = {biomarkerPanels: Multi-objective Optimization for Biomarker Panel Discovery},
+  url = {https://github.com/SydneyBioX/biomarkerPanels}
+}
 ```

@@ -1,6 +1,7 @@
-test_that("optimize_panel returns a BiomarkerPanelResult", {
+test_that("optimize_panel returns an OptimizationResult", {
   skip_slow_tests()
   set.seed(123)
+
   sim <- simulate_expression_data(p = 30, n = 25, k = 1, seed = 42)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
@@ -11,17 +12,107 @@ test_that("optimize_panel returns a BiomarkerPanelResult", {
     objectives = define_objectives(losses = c("sensitivity", "specificity", "num_features")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
-    cohort_aggregator = "none",
-    nsga_control = list(popsize = 20, generations = 20)
+    feature_transform = "none",
+    nsga_control = list(popSize = 12, maxiter = 10)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
-  expect_true(length(res@features) <= 3)
-  expect_named(res@metrics, c("sensitivity", "specificity", "num_features"))
-  expect_s3_class(res@objectives, "data.frame")
-  expect_true(all(res@objectives$objective %in% c("sensitivity", "specificity", "num_features")))
-  expect_equal(res@training_data$num_cohorts, 1L)
-  expect_equal(res@training_data$cohort_labels, "cohort_01")
+  expect_s4_class(res, "OptimizationResult")
+  expect_true(n_solutions(res) >= 1)
+  expect_true(length(res@feature_pool) > 0)
+
+  # Check solutions data frame structure
+  sols <- solutions(res)
+  expect_true("solution_id" %in% names(sols))
+  expect_true("features" %in% names(sols))
+  expect_true("sensitivity" %in% names(sols))
+  expect_true("specificity" %in% names(sols))
+  expect_true("num_features" %in% names(sols))
+
+  # Check training data is stored
+  expect_true(!is.null(res@aggregated_x))
+  expect_true(!is.null(res@aggregated_y))
+})
+
+test_that("num_features objective allows variable panel sizes", {
+  skip_slow_tests()
+  set.seed(999)
+  # Create data with varying signal strength across features
+  n <- 40L
+  p <- 10L
+  x <- matrix(rnorm(n * p), nrow = n, ncol = p)
+  colnames(x) <- paste0("gene_", seq_len(p))
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+  # Strong signal on first 2 genes
+  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 3
+  # Moderate signal on genes 3-5
+  x[y == "Yes", 3:5] <- x[y == "Yes", 3:5] + 1.5
+  # Weak signal on genes 6-8
+  x[y == "Yes", 6:8] <- x[y == "Yes", 6:8] + 0.5
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    max_features = 8,
+    feature_pool = colnames(x),
+    feature_transform = "none",
+    nsga_control = list(popSize = 16, maxiter = 15)
+  )
+
+  expect_s4_class(res, "OptimizationResult")
+
+  # Extract num_features values from all Pareto solutions
+  sols <- solutions(res)
+  nf_values <- sols$num_features
+
+  # All sizes should be between 2 (min for regularized) and max_features
+  expect_true(all(nf_values >= 2),
+              info = paste("Some panel sizes < 2:", paste(nf_values[nf_values < 2], collapse = ", ")))
+  expect_true(all(nf_values <= 8),
+              info = paste("Some panel sizes > 8:", paste(nf_values[nf_values > 8], collapse = ", ")))
+
+  # With threshold-based selection and varying signal, we expect some variation
+  unique_sizes <- unique(nf_values)
+  message("Panel sizes in Pareto front: ", paste(sort(unique_sizes), collapse = ", "))
+
+  # Primary check: mechanism allows variable sizes (not all forced to max_features)
+  expect_true(
+    min(nf_values) < 8,
+    info = "Threshold selection should allow panels smaller than max_features"
+  )
+})
+
+test_that("all Pareto solutions have consistent feature counts", {
+  set.seed(123)
+  n <- 20L
+  p <- 6L
+  x <- matrix(rnorm(n * p), nrow = n)
+  colnames(x) <- paste0("g", seq_len(p))
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 2
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    max_features = 4,
+    feature_transform = "none",
+    nsga_control = list(popSize = 8, maxiter = 5)
+  )
+
+  sols <- solutions(res)
+  expect_true(nrow(sols) > 0)
+
+  # Check each solution's num_features matches actual feature count
+  for (i in seq_len(nrow(sols))) {
+    stored_count <- sols$num_features[i]
+    solution_features <- sols$features[[i]]
+    expect_equal(
+      stored_count, length(solution_features),
+      info = paste("Solution", i, "feature count mismatch:",
+                   "stored =", stored_count, "actual =", length(solution_features))
+    )
+  }
 })
 
 test_that("optimize_panel handles multiple cohorts", {
@@ -35,14 +126,18 @@ test_that("optimize_panel handles multiple cohorts", {
     objectives = define_objectives(losses = c("sensitivity", "specificity", "num_features")),
     max_features = 4,
     feature_pool = colnames(fixture$x_list[[1]])[seq_len(12)],
-    cohort_aggregator = "none",
-    nsga_control = list(popsize = 16, generations = 15)
+    feature_transform = "none",
+    nsga_control = list(popSize = 16, maxiter = 15)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
-  expect_true(length(res@features) <= 4)
-  expect_equal(res@training_data$num_cohorts, length(fixture$x_list))
-  expect_true(all(names(res@training_data$cohort_counts) %in% names(fixture$x_list)))
+  expect_s4_class(res, "OptimizationResult")
+  expect_true(n_solutions(res) >= 1)
+
+  # Check feature count constraint
+  sols <- solutions(res)
+  for (i in seq_len(nrow(sols))) {
+    expect_true(length(sols$features[[i]]) <= 4)
+  }
 })
 
 test_that("optimize_panel intersects feature sets across cohorts", {
@@ -66,12 +161,16 @@ test_that("optimize_panel intersects feature sets across cohorts", {
     y = list(c1$y, c2$y),
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "none",
-    nsga_control = list(popsize = 12, generations = 8)
+    feature_transform = "none",
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
-  expect_true(all(res@features %in% c("gene_common1", "gene_common2")))
+  expect_s4_class(res, "OptimizationResult")
+
+  # All features in solutions should be from the intersection
+  sols <- solutions(res)
+  all_features <- unique(unlist(sols$features))
+  expect_true(all(all_features %in% c("gene_common1", "gene_common2")))
 })
 
 test_that("min_metric_constraint builds feasible constraint", {
@@ -99,13 +198,16 @@ test_that("optimize_panel enforces minimum metric constraints", {
     max_features = 1,
     feature_pool = colnames(x),
     constraints = list(min_metric_constraint("sensitivity", threshold = 0.9)),
-    cohort_aggregator = "none",
-    nsga_control = list(popsize = 16, generations = 15)
+    feature_transform = "none",
+    nsga_control = list(popSize = 16, maxiter = 15)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_s4_class(res, "OptimizationResult")
   expect_true("min_sensitivity_0.9" %in% res@control$constraints)
-  eval_res <- evaluate_panel(res, x, y)
+
+  # Fit and evaluate to verify constraint is satisfied
+  panel <- fit_panel(res)
+  eval_res <- evaluate_panel(panel, x, y)
   expect_gte(eval_res$metrics["sensitivity"], 0.9)
 })
 
@@ -113,8 +215,8 @@ test_that("optimize_panel errors when constraints infeasible", {
   skip_slow_tests()
   set.seed(5002)
   n <- 40L
-  x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
-  colnames(x) <- c("gene_common1", "gene_common2")
+  x <- matrix(rnorm(n * 3), nrow = n, ncol = 3)
+  colnames(x) <- c("gene_common1", "gene_common2", "gene_common3")
   y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
 
   expect_error(
@@ -122,11 +224,11 @@ test_that("optimize_panel errors when constraints infeasible", {
       x = x,
       y = y,
       objectives = define_objectives(losses = c("specificity")),
-      max_features = 1,
+      max_features = 2,
       feature_pool = colnames(x),
       constraints = list(min_metric_constraint("sensitivity", threshold = 1.01)),
-      cohort_aggregator = "none",
-      nsga_control = list(popsize = 12, generations = 10)
+      feature_transform = "none",
+      nsga_control = list(popSize = 12, maxiter = 10)
     ),
     "No solutions satisfied the supplied constraints"
   )
@@ -149,12 +251,12 @@ test_that("pairwise cohort aggregator produces contrast features", {
     y = y_list,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "pairwise_ratios",
-    nsga_control = list(popsize = 12, generations = 8)
+    feature_transform = "pairwise_ratios",
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
-  expect_equal(res@control$cohort_aggregator, "pairwise_ratios")
+  expect_s4_class(res, "OptimizationResult")
+  expect_equal(res@control$feature_transform, "pairwise_ratios")
   expect_true(all(grepl("--", res@control$feature_pool)))
 })
 
@@ -171,18 +273,19 @@ test_that("feature_pool accepts base features with pairwise aggregator", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 1,
     feature_pool = c("GeneA", "GeneC"),
-    cohort_aggregator = "pairwise_ratios",
-    nsga_control = list(popsize = 12, generations = 5)
+    feature_transform = "pairwise_ratios",
+    nsga_control = list(popSize = 12, maxiter = 5)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_s4_class(res, "OptimizationResult")
   expect_equal(sort(res@control$base_feature_pool), sort(c("GeneA", "GeneC")))
-  expect_true(all(grepl("--", res@features, fixed = TRUE)))
-  components <- unique(unlist(strsplit(res@features, "--", fixed = TRUE)))
+
+  sols <- solutions(res)
+  all_features <- unique(unlist(sols$features))
+  expect_true(all(grepl("--", all_features, fixed = TRUE)))
+  components <- unique(unlist(strsplit(all_features, "--", fixed = TRUE)))
   expect_true(all(components %in% c("GeneA", "GeneC")))
 })
-
-# Integration tests for new aggregation strategies
 
 test_that("optimize_panel works with pairwise_log_ratios aggregator", {
   skip_slow_tests()
@@ -198,12 +301,12 @@ test_that("optimize_panel works with pairwise_log_ratios aggregator", {
     y = y,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "pairwise_log_ratios",
-    nsga_control = list(popsize = 12, generations = 8)
+    feature_transform = "pairwise_log_ratios",
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
-  expect_equal(res@control$cohort_aggregator, "pairwise_log_ratios")
+  expect_s4_class(res, "OptimizationResult")
+  expect_equal(res@control$feature_transform, "pairwise_log_ratios")
   expect_true(all(grepl("--", res@control$feature_pool)))
 })
 
@@ -222,12 +325,12 @@ test_that("optimize_panel works with reference_norm aggregator", {
     y = y,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "reference_norm",
-    nsga_control = list(popsize = 12, generations = 8)
+    feature_transform = "reference_norm",
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
-  expect_equal(res@control$cohort_aggregator, "reference_norm")
+  expect_s4_class(res, "OptimizationResult")
+  expect_equal(res@control$feature_transform, "reference_norm")
 })
 
 test_that("optimize_panel rejects unregistered aggregator", {
@@ -241,8 +344,8 @@ test_that("optimize_panel rejects unregistered aggregator", {
       y = sim$y_list[[1]],
       objectives = define_objectives(losses = c("sensitivity", "specificity")),
       max_features = 2,
-      cohort_aggregator = "nonexistent_aggregator",
-      nsga_control = list(popsize = 8, generations = 5)
+      feature_transform = "nonexistent_transform",
+      nsga_control = list(popSize = 8, maxiter = 5)
     ),
     "Unknown aggregator"
   )
@@ -257,7 +360,7 @@ test_that("custom aggregator can be registered and used", {
     colnames(result) <- colnames(x)
     result
   }
-  register_aggregator("center_features", custom_agg, "Center each feature", overwrite = TRUE)
+  register_feature_transform("center_features", custom_agg, "Center each feature", overwrite = TRUE)
 
   set.seed(321)
   sim <- simulate_expression_data(p = 10, n = 20, k = 1, seed = 46)
@@ -267,44 +370,78 @@ test_that("custom aggregator can be registered and used", {
     y = sim$y_list[[1]],
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "center_features",
-    nsga_control = list(popsize = 12, generations = 6)
+    feature_transform = "center_features",
+    nsga_control = list(popSize = 12, maxiter = 6)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
-  expect_equal(res@control$cohort_aggregator, "center_features")
+  expect_s4_class(res, "OptimizationResult")
+  expect_equal(res@control$feature_transform, "center_features")
 
   # Clean up
-  rm("center_features", envir = .aggregator_registry)
+  rm("center_features", envir = .transform_registry)
 })
 
-# Issue 1: Adaptive NSGA-II defaults
-test_that(".get_adaptive_nsga_defaults scales with feature pool size", {
-  # Small feature pool: original defaults
+# Adaptive NSGA defaults
+test_that(".get_adaptive_nsga_defaults scales with feature pool size for NSGA-II", {
+  # NSGA-II: Small feature pool
+  small <- biomarkerPanels:::.get_adaptive_nsga_defaults(20, algorithm = "NSGA-II")
+  expect_equal(small$popSize, 64)
+  expect_equal(small$maxiter, 60)
 
-  small <- biomarkerPanels:::.get_adaptive_nsga_defaults(20)
-  expect_equal(small$popsize, 64)
+  # NSGA-II: Medium feature pool
+  medium <- biomarkerPanels:::.get_adaptive_nsga_defaults(50, algorithm = "NSGA-II")
+  expect_equal(medium$popSize, 128)
+  expect_equal(medium$maxiter, 150)
 
-  expect_equal(small$generations, 60)
-
-  # Medium feature pool: larger population and generations
-  medium <- biomarkerPanels:::.get_adaptive_nsga_defaults(50)
-  expect_equal(medium$popsize, 128)
-  expect_equal(medium$generations, 150)
-
- # Large feature pool: even larger population and generations
-  large <- biomarkerPanels:::.get_adaptive_nsga_defaults(150)
-  expect_equal(large$popsize, 200)
-  expect_equal(large$generations, 300)
+  # NSGA-II: Large feature pool
+  large <- biomarkerPanels:::.get_adaptive_nsga_defaults(150, algorithm = "NSGA-II")
+  expect_equal(large$popSize, 200)
+  expect_equal(large$maxiter, 300)
 
   # All should have consistent base parameters
-  expect_equal(small$cprob, 0.7)
-  expect_equal(medium$cprob, 0.7)
-  expect_equal(large$cprob, 0.7)
+  expect_equal(small$pcrossover, 0.7)
+  expect_equal(medium$pcrossover, 0.7)
+  expect_equal(large$pcrossover, 0.7)
+})
+
+test_that(".get_adaptive_nsga_defaults scales with feature pool size for NSGA-III", {
+  # NSGA-III is the default
+  small <- biomarkerPanels:::.get_adaptive_nsga_defaults(20)
+  expect_equal(small$popSize, 92)
+  expect_equal(small$maxiter, 80)
+
+  # NSGA-III: Medium feature pool
+  medium <- biomarkerPanels:::.get_adaptive_nsga_defaults(50, algorithm = "NSGA-III")
+  expect_equal(medium$popSize, 156)
+  expect_equal(medium$maxiter, 180)
+
+  # NSGA-III: Large feature pool
+  large <- biomarkerPanels:::.get_adaptive_nsga_defaults(150, algorithm = "NSGA-III")
+  expect_equal(large$popSize, 252)
+  expect_equal(large$maxiter, 350)
+
+  # All should have consistent base parameters
+  expect_equal(small$pcrossover, 0.7)
+  expect_equal(medium$pcrossover, 0.7)
+  expect_equal(large$pcrossover, 0.7)
+})
+
+test_that(".compute_nsga3_partitions returns appropriate values", {
+  # 2-3 objectives: 12 partitions
+  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(2), 12L)
+  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(3), 12L)
+
+  # 4-5 objectives: 6 partitions
+  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(4), 6L)
+  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(5), 6L)
+
+  # 6+ objectives: 4 partitions
+  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(6), 4L)
+  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(10), 4L)
 })
 
 test_that("optimize_panel uses adaptive defaults without explicit nsga_control", {
-  skip_extended_tests()  # Very slow: popsize=128, generations=150
+  skip_extended_tests()  # Very slow: popSize=156, maxiter=180
   set.seed(999)
   sim <- simulate_expression_data(p = 40, n = 30, k = 1, seed = 99)
   x <- sim$x_list[[1]]
@@ -317,13 +454,15 @@ test_that("optimize_panel uses adaptive defaults without explicit nsga_control",
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(35)],
-    cohort_aggregator = "none"
+    feature_transform = "none"
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
-  # Verify that the stored nsga2 settings reflect adaptive defaults
-  expect_equal(res@control$nsga2$popsize, 128)
-  expect_equal(res@control$nsga2$generations, 150)
+  expect_s4_class(res, "OptimizationResult")
+  # Default algorithm is NSGA-II
+  expect_equal(res@control$algorithm, "NSGA-II")
+  # Verify that the stored nsga2 settings reflect adaptive NSGA-II defaults
+  expect_equal(res@control$nsga2$popSize, 128)
+  expect_equal(res@control$nsga2$maxiter, 150)
 })
 
 # Issue 4: feature_alignment tests
@@ -341,10 +480,6 @@ test_that("feature_alignment = 'majority' keeps features in >= 50% cohorts", {
     list(x = x, y = y)
   }
 
-  # common1 and common2 in all 4 cohorts (100%)
-  # partial1 in 3/4 cohorts (75%)
-  # partial2 in 2/4 cohorts (50%)
-  # unique features in 1/4 cohorts (25%)
   cohorts <- list(
     make_cohort(1, c("common1", "common2", "partial1", "partial2", "unique1")),
     make_cohort(2, c("common1", "common2", "partial1", "partial2", "unique2")),
@@ -355,22 +490,19 @@ test_that("feature_alignment = 'majority' keeps features in >= 50% cohorts", {
   x_list <- lapply(cohorts, `[[`, "x")
   y_list <- lapply(cohorts, `[[`, "y")
 
-  # With majority alignment, should keep common1, common2, partial1, partial2
-  # (all have >= 50% = 2/4 cohorts)
   res <- optimize_panel(
     x = x_list,
     y = y_list,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     feature_alignment = "majority",
-    nsga_control = list(popsize = 12, generations = 8)
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_s4_class(res, "OptimizationResult")
   expect_equal(res@control$feature_alignment, "majority")
 
-  # Feature pool should include partial features but not unique ones
   pool_features <- res@control$feature_pool
   expect_true(all(c("common1", "common2") %in% pool_features))
   expect_true("partial1" %in% pool_features)  # 3/4 = 75%
@@ -391,7 +523,7 @@ test_that("feature_alignment = 'intersection' is default and drops partial featu
 
   cohorts <- list(
     make_cohort(1, c("geneA", "geneB", "geneC")),
-    make_cohort(2, c("geneA", "geneB", "geneD"))  # geneC missing, geneD unique
+    make_cohort(2, c("geneA", "geneB", "geneD"))
   )
 
   x_list <- lapply(cohorts, `[[`, "x")
@@ -402,94 +534,17 @@ test_that("feature_alignment = 'intersection' is default and drops partial featu
     y = y_list,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 2,
-    cohort_aggregator = "none",
+    feature_transform = "none",
     feature_alignment = "intersection",
-    nsga_control = list(popsize = 12, generations = 5)
+    nsga_control = list(popSize = 12, maxiter = 5)
   )
 
   expect_equal(res@control$feature_alignment, "intersection")
-  # Only geneA and geneB should be in the pool
   expect_equal(sort(res@control$feature_pool), c("geneA", "geneB"))
 })
 
-# Issue 5: final_model_cv tests
-test_that("final_model_cv = TRUE uses cross-validated coefficients", {
-  skip_slow_tests()
-  set.seed(456)
-  sim <- simulate_expression_data(p = 15, n = 50, k = 1, seed = 789)
-  x <- sim$x_list[[1]]
-  y <- sim$y_list[[1]]
-
-  # Without CV
-  res_no_cv <- optimize_panel(
-    x = x,
-    y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
-    max_features = 2,
-    feature_pool = colnames(x)[seq_len(10)],
-    cohort_aggregator = "none",
-    final_model_cv = FALSE,
-    nsga_control = list(popsize = 12, generations = 8)
-  )
-
-  # With CV
-  res_cv <- optimize_panel(
-    x = x,
-    y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
-    max_features = 2,
-    feature_pool = colnames(x)[seq_len(10)],
-    cohort_aggregator = "none",
-    final_model_cv = TRUE,
-    cv_folds = 5L,
-    nsga_control = list(popsize = 12, generations = 8)
-  )
-
-  expect_s4_class(res_no_cv, "BiomarkerPanelResult")
-  expect_s4_class(res_cv, "BiomarkerPanelResult")
-
-  # Check control settings are stored correctly
-  expect_false(res_no_cv@control$final_model_cv)
-  expect_true(res_cv@control$final_model_cv)
-  expect_null(res_no_cv@control$cv_folds)
-  expect_equal(res_cv@control$cv_folds, 5L)
-
-  # The CV model should have the cv_averaged flag
-  if (!is.null(res_cv@model)) {
-    expect_true(isTRUE(res_cv@model$cv_averaged))
-  }
-})
-
-test_that("final_model_cv falls back when data is too small", {
-  skip_slow_tests()
-  set.seed(789)
-  # Small dataset with only 8 samples
-  n <- 8L
-  x <- matrix(rnorm(n * 3), nrow = n, ncol = 3)
-  colnames(x) <- c("geneA", "geneB", "geneC")
-  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
-
-  # 5-fold CV needs at least 10 samples (2 per fold), so should fall back
-  res <- optimize_panel(
-    x = x,
-    y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
-    max_features = 2,
-    cohort_aggregator = "none",
-    final_model_cv = TRUE,
-    cv_folds = 5L,
-    nsga_control = list(popsize = 8, generations = 5)
-  )
-
-  expect_s4_class(res, "BiomarkerPanelResult")
-  # Should have fallen back to standard model fitting
-  if (!is.null(res@model)) {
-    expect_null(res@model$cv_averaged)
-  }
-})
-
 # Regularized scoring tests
-test_that("regularized = TRUE produces cv.glmnet model", {
+test_that("regularized = TRUE uses regularized scoring during optimization", {
   skip_slow_tests()
   set.seed(123)
   sim <- simulate_expression_data(p = 20, n = 40, k = 1, seed = 42)
@@ -502,25 +557,18 @@ test_that("regularized = TRUE produces cv.glmnet model", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(10)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     regularized = TRUE,
     regularized_alpha = 0.5,
-    nsga_control = list(popsize = 16, generations = 10)
+    nsga_control = list(popSize = 16, maxiter = 10)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_s4_class(res, "OptimizationResult")
   expect_true(res@control$regularized)
   expect_equal(res@control$regularized_alpha, 0.5)
-
-  # The stored model should be a cv.glmnet object
-  expect_true(inherits(res@model, "cv.glmnet"))
-
-  # Should have metadata for prediction
-  expect_true(!is.null(res@model$biomarkerPanels_meta))
-  expect_true(!is.null(res@model$biomarkerPanels_meta$feature_names))
 })
 
-test_that("regularized = FALSE produces glm model", {
+test_that("regularized = FALSE uses unregularized scoring", {
   skip_slow_tests()
   set.seed(456)
   sim <- simulate_expression_data(p = 20, n = 40, k = 1, seed = 43)
@@ -533,126 +581,184 @@ test_that("regularized = FALSE produces glm model", {
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(10)],
-    cohort_aggregator = "none",
+    feature_transform = "none",
     regularized = FALSE,
-    nsga_control = list(popsize = 16, generations = 10)
+    nsga_control = list(popSize = 16, maxiter = 10)
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
+  expect_s4_class(res, "OptimizationResult")
   expect_false(res@control$regularized)
   expect_null(res@control$regularized_alpha)
-
-  # The stored model should be a glm object, not cv.glmnet
-  expect_false(inherits(res@model, "cv.glmnet"))
-  expect_true(inherits(res@model, "glm"))
 })
 
-test_that("evaluate_panel works with regularized cv.glmnet model", {
+# NSGA algorithm tests
+test_that("optimize_panel uses NSGA-II by default", {
   skip_slow_tests()
-  set.seed(789)
-  sim <- simulate_expression_data(p = 20, n = 60, k = 1, seed = 44)
+  set.seed(123)
+  sim <- simulate_expression_data(p = 15, n = 25, k = 1, seed = 42)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
-
-  # Split into train/test
-  train_idx <- seq_len(40)
-  test_idx <- seq(41, 60)
-
-  x_train <- x[train_idx, ]
-  y_train <- y[train_idx]
-  x_test <- x[test_idx, ]
-  y_test <- y[test_idx]
 
   res <- optimize_panel(
-    x = x_train,
-    y = y_train,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
-    max_features = 3,
-    feature_pool = colnames(x)[seq_len(12)],
-    cohort_aggregator = "none",
-    regularized = TRUE,
-    nsga_control = list(popsize = 16, generations = 10)
-  )
-
-  # Evaluate on test set
-  eval_res <- evaluate_panel(res, x_test, y_test)
-
-  expect_type(eval_res, "list")
-  expect_true("metrics" %in% names(eval_res))
-  expect_true("roc" %in% names(eval_res))
-
-  # Scores should be valid probabilities
-  expect_true(all(eval_res$scores >= 0 & eval_res$scores <= 1))
-  expect_equal(length(eval_res$scores), length(y_test))
-})
-
-test_that("regularized scoring with different alpha values", {
-  skip_slow_tests()
-  set.seed(321)
-  sim <- simulate_expression_data(p = 15, n = 40, k = 1, seed = 45)
-  x <- sim$x_list[[1]]
-  y <- sim$y_list[[1]]
-
-  # Lasso (alpha = 1)
-  res_lasso <- optimize_panel(
     x = x,
     y = y,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
-    feature_pool = colnames(x)[seq_len(10)],
-    cohort_aggregator = "none",
-    regularized = TRUE,
-    regularized_alpha = 1.0,
-    nsga_control = list(popsize = 12, generations = 8)
+    feature_pool = colnames(x)[seq_len(8)],
+    feature_transform = "none",
+    nsga_control = list(popSize = 12, maxiter = 10)
   )
 
-  # Ridge (alpha = 0)
-  res_ridge <- optimize_panel(
+  expect_s4_class(res, "OptimizationResult")
+  expect_equal(res@control$algorithm, "NSGA-II")
+})
+
+test_that("optimize_panel respects explicit NSGA-III algorithm selection", {
+  # Skip: NSGA-III has a bug in rmoo 0.3.0 (associate_to_niches returns list)
+  skip("NSGA-III has known bug in rmoo 0.3.0")
+  skip_slow_tests()
+  set.seed(456)
+  sim <- simulate_expression_data(p = 15, n = 25, k = 1, seed = 43)
+  x <- sim$x_list[[1]]
+  y <- sim$y_list[[1]]
+
+  res <- optimize_panel(
     x = x,
     y = y,
     objectives = define_objectives(losses = c("sensitivity", "specificity")),
     max_features = 3,
-    feature_pool = colnames(x)[seq_len(10)],
-    cohort_aggregator = "none",
-    regularized = TRUE,
-    regularized_alpha = 0.0,
-    nsga_control = list(popsize = 12, generations = 8)
+    feature_pool = colnames(x)[seq_len(8)],
+    feature_transform = "none",
+    algorithm = "NSGA-III",
+    nsga_control = list(popSize = 12, maxiter = 10)
   )
 
-  expect_s4_class(res_lasso, "BiomarkerPanelResult")
-  expect_s4_class(res_ridge, "BiomarkerPanelResult")
-
-  expect_equal(res_lasso@control$regularized_alpha, 1.0)
-  expect_equal(res_ridge@control$regularized_alpha, 0.0)
-
-  # Both should produce valid cv.glmnet models
-  expect_true(inherits(res_lasso@model, "cv.glmnet"))
-  expect_true(inherits(res_ridge@model, "cv.glmnet"))
+  expect_s4_class(res, "OptimizationResult")
+  expect_equal(res@control$algorithm, "NSGA-III")
 })
 
-test_that("regularized scoring handles multi-cohort data", {
-  skip_slow_tests()
-  skip_if_not(file.exists(fixture_path("fake_gene_expression.Rds")))
-  fixture <- readRDS(fixture_path("fake_gene_expression.Rds"))
-
-  res <- optimize_panel(
-    x = fixture$x_list,
-    y = fixture$y_list,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
-    max_features = 4,
-    feature_pool = colnames(fixture$x_list[[1]])[seq_len(10)],
-    cohort_aggregator = "none",
-    regularized = TRUE,
-    regularized_alpha = 0.5,
-    nsga_control = list(popsize = 12, generations = 10)
+# Adaptive threshold tests
+test_that(".generate_sparse_suggestions creates diverse panel sizes", {
+  set.seed(123)
+  suggestions <- biomarkerPanels:::.generate_sparse_suggestions(
+    n_features = 20,
+    n_suggestions = 10,
+    min_features = 2,
+    max_features = 15
   )
 
-  expect_s4_class(res, "BiomarkerPanelResult")
-  expect_true(res@control$regularized)
-  expect_true(inherits(res@model, "cv.glmnet"))
+  expect_true(is.matrix(suggestions))
+  expect_equal(ncol(suggestions), 20)
+  expect_true(nrow(suggestions) >= 2)
 
-  # Should have cohort info in metadata
-  if (!is.null(res@model$biomarkerPanels_meta$cohort_info)) {
-    expect_true(length(res@model$biomarkerPanels_meta$cohort_info$levels) > 1)
+  # All values should be in [0, 1]
+  expect_true(all(suggestions >= 0 & suggestions <= 1))
+
+  # Each row should have a mix of high and low values
+  for (i in seq_len(nrow(suggestions))) {
+    high_weights <- sum(suggestions[i, ] > 0.5)
+    low_weights <- sum(suggestions[i, ] < 0.5)
+    expect_true(high_weights >= 2)
+    expect_true(low_weights >= 1)
   }
+})
+
+test_that("adaptive threshold produces variable panel sizes", {
+  skip_slow_tests()
+  set.seed(123)
+  n <- 60L
+  p <- 30L
+  x <- matrix(rnorm(n * p), nrow = n)
+  colnames(x) <- paste0("gene_", seq_len(p))
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+  # Strong signal on first 5 genes
+  x[y == "Yes", 1:5] <- x[y == "Yes", 1:5] + 2
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("balanced_accuracy", "num_features")),
+    max_features = 15,
+    feature_transform = "none",
+    regularized = FALSE,
+    selection_threshold = "adaptive",
+    nsga_control = list(popSize = 40, maxiter = 30)
+  )
+
+  expect_s4_class(res, "OptimizationResult")
+  expect_equal(res@control$selection_threshold, "adaptive")
+
+  sols <- solutions(res)
+  nf_values <- sols$num_features
+  message("Panel sizes in Pareto front (adaptive): ", paste(sort(unique(nf_values)), collapse = ", "))
+
+  expect_true(
+    min(nf_values) < 15,
+    info = "Adaptive threshold should allow panels smaller than max_features"
+  )
+})
+
+test_that("fixed threshold 0.5 is backward compatible", {
+  skip_slow_tests()
+  set.seed(456)
+  n <- 40L
+  p <- 15L
+  x <- matrix(rnorm(n * p), nrow = n)
+  colnames(x) <- paste0("gene_", seq_len(p))
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+  x[y == "Yes", 1:3] <- x[y == "Yes", 1:3] + 2
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    max_features = 8,
+    feature_transform = "none",
+    regularized = FALSE,
+    selection_threshold = 0.5,
+    nsga_control = list(popSize = 20, maxiter = 15)
+  )
+
+  expect_s4_class(res, "OptimizationResult")
+  expect_equal(res@control$selection_threshold, 0.5)
+
+  sols <- solutions(res)
+  for (i in seq_len(nrow(sols))) {
+    expect_true(length(sols$features[[i]]) >= 1)
+    expect_true(length(sols$features[[i]]) <= 8)
+  }
+})
+
+test_that("selection_threshold stored in control slot", {
+  set.seed(42)
+  n <- 20L
+  p <- 6L
+  x <- matrix(rnorm(n * p), nrow = n)
+  colnames(x) <- paste0("g", seq_len(p))
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 2
+
+  # Test with adaptive
+  res_adaptive <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    max_features = 4,
+    feature_transform = "none",
+    selection_threshold = "adaptive",
+    nsga_control = list(popSize = 8, maxiter = 5)
+  )
+  expect_equal(res_adaptive@control$selection_threshold, "adaptive")
+
+  # Test with numeric
+  res_fixed <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    max_features = 4,
+    feature_transform = "none",
+    selection_threshold = 0.6,
+    nsga_control = list(popSize = 8, maxiter = 5)
+  )
+  expect_equal(res_fixed@control$selection_threshold, 0.6)
 })

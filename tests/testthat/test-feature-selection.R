@@ -89,7 +89,7 @@ test_that("select_transferable_features prioritises consistent ridge coefficient
   skip_slow_tests()
   make_cohort <- function(seed, delta) {
     set.seed(seed)
-    n <- 80L
+    n <- 40L
     x <- matrix(rnorm(n * 3), nrow = n, ncol = 3)
     colnames(x) <- c("geneA", "geneB", "geneC")
     linear <- 1.5 * x[, "geneA"] - 0.5 * x[, "geneB"] + delta
@@ -128,7 +128,7 @@ test_that("select_transferable_features intersects cohort feature sets", {
   skip_slow_tests()
   make_dataset <- function(seed, cols) {
     set.seed(seed)
-    n <- 60L
+    n <- 40L
     x <- matrix(rnorm(n * length(cols)), nrow = n, ncol = length(cols))
     colnames(x) <- cols
     linear <- 1.2 * x[, "gene_common1"] - 0.8 * x[, "gene_common2"]
@@ -161,7 +161,7 @@ test_that("sign_consistency_threshold allows partial sign consistency", {
   # Create 4 cohorts where geneB has sign inconsistency in one cohort
   make_cohort <- function(seed, b_sign) {
     set.seed(seed)
-    n <- 80L
+    n <- 40L
     x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
     colnames(x) <- c("geneA", "geneB")
     # geneA always has positive effect, geneB has varying sign

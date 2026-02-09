@@ -25,17 +25,12 @@ to deployable panel definitions.
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/your-org/biomarkerPanels}
-  \item Report bugs at \url{https://github.com/your-org/biomarkerPanels/issues}
+  \item \url{https://github.com/SydneyBioX/biomarkerPanels}
+  \item Report bugs at \url{https://github.com/SydneyBioX/biomarkerPanels/issues}
 }
 
 }
 \author{
-\strong{Maintainer}: First Last \email{first.last@example.com}
-
-Other contributors:
-\itemize{
-  \item Contributors TBD [contributor]
-}
+\strong{Maintainer}: Harry Robertson \email{harry.robertson@sydney.edu.au}
 
 }
