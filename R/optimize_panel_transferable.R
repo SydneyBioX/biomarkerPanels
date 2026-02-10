@@ -367,7 +367,7 @@ optimize_panel_transferable <- function(
         }
 
         # Predict on validation data
-        val_scores <- .predict_from_model(fit, x_val_sel)
+        val_scores <- .predict_from_model(fit, x_val_sel, cohort = val_cohort)
 
         # Compute constraints on validation data
         constraint_results <- if (length(constraint_specs)) {

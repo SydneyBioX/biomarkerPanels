@@ -69,14 +69,14 @@ eval$metrics
 
 ### Multi-cohort optimization
 
-For multi-site studies, pass data as named lists. Use cohort-aware objectives like `min_cohort_sensitivity` to ensure the panel generalizes:
+For multi-site studies, pass data as named lists. Use cohort-aware objectives like `min_cohort_auc` to ensure the panel generalizes:
 
 ```r
 result <- optimize_panel(
   x = list(site_A = mat1, site_B = mat2, site_C = mat3),
   y = list(site_A = y1, site_B = y2, site_C = y3),
   objectives = define_objectives(
-    losses = c("sensitivity", "min_cohort_sensitivity", "num_features")
+    losses = c("sensitivity", "min_cohort_auc", "num_features")
   ),
   max_features = 8
 )
@@ -121,9 +121,9 @@ result <- optimize_panel(x, y, feature_pool = top_de, ...)
 | `auc` | Area under ROC curve | maximize |
 | `pauc` | Partial AUC (high-sensitivity region) | maximize |
 | `num_features` | Panel size | minimize |
-| `min_cohort_sensitivity` | Worst-case sensitivity across cohorts | maximize |
-| `min_cohort_specificity` | Worst-case specificity across cohorts | maximize |
-| `cohort_sensitivity_gap` | Max sensitivity difference between cohorts | minimize |
+| `min_cohort_auc` | Worst-case AUC across cohorts | maximize |
+| `cohort_auc_gap` | Max AUC difference between cohorts | minimize |
+| `cohort_auc_var` | Variance of per-cohort AUC values | minimize |
 
 See `loss_registry()` for the complete list.
 

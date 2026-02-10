@@ -61,19 +61,16 @@ NULL
   cutoff_dependent = TRUE
 )
 .register_default_loss(
-  "min_cohort_sensitivity", loss_min_cohort_sensitivity, "maximize",
-  "Minimum Cohort Sensitivity",
-  cutoff_dependent = TRUE
+  "min_cohort_auc", loss_min_cohort_auc, "maximize",
+  "Minimum Cohort AUC"
 )
 .register_default_loss(
-  "min_cohort_specificity", loss_min_cohort_specificity, "maximize",
-  "Minimum Cohort Specificity",
-  cutoff_dependent = TRUE
+  "cohort_auc_gap", loss_cohort_auc_gap, "minimize",
+  "Cohort AUC Gap"
 )
 .register_default_loss(
-  "cohort_sensitivity_gap", loss_cohort_sensitivity_gap, "minimize",
-  "Cohort Sensitivity Gap",
-  cutoff_dependent = TRUE
+  "cohort_auc_var", loss_cohort_auc_var, "minimize",
+  "Cohort AUC Variance"
 )
 
 # Cutoff-free metrics (do not depend on probability threshold)
@@ -86,10 +83,6 @@ NULL
 .register_default_loss(
   "max_cohort_brier", loss_max_cohort_brier, "minimize",
   "Maximum Cohort Brier Score"
-)
-.register_default_loss(
-  "max_cohort_mean_shift", loss_max_cohort_mean_shift, "minimize",
-  "Maximum Cohort Mean Shift"
 )
 .register_default_loss(
   "pauc", loss_pauc, "maximize", "Partial AUC (High Sensitivity)"

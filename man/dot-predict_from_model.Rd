@@ -4,7 +4,7 @@
 \alias{.predict_from_model}
 \title{Predict from Fitted Model}
 \usage{
-.predict_from_model(model, newx)
+.predict_from_model(model, newx, cohort = NULL)
 }
 \arguments{
 \item{model}{Fitted model (cv.glmnet or glm).}

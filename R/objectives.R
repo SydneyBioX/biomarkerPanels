@@ -30,9 +30,7 @@ define_objectives <- function(losses = c("sensitivity", "specificity"),
   cutoff_strategy <- match.arg(cutoff_strategy)
 
   # Add cutoff_strategy to params for losses that use cutoffs
-  cutoff_losses <- c("sensitivity", "specificity", "balanced_accuracy",
-                     "min_cohort_sensitivity", "min_cohort_specificity",
-                     "cohort_sensitivity_gap")
+  cutoff_losses <- c("sensitivity", "specificity", "balanced_accuracy")
 
   for (loss_name in intersect(losses, cutoff_losses)) {
     if (is.null(params[[loss_name]])) {

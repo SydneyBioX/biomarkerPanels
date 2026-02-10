@@ -27,10 +27,8 @@ NULL
 .make_cohort_aware_loss <- function(base_loss, aggregator, metric_name,
                                      single_cohort_fallback = NULL) {
   function(truth, scores = NULL, selected = NULL,
-           cutoff_prob = 0.5,
-           cutoff_strategy = c("fixed", "prevalence", "youden"),
            positive = "Yes",
-           cohort = NULL) {
+           cohort = NULL, ...) {
     # Standardize truth once at the start to get consistent factor levels
     truth <- ensure_binary_response(truth)
     truth_levels <- levels(truth)
@@ -38,14 +36,11 @@ NULL
     if (is.null(scores)) {
       stop("`scores` must be supplied to compute ", metric_name, ".", call. = FALSE)
     }
-    cutoff_strategy <- match.arg(cutoff_strategy)
 
     # Fall back to base loss when no cohort provided
     if (is.null(cohort)) {
       base_result <- base_loss(truth, scores, selected,
-                               cutoff_prob = cutoff_prob,
-                               cutoff_strategy = cutoff_strategy,
-                               positive = positive)
+                               positive = positive, ...)
       if (!is.null(single_cohort_fallback)) {
         return(single_cohort_fallback * base_result)
       }
@@ -59,15 +54,18 @@ NULL
 
     # Compute per-cohort values
     # Preserve factor levels when subsetting to avoid re-inferring classes
+    # tryCatch guards against base_loss errors (e.g., loss_auc when a cohort
+    # has 0 positives or 0 negatives)
     values <- vapply(levels(cohort), function(level) {
       idx <- !is.na(cohort) & cohort == level
       if (!any(idx)) return(NA_real_)
       # Subset and preserve factor levels
       truth_subset <- factor(truth[idx], levels = truth_levels)
-      base_loss(truth_subset, scores[idx], selected = selected,
-                cutoff_prob = cutoff_prob,
-                cutoff_strategy = cutoff_strategy,
-                positive = positive)
+      tryCatch(
+        base_loss(truth_subset, scores[idx], selected = selected,
+                  positive = positive, ...),
+        error = function(e) NA_real_
+      )
     }, numeric(1))
 
     if (all(is.na(values))) return(NA_real_)
@@ -88,51 +86,76 @@ NULL
   max(values, na.rm = na.rm) - min(values, na.rm = na.rm)
 }
 
-#' Minimum Cohort Sensitivity
+#' Variance Aggregator for Cohort Metrics
 #'
-#' Computes sensitivity within each cohort and returns the minimum value to
-#' capture worst-case performance.
+#' Computes the sample variance of values across cohorts. Returns 0 when
+#' fewer than 2 non-NA values are available.
+#'
+#' @param values Numeric vector of per-cohort metric values.
+#' @param na.rm Logical; whether to remove NA values before computation.
+#' @return Variance of the values, or 0 for single-cohort input.
+#' @keywords internal
+.variance_aggregator <- function(values, na.rm = TRUE) {
+  if (na.rm) values <- values[!is.na(values)]
+  if (length(values) <= 1L) return(0)
+  stats::var(values)
+}
+
+#' Minimum Cohort AUC
+#'
+#' Computes AUC within each cohort and returns the minimum value to capture
+#' worst-case discrimination. Unlike cutoff-dependent cohort losses, this
+#' metric is threshold-free.
 #'
 #' @param truth Binary outcome; coerced with [ensure_binary_response()].
 #' @param scores Numeric scores or probabilities.
 #' @param selected Ignored; kept for signature compatibility.
-#' @param cutoff_prob Classification probability cutoff applied to `scores`.
-#' @param cutoff_strategy Strategy for computing cutoff.
 #' @param positive Label treated as the positive ("event") class.
 #' @param cohort Factor indicating cohort membership.
-#' @return Sensitivity of the weakest cohort.
+#' @param ... Additional arguments forwarded to [loss_auc()].
+#' @return AUC of the weakest cohort.
+#' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
+#'   of each class. Consider using `loss_auc` as the primary objective and
+#'   this metric for monitoring.
 #' @export
-loss_min_cohort_sensitivity <- .make_cohort_aware_loss(
-  base_loss = loss_sensitivity,
+loss_min_cohort_auc <- .make_cohort_aware_loss(
+  base_loss = loss_auc,
   aggregator = min,
-  metric_name = "sensitivity"
+  metric_name = "AUC"
 )
 
-#' Minimum Cohort Specificity
+#' Cohort AUC Range
 #'
-#' Computes specificity within each cohort and returns the minimum value.
+#' Difference between maximum and minimum per-cohort AUC values. Smaller
+#' values indicate more uniform discrimination across cohorts.
 #'
-#' @inheritParams loss_min_cohort_sensitivity
-#' @return Specificity of the weakest cohort.
+#' @inheritParams loss_min_cohort_auc
+#' @return AUC range across cohorts.
+#' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
+#'   of each class.
 #' @export
-loss_min_cohort_specificity <- .make_cohort_aware_loss(
-  base_loss = loss_specificity,
-  aggregator = min,
-  metric_name = "specificity"
-)
-
-#' Cohort Sensitivity Range
-#'
-#' Difference between maximum and minimum cohort sensitivities. Smaller values
-#' indicate more uniform transfer across cohorts.
-#'
-#' @inheritParams loss_min_cohort_sensitivity
-#' @return Sensitivity range across cohorts.
-#' @export
-loss_cohort_sensitivity_gap <- .make_cohort_aware_loss(
-  base_loss = loss_sensitivity,
+loss_cohort_auc_gap <- .make_cohort_aware_loss(
+  base_loss = loss_auc,
   aggregator = .gap_aggregator,
-  metric_name = "sensitivity",
+  metric_name = "AUC",
+  single_cohort_fallback = 0
+)
+
+#' Cohort AUC Variance
+#'
+#' Sample variance of per-cohort AUC values. Penalises uneven discrimination
+#' across cohorts without being dominated by extreme cohorts the way the gap
+#' metric can be.
+#'
+#' @inheritParams loss_min_cohort_auc
+#' @return Variance of per-cohort AUC values.
+#' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
+#'   of each class.
+#' @export
+loss_cohort_auc_var <- .make_cohort_aware_loss(
+  base_loss = loss_auc,
+  aggregator = .variance_aggregator,
+  metric_name = "AUC",
   single_cohort_fallback = 0
 )
 
@@ -141,7 +164,7 @@ loss_cohort_sensitivity_gap <- .make_cohort_aware_loss(
 #' Computes the Brier score (mean squared error on probabilities) within each
 #' cohort and returns the maximum, highlighting the worst calibrated cohort.
 #'
-#' @inheritParams loss_min_cohort_sensitivity
+#' @inheritParams loss_min_cohort_auc
 #' @return Maximum Brier score across cohorts.
 #' @export
 loss_max_cohort_brier <- function(truth, scores = NULL, selected = NULL,
@@ -163,52 +186,4 @@ loss_max_cohort_brier <- function(truth, scores = NULL, selected = NULL,
     mean((scores[idx] - target[idx])^2)
   }, numeric(1))
   max(values, na.rm = TRUE)
-}
-
-#' Maximum Mean Shift Across Cohorts
-#'
-#' Computes pairwise distances between cohort-specific mean expression vectors
-#' for the selected features and returns the maximum distance. Encourages panels
-#' whose selected biomarkers exhibit similar distributions across cohorts.
-#'
-#' @inheritParams loss_min_cohort_sensitivity
-#' @param x Matrix of selected feature values (samples x features).
-#' @return Maximum pairwise distance between cohort means.
-#' @export
-loss_max_cohort_mean_shift <- function(truth, scores = NULL, selected = NULL,
-                                       cohort = NULL, x = NULL) {
-  # Validate inputs - x must be provided with features
-  if (is.null(x)) {
-    stop("`x` (feature matrix) must be provided to compute cohort mean shift.", call. = FALSE)
-  }
-  if (ncol(x) == 0L) {
-    stop("Feature matrix `x` has no columns. Cannot compute cohort mean shift.", call. = FALSE)
-  }
-  # Single cohort is valid - return 0 as there's no shift to measure
-  if (is.null(cohort)) {
-    return(0)
-  }
-  cohort <- factor(cohort)
-  if (length(cohort) != nrow(x)) {
-    stop("Length of `cohort` must match the number of rows in `x`.", call. = FALSE)
-  }
-  if (nlevels(cohort) <= 1L) {
-    return(0)
-  }
-  means <- lapply(levels(cohort), function(level) {
-    idx <- !is.na(cohort) & cohort == level
-    if (!any(idx)) {
-      return(NULL)
-    }
-    colMeans(x[idx, , drop = FALSE])
-  })
-  means <- Filter(Negate(is.null), means)
-  if (length(means) <= 1L) {
-    return(0)
-  }
-  mean_matrix <- do.call(rbind, means)
-  if (nrow(mean_matrix) <= 1L) {
-    return(0)
-  }
-  max(stats::dist(mean_matrix))
 }

@@ -217,16 +217,12 @@ evaluate_panel <- function(panel, x, y,
           newdata <- newdata[, feature_cols, drop = FALSE]
         }
 
-        # Add cohort if the model was trained with cohort
+        # If model was trained with cohort, always use reference level so
+        # predictions are cohort-agnostic. Cohort-aware losses split downstream.
         if (".cohort" %in% names(stored_model$model)) {
-          if (length(unique(cohort_vec)) > 1L) {
-            newdata$.cohort <- factor(cohort_vec)
-          } else {
-            # If validation has only one cohort, use the first training cohort level
-            train_cohort_levels <- levels(stored_model$model$.cohort)
-            newdata$.cohort <- factor(rep(train_cohort_levels[1], nrow(newdata)),
-                                      levels = train_cohort_levels)
-          }
+          train_cohort_levels <- levels(stored_model$model$.cohort)
+          newdata$.cohort <- factor(rep(train_cohort_levels[1], nrow(newdata)),
+                                    levels = train_cohort_levels)
         }
         preds <- stats::predict(stored_model, newdata = newdata, type = "response")
       }
@@ -431,44 +427,15 @@ evaluate_panel <- function(panel, x, y,
 
   meta <- model$biomarkerPanels_meta
 
-  # Add cohort dummies if the model was trained with them
+  # Add cohort dummies if the model was trained with them.
+  # Always zero out — predictions should be cohort-agnostic for
+
+  # transferability. Cohort-aware losses split by cohort downstream.
   if (!is.null(meta$cohort_info)) {
-    cohort_info <- meta$cohort_info
-    train_levels <- cohort_info$levels
-    n_dummies <- cohort_info$n_dummies
-
-    # Create cohort factor with training levels
-    cohort_factor <- factor(cohort_vec, levels = train_levels)
-
-    # Handle unseen cohort levels - this is a data integrity error
-    if (any(is.na(cohort_factor))) {
-      unseen <- unique(as.character(cohort_vec)[is.na(cohort_factor)])
-      stop(
-        "Validation data contains cohort levels not seen during training: ",
-        paste(unseen, collapse = ", "), ".\n",
-        "Training cohorts: ", paste(train_levels, collapse = ", "), ".\n",
-        "Cannot make valid predictions for unseen cohorts. ",
-        "Either include these cohorts in training or exclude them from validation.",
-        call. = FALSE
-      )
-    }
-
-    cohort_dummies <- stats::model.matrix(~ cohort_factor - 1)[, -1, drop = FALSE]
-
-    # Ensure correct number of dummy columns
-    if (ncol(cohort_dummies) != n_dummies) {
-      # Pad with zeros if needed (for cohorts not in validation data)
-      if (ncol(cohort_dummies) < n_dummies) {
-        padding <- matrix(0, nrow = nrow(cohort_dummies),
-                          ncol = n_dummies - ncol(cohort_dummies))
-        cohort_dummies <- cbind(cohort_dummies, padding)
-      } else {
-        cohort_dummies <- cohort_dummies[, seq_len(n_dummies), drop = FALSE]
-      }
-    }
-
-    colnames(cohort_dummies) <- paste0(".cohort_", seq_len(n_dummies))
-    x_mat <- cbind(x_mat, cohort_dummies)
+    n_dummies <- meta$cohort_info$n_dummies
+    dummy_cols <- matrix(0, nrow = nrow(x_mat), ncol = n_dummies)
+    colnames(dummy_cols) <- paste0(".cohort_", seq_len(n_dummies))
+    x_mat <- cbind(x_mat, dummy_cols)
   }
 
   # Predict using lambda.min

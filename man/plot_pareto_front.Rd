@@ -6,70 +6,52 @@
 \usage{
 plot_pareto_front(
   optimization_result,
-  x,
-  y,
+  x = NULL,
+  y = NULL,
   x_metric = "sensitivity",
   y_metric = "specificity",
   color_by = "n_features",
   point_size = 4,
   point_alpha = 0.7,
   viridis_option = "plasma",
-  connect = FALSE,
   title = NULL,
-  xlab = NULL,
-  ylab = NULL,
-  color_label = NULL,
   regularized = TRUE,
-  on_error = c("warn", "stop"),
-  verbose = interactive(),
-  ...
+  verbose = interactive()
 )
 }
 \arguments{
 \item{optimization_result}{An \code{OptimizationResult} from \code{\link[=optimize_panel]{optimize_panel()}}.}
 
 \item{x}{Held-out validation data: a matrix, data.frame,
-\code{SummarizedExperiment}, or list of such objects.}
+\code{SummarizedExperiment}, or list of such objects. When \code{NULL} (default),
+automatically uses held-out data stored by
+\code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}.}
 
 \item{y}{Held-out validation labels: a factor (or list of factors when \code{x}
-is a list).}
+is a list). When \code{NULL} (default), automatically uses held-out labels
+stored by \code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}.}
 
-\item{x_metric}{Character; metric name for the x-axis. Default
-\code{"sensitivity"}.}
+\item{x_metric}{Character; metric name for the x-axis. Must be one of
+\code{"sensitivity"}, \code{"specificity"}, or \code{"auc"}. Default \code{"sensitivity"}.}
 
-\item{y_metric}{Character; metric name for the y-axis. Default
-\code{"specificity"}.}
+\item{y_metric}{Character; metric name for the y-axis. Same options as
+\code{x_metric}. Default \code{"specificity"}.}
 
-\item{color_by}{Character or \code{NULL}; metric name (or \code{"n_features"} /
-\code{"n_base_features"}) for point colour. \code{NULL} disables colour mapping.
-Default \code{"n_features"}.}
+\item{color_by}{One of \code{"n_features"}, \code{"n_base_features"}, \code{"auc"},
+\code{"sensitivity"}, \code{"specificity"}, or \code{NULL} to disable. Default
+\code{"n_features"}.}
 
-\item{point_size}{Numeric; point size passed to \code{\link[ggplot2:geom_point]{ggplot2::geom_point()}}.
-Default \code{4}.}
+\item{point_size}{Numeric; point size. Default \code{4}.}
 
 \item{point_alpha}{Numeric; point transparency. Default \code{0.7}.}
 
 \item{viridis_option}{Character; viridis palette name. Default \code{"plasma"}.}
 
-\item{connect}{Logical; if \code{TRUE}, connect points with a grey line sorted
-by \code{x_metric}. Default \code{FALSE}.}
-
 \item{title}{Character or \code{NULL}; plot title. Auto-generated when \code{NULL}.}
-
-\item{xlab, ylab}{Character or \code{NULL}; axis labels. Default to metric names.}
-
-\item{color_label}{Character or \code{NULL}; colour legend title. Defaults to
-\code{color_by}.}
 
 \item{regularized}{Logical; passed to \code{\link[=fit_panel]{fit_panel()}}. Default \code{TRUE}.}
 
-\item{on_error}{One of \code{"warn"} (skip failed solutions with a warning) or
-\code{"stop"} (abort on first failure). Default \code{"warn"}.}
-
-\item{verbose}{Logical; print progress messages. Default
-\code{interactive()}.}
-
-\item{...}{Additional arguments passed to \code{\link[=evaluate_panel]{evaluate_panel()}}.}
+\item{verbose}{Logical; print progress messages. Default \code{interactive()}.}
 }
 \value{
 A \code{ggplot} object. The underlying metrics data frame is accessible

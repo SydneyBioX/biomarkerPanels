@@ -236,7 +236,7 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
   }
 
   # Generate predictions using stored model
-  heldout_scores <- .predict_from_model(panel@model, x_selected)
+  heldout_scores <- .predict_from_model(panel@model, x_selected, cohort = cohort_ho)
 
   # NP threshold selection
   np_result <- .select_np_threshold(
@@ -289,7 +289,7 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
 #' @param newx New feature matrix for prediction.
 #' @return Numeric vector of predicted probabilities.
 #' @keywords internal
-.predict_from_model <- function(model, newx) {
+.predict_from_model <- function(model, newx, cohort = NULL) {
   if (inherits(model, "cv.glmnet")) {
     # glmnet model
     x_mat <- as.matrix(newx)
@@ -310,7 +310,22 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
     )[, 1]
   } else if (inherits(model, "glm")) {
     # Standard GLM
-    newdata <- as.data.frame(newx, check.names = TRUE)
+    # Note: as.data.frame.matrix() ignores check.names, so we must sanitize
+    # names explicitly to match the names used during training in
+    # .fit_final_model(), which wraps in data.frame(check.names = TRUE).
+    newdata <- as.data.frame(newx)
+    names(newdata) <- make.names(names(newdata), unique = TRUE)
+
+    # If model was trained with cohort covariate, always use reference level
+    # so predictions are cohort-agnostic (matching the glmnet path which zeros
+    # out cohort dummies). Cohort-aware losses split by cohort downstream.
+    model_terms <- attr(stats::terms(model), "term.labels")
+    if (".cohort" %in% model_terms) {
+      ref_level <- model$xlevels[[".cohort"]][1]
+      newdata$.cohort <- factor(rep(ref_level, nrow(newdata)),
+                                levels = model$xlevels[[".cohort"]])
+    }
+
     preds <- stats::predict(model, newdata = newdata, type = "response")
   } else {
     stop("Unknown model type: ", class(model)[1], call. = FALSE)

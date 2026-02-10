@@ -76,56 +76,77 @@ test_that("register_loss_function adds new entries", {
   expect_equal(objs[[name]]$fun(NULL, NULL, NULL), 42)
 })
 
-test_that("cohort-aware losses compute transfer metrics", {
+test_that("cohort-aware AUC losses compute transfer metrics", {
+  # Need enough samples per cohort for AUC to be meaningful
+  set.seed(123)
   truth <- factor(
-    c("No", "Yes", "Yes", "No", "Yes", "No"),
+    c("No", "Yes", "Yes", "No", "Yes", "No", "No", "Yes", "Yes", "No"),
     levels = c("No", "Yes")
   )
-  scores <- c(0.1, 0.9, 0.8, 0.2, 0.6, 0.4)
-  cohort <- factor(c("A", "A", "B", "B", "B", "A"))
+  scores <- c(0.1, 0.9, 0.8, 0.2, 0.7, 0.3, 0.15, 0.85, 0.75, 0.25)
+  cohort <- factor(c("A", "A", "A", "A", "A", "B", "B", "B", "B", "B"))
+
+  auc_A <- loss_auc(truth[cohort == "A"], scores[cohort == "A"])
+  auc_B <- loss_auc(truth[cohort == "B"], scores[cohort == "B"])
+
+  # loss_min_cohort_auc equals minimum per-cohort AUC
   expect_equal(
-    loss_min_cohort_sensitivity(truth, scores, cohort = cohort),
-    min(
-      loss_sensitivity(truth[cohort == "A"], scores[cohort == "A"]),
-      loss_sensitivity(truth[cohort == "B"], scores[cohort == "B"])
-    )
+    loss_min_cohort_auc(truth, scores, cohort = cohort),
+    min(auc_A, auc_B)
   )
-  expect_equal(
-    loss_min_cohort_specificity(truth, scores, cohort = cohort),
-    min(
-      loss_specificity(truth[cohort == "A"], scores[cohort == "A"]),
-      loss_specificity(truth[cohort == "B"], scores[cohort == "B"])
-    )
-  )
-  gap <- loss_cohort_sensitivity_gap(truth, scores, cohort = cohort)
+
+  # loss_cohort_auc_gap equals max - min per-cohort AUC
+  gap <- loss_cohort_auc_gap(truth, scores, cohort = cohort)
   expect_gte(gap, 0)
-  expect_equal(gap, max(
-    loss_sensitivity(truth[cohort == "A"], scores[cohort == "A"]),
-    loss_sensitivity(truth[cohort == "B"], scores[cohort == "B"])
-  ) - min(
-    loss_sensitivity(truth[cohort == "A"], scores[cohort == "A"]),
-    loss_sensitivity(truth[cohort == "B"], scores[cohort == "B"])
-  ))
+  expect_equal(gap, max(auc_A, auc_B) - min(auc_A, auc_B))
+
+  # loss_cohort_auc_var equals variance of per-cohort AUC
+  auc_var <- loss_cohort_auc_var(truth, scores, cohort = cohort)
+  expect_gte(auc_var, 0)
+  expect_equal(auc_var, var(c(auc_A, auc_B)))
 
   brier <- loss_max_cohort_brier(truth, scores, cohort = cohort)
   expect_gte(brier, 0)
 
-  x <- matrix(
-    c(1, 2, 3, 4, 5, 6,
-      2, 3, 4, 5, 6, 7),
-    nrow = 6, ncol = 2, byrow = FALSE
+  objs <- build_objectives("min_cohort_auc")
+  expect_equal(
+    objs$min_cohort_auc$fun(truth, scores, cohort = cohort),
+    loss_min_cohort_auc(truth, scores, cohort = cohort)
   )
-  shift <- loss_max_cohort_mean_shift(truth, scores, cohort = cohort, x = x)
-  expect_gte(shift, 0)
+})
 
-  objs <- build_objectives(c("min_cohort_sensitivity", "max_cohort_mean_shift"))
-  expect_equal(
-    objs$min_cohort_sensitivity$fun(truth, scores, cohort = cohort),
-    loss_min_cohort_sensitivity(truth, scores, cohort = cohort)
+test_that("cohort AUC losses handle degenerate cohorts (0 positives)", {
+  # Cohort C has no positives — loss_auc will error, should return NA
+  truth <- factor(
+    c("No", "Yes", "Yes", "No", "No", "No"),
+    levels = c("No", "Yes")
   )
+  scores <- c(0.1, 0.9, 0.8, 0.2, 0.3, 0.4)
+  cohort <- factor(c("A", "A", "A", "A", "C", "C"))
+
+  # Should not crash — degenerate cohort returns NA, aggregator ignores it
+
+  result <- loss_min_cohort_auc(truth, scores, cohort = cohort)
+  expect_true(is.numeric(result))
+  expect_false(is.na(result))  # cohort A is valid
+
+  gap <- loss_cohort_auc_gap(truth, scores, cohort = cohort)
+  # With only one valid cohort, gap = 0 (single value range)
+  expect_equal(gap, 0)
+})
+
+test_that("cohort AUC losses return fallback for single cohort", {
+  truth <- factor(c("No", "Yes", "Yes", "No"), levels = c("No", "Yes"))
+  scores <- c(0.1, 0.9, 0.8, 0.2)
+
+  # No cohort argument — gap and var should return 0 (single_cohort_fallback)
+  expect_equal(loss_cohort_auc_gap(truth, scores), 0)
+  expect_equal(loss_cohort_auc_var(truth, scores), 0)
+
+  # min_cohort_auc without cohort falls back to overall AUC
   expect_equal(
-    objs$max_cohort_mean_shift$fun(truth, scores, cohort = cohort, x = x),
-    loss_max_cohort_mean_shift(truth, scores, cohort = cohort, x = x)
+    loss_min_cohort_auc(truth, scores),
+    loss_auc(truth, scores)
   )
 })
 
@@ -377,9 +398,9 @@ test_that("loss registry includes cutoff_dependent field", {
   expect_true(registry$f1$cutoff_dependent)
   expect_true(registry$precision$cutoff_dependent)
   expect_true(registry$npv$cutoff_dependent)
-  expect_true(registry$min_cohort_sensitivity$cutoff_dependent)
-  expect_true(registry$min_cohort_specificity$cutoff_dependent)
-  expect_true(registry$cohort_sensitivity_gap$cutoff_dependent)
+  expect_false(registry$min_cohort_auc$cutoff_dependent)
+  expect_false(registry$cohort_auc_gap$cutoff_dependent)
+  expect_false(registry$cohort_auc_var$cutoff_dependent)
 
   # Cutoff-free metrics should have cutoff_dependent = FALSE
   expect_false(registry$auc$cutoff_dependent)
@@ -387,7 +408,7 @@ test_that("loss registry includes cutoff_dependent field", {
   expect_false(registry$specificity_at_sensitivity$cutoff_dependent)
   expect_false(registry$num_features$cutoff_dependent)
   expect_false(registry$max_cohort_brier$cutoff_dependent)
-  expect_false(registry$max_cohort_mean_shift$cutoff_dependent)
+
 })
 
 test_that("min_metric_constraint warns for cutoff-dependent metrics", {
