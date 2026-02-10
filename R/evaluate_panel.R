@@ -48,7 +48,7 @@ NULL
 #' @export
 evaluate_panel <- function(panel, x, y,
                            objectives = define_objectives(
-                             losses = c("sensitivity", "specificity", "auc")
+                             metrics = c("sensitivity", "specificity", "auc")
                            ),
                            cohort = NULL,
                            assay = NULL,
@@ -218,7 +218,7 @@ evaluate_panel <- function(panel, x, y,
         }
 
         # If model was trained with cohort, always use reference level so
-        # predictions are cohort-agnostic. Cohort-aware losses split downstream.
+        # predictions are cohort-agnostic. Cohort-aware metrics split downstream.
         if (".cohort" %in% names(stored_model$model)) {
           train_cohort_levels <- levels(stored_model$model$.cohort)
           newdata$.cohort <- factor(rep(train_cohort_levels[1], nrow(newdata)),
@@ -266,13 +266,13 @@ evaluate_panel <- function(panel, x, y,
     )
   }, numeric(1))
 
-  sensitivity_point <- loss_sensitivity(
+  sensitivity_point <- metric_sensitivity(
     truth,
     scores,
     cutoff_prob = cutoff_prob,
     positive = positive
   )
-  specificity_point <- loss_specificity(
+  specificity_point <- metric_specificity(
     truth,
     scores,
     cutoff_prob = cutoff_prob,
@@ -321,7 +321,7 @@ evaluate_panel <- function(panel, x, y,
       ggplot2::theme_minimal()
   }
 
-  roc_auc <- loss_auc(truth, scores, positive = positive)
+  roc_auc <- metric_auc(truth, scores, positive = positive)
 
   list(
     metrics = objective_values,
@@ -430,7 +430,7 @@ evaluate_panel <- function(panel, x, y,
   # Add cohort dummies if the model was trained with them.
   # Always zero out — predictions should be cohort-agnostic for
 
-  # transferability. Cohort-aware losses split by cohort downstream.
+  # transferability. Cohort-aware metrics split by cohort downstream.
   if (!is.null(meta$cohort_info)) {
     n_dummies <- meta$cohort_info$n_dummies
     dummy_cols <- matrix(0, nrow = nrow(x_mat), ncol = n_dummies)

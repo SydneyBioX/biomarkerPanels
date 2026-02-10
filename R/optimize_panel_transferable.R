@@ -48,7 +48,7 @@
 optimize_panel_transferable <- function(
   x, y,
   objectives = define_objectives(
-    losses = c("sensitivity", "specificity", "num_features")
+    metrics = c("sensitivity", "specificity", "num_features")
   ),
   max_features = 5L,
   feature_pool = NULL,

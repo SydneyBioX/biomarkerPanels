@@ -1,7 +1,7 @@
 #' Optimize Biomarker Panels with NSGA-II
 #'
 #' Wrapper around [rmoo::nsga2()] (or [rmoo::nsga3()]) that composes registered
-#' loss functions into a multi-objective search for compact biomarker panels.
+#' metric functions into a multi-objective search for compact biomarker panels.
 #' Candidate solutions are represented as weights over a feature pool; features
 #' with weight > 0.5 are included in the panel (up to `max_features`). This
 #' threshold-based selection allows variable panel sizes, making the
@@ -92,7 +92,7 @@
 #' @seealso [fit_panel()], [summarize_solutions()], [evaluate_panel()]
 optimize_panel <- function(x, y,
                            objectives = define_objectives(
-                             losses = c("sensitivity", "specificity", "num_features")
+                             metrics = c("sensitivity", "specificity", "num_features")
                            ),
                            max_features = 5L,
                            feature_pool = NULL,

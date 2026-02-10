@@ -9,7 +9,7 @@ test_that("optimize_panel returns an OptimizationResult", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity", "num_features")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity", "num_features")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
     feature_transform = "none",
@@ -52,7 +52,7 @@ test_that("num_features objective allows variable panel sizes", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    objectives = define_objectives(metrics = c("sensitivity", "num_features")),
     max_features = 8,
     feature_pool = colnames(x),
     feature_transform = "none",
@@ -94,7 +94,7 @@ test_that("all Pareto solutions have consistent feature counts", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    objectives = define_objectives(metrics = c("sensitivity", "num_features")),
     max_features = 4,
     feature_transform = "none",
     nsga_control = list(popSize = 8, maxiter = 5)
@@ -123,7 +123,7 @@ test_that("optimize_panel handles multiple cohorts", {
   res <- optimize_panel(
     x = fixture$x_list,
     y = fixture$y_list,
-    objectives = define_objectives(losses = c("sensitivity", "specificity", "num_features")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity", "num_features")),
     max_features = 4,
     feature_pool = colnames(fixture$x_list[[1]])[seq_len(12)],
     feature_transform = "none",
@@ -159,7 +159,7 @@ test_that("optimize_panel intersects feature sets across cohorts", {
   res <- optimize_panel(
     x = list(c1$x, c2$x),
     y = list(c1$y, c2$y),
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 2,
     feature_transform = "none",
     nsga_control = list(popSize = 12, maxiter = 8)
@@ -177,7 +177,7 @@ test_that("min_metric_constraint builds feasible constraint", {
   constraint <- min_metric_constraint("sensitivity", threshold = 0.9)
   expect_type(constraint$label, "character")
   expect_true(is.function(constraint$fun))
-  expect_equal(constraint$loss, "sensitivity")
+  expect_equal(constraint$metric, "sensitivity")
   expect_equal(constraint$direction, "maximize")
 })
 
@@ -194,7 +194,7 @@ test_that("optimize_panel enforces minimum metric constraints", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("specificity")),
+    objectives = define_objectives(metrics = c("specificity")),
     max_features = 1,
     feature_pool = colnames(x),
     constraints = list(min_metric_constraint("sensitivity", threshold = 0.9)),
@@ -223,7 +223,7 @@ test_that("optimize_panel errors when constraints infeasible", {
     optimize_panel(
       x = x,
       y = y,
-      objectives = define_objectives(losses = c("specificity")),
+      objectives = define_objectives(metrics = c("specificity")),
       max_features = 2,
       feature_pool = colnames(x),
       constraints = list(min_metric_constraint("sensitivity", threshold = 1.01)),
@@ -249,7 +249,7 @@ test_that("pairwise cohort aggregator produces contrast features", {
   res <- optimize_panel(
     x = x_list,
     y = y_list,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 2,
     feature_transform = "pairwise_ratios",
     nsga_control = list(popSize = 12, maxiter = 8)
@@ -270,7 +270,7 @@ test_that("feature_pool accepts base features with pairwise aggregator", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 1,
     feature_pool = c("GeneA", "GeneC"),
     feature_transform = "pairwise_ratios",
@@ -299,7 +299,7 @@ test_that("optimize_panel works with pairwise_log_ratios aggregator", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 2,
     feature_transform = "pairwise_log_ratios",
     nsga_control = list(popSize = 12, maxiter = 8)
@@ -323,7 +323,7 @@ test_that("optimize_panel works with reference_norm aggregator", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 2,
     feature_transform = "reference_norm",
     nsga_control = list(popSize = 12, maxiter = 8)
@@ -342,7 +342,7 @@ test_that("optimize_panel rejects unregistered aggregator", {
     optimize_panel(
       x = sim$x_list[[1]],
       y = sim$y_list[[1]],
-      objectives = define_objectives(losses = c("sensitivity", "specificity")),
+      objectives = define_objectives(metrics = c("sensitivity", "specificity")),
       max_features = 2,
       feature_transform = "nonexistent_transform",
       nsga_control = list(popSize = 8, maxiter = 5)
@@ -368,7 +368,7 @@ test_that("custom aggregator can be registered and used", {
   res <- optimize_panel(
     x = sim$x_list[[1]],
     y = sim$y_list[[1]],
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 2,
     feature_transform = "center_features",
     nsga_control = list(popSize = 12, maxiter = 6)
@@ -451,7 +451,7 @@ test_that("optimize_panel uses adaptive defaults without explicit nsga_control",
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(35)],
     feature_transform = "none"
@@ -493,7 +493,7 @@ test_that("feature_alignment = 'majority' keeps features in >= 50% cohorts", {
   res <- optimize_panel(
     x = x_list,
     y = y_list,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 2,
     feature_transform = "none",
     feature_alignment = "majority",
@@ -532,7 +532,7 @@ test_that("feature_alignment = 'intersection' is default and drops partial featu
   res <- optimize_panel(
     x = x_list,
     y = y_list,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 2,
     feature_transform = "none",
     feature_alignment = "intersection",
@@ -554,7 +554,7 @@ test_that("regularized = TRUE uses regularized scoring during optimization", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(10)],
     feature_transform = "none",
@@ -578,7 +578,7 @@ test_that("regularized = FALSE uses unregularized scoring", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(10)],
     feature_transform = "none",
@@ -602,7 +602,7 @@ test_that("optimize_panel uses NSGA-II by default", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
     feature_transform = "none",
@@ -625,7 +625,7 @@ test_that("optimize_panel respects explicit NSGA-III algorithm selection", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
     feature_transform = "none",
@@ -677,7 +677,7 @@ test_that("adaptive threshold produces variable panel sizes", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("balanced_accuracy", "num_features")),
+    objectives = define_objectives(metrics = c("balanced_accuracy", "num_features")),
     max_features = 15,
     feature_transform = "none",
     regularized = FALSE,
@@ -711,7 +711,7 @@ test_that("fixed threshold 0.5 is backward compatible", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    objectives = define_objectives(metrics = c("sensitivity", "num_features")),
     max_features = 8,
     feature_transform = "none",
     regularized = FALSE,
@@ -742,7 +742,7 @@ test_that("selection_threshold stored in control slot", {
   res_adaptive <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    objectives = define_objectives(metrics = c("sensitivity", "num_features")),
     max_features = 4,
     feature_transform = "none",
     selection_threshold = "adaptive",
@@ -754,7 +754,7 @@ test_that("selection_threshold stored in control slot", {
   res_fixed <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "num_features")),
+    objectives = define_objectives(metrics = c("sensitivity", "num_features")),
     max_features = 4,
     feature_transform = "none",
     selection_threshold = 0.6,

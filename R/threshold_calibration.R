@@ -318,7 +318,7 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
 
     # If model was trained with cohort covariate, always use reference level
     # so predictions are cohort-agnostic (matching the glmnet path which zeros
-    # out cohort dummies). Cohort-aware losses split by cohort downstream.
+    # out cohort dummies). Cohort-aware metrics split by cohort downstream.
     model_terms <- attr(stats::terms(model), "term.labels")
     if (".cohort" %in% model_terms) {
       ref_level <- model$xlevels[[".cohort"]][1]

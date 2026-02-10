@@ -9,7 +9,7 @@ evaluate_panel_at_sensitivity(
   x,
   y,
   target_sensitivity = 0.9,
-  objectives = define_objectives(losses = c("sensitivity", "specificity", "auc")),
+  objectives = define_objectives(metrics = c("sensitivity", "specificity", "auc")),
   positive = NULL,
   feature_transform = NULL,
   assay = NULL
@@ -48,12 +48,12 @@ selection.
 Convenience wrapper that combines \code{\link[=find_threshold_for_sensitivity]{find_threshold_for_sensitivity()}} and
 \code{\link[=evaluate_panel]{evaluate_panel()}} to evaluate a panel at the operating point corresponding
 to a target sensitivity level. This is the recommended way to evaluate
-panels optimized with \code{\link[=loss_specificity_at_sensitivity]{loss_specificity_at_sensitivity()}}.
+panels optimized with \code{\link[=metric_specificity_at_sensitivity]{metric_specificity_at_sensitivity()}}.
 }
 \examples{
 # After optimizing with specificity_at_sensitivity:
 # result <- optimize_panel(x, y, objectives = build_objectives(
-#   losses = c("specificity_at_sensitivity", "num_features")
+#   metrics = c("specificity_at_sensitivity", "num_features")
 # ))
 #
 # Evaluate at 90\% sensitivity operating point:

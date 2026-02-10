@@ -1,30 +1,30 @@
-#' Cohort-Aware Loss Functions
+#' Cohort-Aware Metric Functions
 #'
-#' Loss functions that evaluate performance across multiple cohorts, capturing
+#' Metric functions that evaluate performance across multiple cohorts, capturing
 #' worst-case performance, cohort gaps, and transferability metrics.
 #'
-#' @name loss_cohort
+#' @name metric_cohort
 NULL
 
 # -----------------------------------------------------------------------------
-# Factory for Cohort-Aware Loss Functions
+# Factory for Cohort-Aware Metric Functions
 # -----------------------------------------------------------------------------
-# This factory pattern eliminates code duplication across cohort-aware losses.
-# Each cohort-aware loss applies a base metric to each cohort and aggregates.
+# This factory pattern eliminates code duplication across cohort-aware metrics.
+# Each cohort-aware metric applies a base metric to each cohort and aggregates.
 
-#' Create a Cohort-Aware Loss Function
+#' Create a Cohort-Aware Metric Function
 #'
-#' Factory function that wraps a base loss function to compute per-cohort
+#' Factory function that wraps a base metric function to compute per-cohort
 #' values and aggregate them. Reduces code duplication for cohort-aware metrics.
 #'
-#' @param base_loss The base loss function (e.g., loss_sensitivity).
+#' @param base_metric The base metric function (e.g., metric_sensitivity).
 #' @param aggregator Function to aggregate cohort values (e.g., min, max).
 #' @param metric_name Name of the metric for error messages.
 #' @param single_cohort_fallback Value to return for single cohort with gap
-#'   aggregation (default NULL uses base_loss result).
-#' @return A cohort-aware loss function.
+#'   aggregation (default NULL uses base metric result).
+#' @return A cohort-aware metric function.
 #' @keywords internal
-.make_cohort_aware_loss <- function(base_loss, aggregator, metric_name,
+.make_cohort_aware_metric <- function(base_metric, aggregator, metric_name,
                                      single_cohort_fallback = NULL) {
   function(truth, scores = NULL, selected = NULL,
            positive = "Yes",
@@ -37,9 +37,9 @@ NULL
       stop("`scores` must be supplied to compute ", metric_name, ".", call. = FALSE)
     }
 
-    # Fall back to base loss when no cohort provided
+    # Fall back to base metric when no cohort provided
     if (is.null(cohort)) {
-      base_result <- base_loss(truth, scores, selected,
+      base_result <- base_metric(truth, scores, selected,
                                positive = positive, ...)
       if (!is.null(single_cohort_fallback)) {
         return(single_cohort_fallback * base_result)
@@ -54,7 +54,7 @@ NULL
 
     # Compute per-cohort values
     # Preserve factor levels when subsetting to avoid re-inferring classes
-    # tryCatch guards against base_loss errors (e.g., loss_auc when a cohort
+    # tryCatch guards against base_metric errors (e.g., metric_auc when a cohort
     # has 0 positives or 0 negatives)
     values <- vapply(levels(cohort), function(level) {
       idx <- !is.na(cohort) & cohort == level
@@ -62,7 +62,7 @@ NULL
       # Subset and preserve factor levels
       truth_subset <- factor(truth[idx], levels = truth_levels)
       tryCatch(
-        base_loss(truth_subset, scores[idx], selected = selected,
+        base_metric(truth_subset, scores[idx], selected = selected,
                   positive = positive, ...),
         error = function(e) NA_real_
       )
@@ -76,7 +76,7 @@ NULL
 #' Gap Aggregator for Cohort Metrics
 #'
 #' Computes the range (max - min) of values across cohorts. Used internally
-#' by cohort gap loss functions.
+#' by cohort gap metric functions.
 #'
 #' @param values Numeric vector of per-cohort metric values.
 #' @param na.rm Logical; whether to remove NA values before computation.
@@ -104,7 +104,7 @@ NULL
 #' Minimum Cohort AUC
 #'
 #' Computes AUC within each cohort and returns the minimum value to capture
-#' worst-case discrimination. Unlike cutoff-dependent cohort losses, this
+#' worst-case discrimination. Unlike cutoff-dependent cohort metrics, this
 #' metric is threshold-free.
 #'
 #' @param truth Binary outcome; coerced with [ensure_binary_response()].
@@ -112,14 +112,14 @@ NULL
 #' @param selected Ignored; kept for signature compatibility.
 #' @param positive Label treated as the positive ("event") class.
 #' @param cohort Factor indicating cohort membership.
-#' @param ... Additional arguments forwarded to [loss_auc()].
+#' @param ... Additional arguments forwarded to [metric_auc()].
 #' @return AUC of the weakest cohort.
 #' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
-#'   of each class. Consider using `loss_auc` as the primary objective and
+#'   of each class. Consider using `metric_auc` as the primary objective and
 #'   this metric for monitoring.
 #' @export
-loss_min_cohort_auc <- .make_cohort_aware_loss(
-  base_loss = loss_auc,
+metric_min_cohort_auc <- .make_cohort_aware_metric(
+  base_metric = metric_auc,
   aggregator = min,
   metric_name = "AUC"
 )
@@ -129,13 +129,13 @@ loss_min_cohort_auc <- .make_cohort_aware_loss(
 #' Difference between maximum and minimum per-cohort AUC values. Smaller
 #' values indicate more uniform discrimination across cohorts.
 #'
-#' @inheritParams loss_min_cohort_auc
+#' @inheritParams metric_min_cohort_auc
 #' @return AUC range across cohorts.
 #' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
 #'   of each class.
 #' @export
-loss_cohort_auc_gap <- .make_cohort_aware_loss(
-  base_loss = loss_auc,
+metric_cohort_auc_gap <- .make_cohort_aware_metric(
+  base_metric = metric_auc,
   aggregator = .gap_aggregator,
   metric_name = "AUC",
   single_cohort_fallback = 0
@@ -147,13 +147,13 @@ loss_cohort_auc_gap <- .make_cohort_aware_loss(
 #' across cohorts without being dominated by extreme cohorts the way the gap
 #' metric can be.
 #'
-#' @inheritParams loss_min_cohort_auc
+#' @inheritParams metric_min_cohort_auc
 #' @return Variance of per-cohort AUC values.
 #' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
 #'   of each class.
 #' @export
-loss_cohort_auc_var <- .make_cohort_aware_loss(
-  base_loss = loss_auc,
+metric_cohort_auc_var <- .make_cohort_aware_metric(
+  base_metric = metric_auc,
   aggregator = .variance_aggregator,
   metric_name = "AUC",
   single_cohort_fallback = 0
@@ -164,10 +164,10 @@ loss_cohort_auc_var <- .make_cohort_aware_loss(
 #' Computes the Brier score (mean squared error on probabilities) within each
 #' cohort and returns the maximum, highlighting the worst calibrated cohort.
 #'
-#' @inheritParams loss_min_cohort_auc
+#' @inheritParams metric_min_cohort_auc
 #' @return Maximum Brier score across cohorts.
 #' @export
-loss_max_cohort_brier <- function(truth, scores = NULL, selected = NULL,
+metric_max_cohort_brier <- function(truth, scores = NULL, selected = NULL,
                                   positive = "Yes", cohort = NULL) {
   truth <- ensure_binary_response(truth)
   if (is.null(scores)) {

@@ -5,7 +5,7 @@
 \title{Define optimization objectives.}
 \usage{
 define_objectives(
-  losses = c("sensitivity", "specificity"),
+  metrics = c("sensitivity", "specificity"),
   custom = NULL,
   params = list(),
   directions = NULL,
@@ -14,16 +14,16 @@ define_objectives(
 )
 }
 \arguments{
-\item{losses}{Character vector of registered loss names (default:
+\item{metrics}{Character vector of registered metric names (default:
 \code{c("sensitivity", "specificity")}).}
 
 \item{custom}{Optional named list of objective descriptors with elements
 \code{label}, \code{direction}, and \code{fun}.}
 
-\item{params}{Named list of additional argument lists for specific losses
+\item{params}{Named list of additional argument lists for specific metrics
 (e.g., custom cutoff probabilities for sensitivity).}
 
-\item{directions}{Optional named vector overriding loss directions.}
+\item{directions}{Optional named vector overriding metric directions.}
 
 \item{cutoff_strategy}{Strategy for computing classification cutoff. One of:
 \describe{
@@ -40,6 +40,6 @@ Named list of objective descriptors.
 }
 \description{
 Assemble a list of objective descriptors ready for consumption by the
-optimization engine. Built-in losses are pulled from the registry created in
+optimization engine. Built-in metrics are pulled from the registry created in
 \code{\link[=build_objectives]{build_objectives()}}; custom entries may be appended for experimental goals.
 }

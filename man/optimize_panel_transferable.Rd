@@ -7,7 +7,7 @@
 optimize_panel_transferable(
   x,
   y,
-  objectives = define_objectives(losses = c("sensitivity", "specificity",
+  objectives = define_objectives(metrics = c("sensitivity", "specificity",
     "num_features")),
   max_features = 5L,
   feature_pool = NULL,

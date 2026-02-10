@@ -203,8 +203,8 @@ test_that("evaluate_panel accepts custom cutoff for confusion and ROC highlight"
 
   highlight <- eval_res$roc$highlight
   expect_equal(highlight$threshold, 0.3)
-  expect_equal(highlight$sensitivity, loss_sensitivity(y, eval_res$scores, cutoff_prob = 0.3))
-  expect_equal(highlight$specificity, loss_specificity(y, eval_res$scores, cutoff_prob = 0.3))
+  expect_equal(highlight$sensitivity, metric_sensitivity(y, eval_res$scores, cutoff_prob = 0.3))
+  expect_equal(highlight$specificity, metric_specificity(y, eval_res$scores, cutoff_prob = 0.3))
 })
 
 # ============================================================================

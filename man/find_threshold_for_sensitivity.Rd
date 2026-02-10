@@ -48,14 +48,14 @@ slightly from target due to discrete ROC points)}
 \description{
 Computes the classification threshold that achieves a target sensitivity
 level on the ROC curve. This is essential when using ROC-based optimization
-objectives like \code{\link[=loss_specificity_at_sensitivity]{loss_specificity_at_sensitivity()}}, where the optimization
+objectives like \code{\link[=metric_specificity_at_sensitivity]{metric_specificity_at_sensitivity()}}, where the optimization
 finds panels that perform well at a specific sensitivity level, but the
 default evaluation cutoff (0.5) may correspond to a different operating point.
 }
 \examples{
 # After optimizing with specificity_at_sensitivity objective:
 # result <- optimize_panel(x, y, objectives = build_objectives(
-#   losses = c("specificity_at_sensitivity", "num_features")
+#   metrics = c("specificity_at_sensitivity", "num_features")
 # ))
 #
 # Find the threshold for 90\% sensitivity:
@@ -66,5 +66,5 @@ default evaluation cutoff (0.5) may correspond to a different operating point.
 }
 \seealso{
 \code{\link[=evaluate_panel]{evaluate_panel()}} to evaluate with a specific cutoff,
-\code{\link[=loss_specificity_at_sensitivity]{loss_specificity_at_sensitivity()}} for the optimization objective.
+\code{\link[=metric_specificity_at_sensitivity]{metric_specificity_at_sensitivity()}} for the optimization objective.
 }

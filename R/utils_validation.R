@@ -22,7 +22,7 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
 
   # Short-circuit: if y is already a factor with levels c("No", "Yes"),
   # return it unchanged. This handles subsetted factors from cohort-aware
-  # loss functions where only one class may be present in the data.
+  # metric functions where only one class may be present in the data.
   if (is.factor(y) && identical(levels(y), c("No", "Yes"))) {
     return(y)
   }

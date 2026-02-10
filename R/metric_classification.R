@@ -1,10 +1,10 @@
-#' Classification Loss Functions
+#' Classification Metric Functions
 #'
-#' Cutoff-dependent loss functions for binary classification that require a
+#' Cutoff-dependent metric functions for binary classification that require a
 #' probability threshold. These compute metrics like sensitivity, specificity,
 #' precision, NPV, F1, and balanced accuracy.
 #'
-#' @name loss_classification
+#' @name metric_classification
 NULL
 
 #' Sensitivity (True Positive Rate)
@@ -20,7 +20,7 @@ NULL
 #' @param positive Label treated as the positive ("event") class.
 #' @return Sensitivity between 0 and 1, or `NA_real_` if undefined.
 #' @export
-loss_sensitivity <- function(truth, scores = NULL, selected = NULL,
+metric_sensitivity <- function(truth, scores = NULL, selected = NULL,
                              cutoff_prob = 0.5,
                              cutoff_strategy = c("fixed", "prevalence", "youden"),
                              positive = "Yes") {
@@ -42,10 +42,10 @@ loss_sensitivity <- function(truth, scores = NULL, selected = NULL,
 
 #' Specificity (True Negative Rate)
 #'
-#' @inheritParams loss_sensitivity
+#' @inheritParams metric_sensitivity
 #' @return Specificity between 0 and 1, or `NA_real_` if undefined.
 #' @export
-loss_specificity <- function(truth, scores = NULL, selected = NULL,
+metric_specificity <- function(truth, scores = NULL, selected = NULL,
                              cutoff_prob = 0.5,
                              cutoff_strategy = c("fixed", "prevalence", "youden"),
                              positive = "Yes") {
@@ -70,10 +70,10 @@ loss_specificity <- function(truth, scores = NULL, selected = NULL,
 #' Computes the proportion of predicted positives that are true positives.
 #' Also known as Positive Predictive Value (PPV).
 #'
-#' @inheritParams loss_sensitivity
+#' @inheritParams metric_sensitivity
 #' @return Precision between 0 and 1, or `NA_real_` if undefined.
 #' @export
-loss_precision <- function(truth, scores = NULL, selected = NULL,
+metric_precision <- function(truth, scores = NULL, selected = NULL,
                            cutoff_prob = 0.5,
                            cutoff_strategy = c("fixed", "prevalence", "youden"),
                            positive = "Yes") {
@@ -102,10 +102,10 @@ loss_precision <- function(truth, scores = NULL, selected = NULL,
 #' Important for rule-out diagnostics where a negative prediction should
 #' reliably exclude disease.
 #'
-#' @inheritParams loss_sensitivity
+#' @inheritParams metric_sensitivity
 #' @return NPV between 0 and 1, or `NA_real_` if undefined.
 #' @export
-loss_npv <- function(truth, scores = NULL, selected = NULL,
+metric_npv <- function(truth, scores = NULL, selected = NULL,
                      cutoff_prob = 0.5,
                      cutoff_strategy = c("fixed", "prevalence", "youden"),
                      positive = "Yes") {
@@ -133,10 +133,10 @@ loss_npv <- function(truth, scores = NULL, selected = NULL,
 #' Computes the harmonic mean of precision and recall (sensitivity).
 #' F1 = 2 * (precision * recall) / (precision + recall).
 #'
-#' @inheritParams loss_sensitivity
+#' @inheritParams metric_sensitivity
 #' @return F1 score between 0 and 1, or `NA_real_` if undefined.
 #' @export
-loss_f1 <- function(truth, scores = NULL, selected = NULL,
+metric_f1 <- function(truth, scores = NULL, selected = NULL,
                     cutoff_prob = 0.5,
                     cutoff_strategy = c("fixed", "prevalence", "youden"),
                     positive = "Yes") {
@@ -165,19 +165,19 @@ loss_f1 <- function(truth, scores = NULL, selected = NULL,
 
 #' Balanced Accuracy
 #'
-#' @inheritParams loss_sensitivity
+#' @inheritParams metric_sensitivity
 #' @return Mean of sensitivity and specificity.
 #' @export
-loss_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
+metric_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
                                    cutoff_prob = 0.5,
                                    cutoff_strategy = c("fixed", "prevalence", "youden"),
                                    positive = "Yes") {
   cutoff_strategy <- match.arg(cutoff_strategy)
-  sens <- loss_sensitivity(truth, scores, selected,
+  sens <- metric_sensitivity(truth, scores, selected,
                            cutoff_prob = cutoff_prob,
                            cutoff_strategy = cutoff_strategy,
                            positive = positive)
-  spec <- loss_specificity(truth, scores, selected,
+  spec <- metric_specificity(truth, scores, selected,
                            cutoff_prob = cutoff_prob,
                            cutoff_strategy = cutoff_strategy,
                            positive = positive)

@@ -4,26 +4,26 @@
 \alias{min_metric_constraint}
 \title{Minimum metric constraint constructor.}
 \usage{
-min_metric_constraint(loss, threshold, params = list(), label = NULL)
+min_metric_constraint(metric, threshold, params = list(), label = NULL)
 }
 \arguments{
-\item{loss}{Character scalar naming a registered loss function.}
+\item{metric}{Character scalar naming a registered metric function.}
 
 \item{threshold}{Numeric scalar describing the required metric level.}
 
 \item{params}{Optional named list of additional parameters forwarded to the
-loss function (e.g., cutoff probabilities for sensitivity).}
+metric function (e.g., cutoff probabilities for sensitivity).}
 
 \item{label}{Optional human-readable label for the constraint; defaults to
-\code{paste0("min_", loss, "_", threshold)}.}
+\code{paste0("min_", metric, "_", threshold)}.}
 }
 \value{
 A constraint descriptor (list) with elements \code{label}, \code{fun},
-\code{threshold}, \code{loss}, and \code{direction}.
+\code{threshold}, \code{metric}, and \code{direction}.
 }
 \description{
-Create a boolean constraint that requires a registered loss to meet or exceed
-(or undercut, for minimised losses) a specified threshold during optimisation.
+Create a boolean constraint that requires a registered metric to meet or exceed
+(or undercut, for minimised metrics) a specified threshold during optimisation.
 These constraints can be supplied to \code{\link[=optimize_panel]{optimize_panel()}} via its \code{constraints}
 argument.
 }

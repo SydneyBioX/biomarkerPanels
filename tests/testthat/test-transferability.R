@@ -182,7 +182,7 @@ test_that("optimize_panel_transferable returns OptimizationResult", {
   result <- optimize_panel_transferable(
     x = sim$x_list,
     y = sim$y_list,
-    objectives = define_objectives(losses = c("sensitivity", "specificity", "num_features")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity", "num_features")),
     max_features = 4,
     train_ratio = 0.7,
     val_ratio = 0.2,

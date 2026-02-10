@@ -8,7 +8,7 @@ evaluate_panel(
   panel,
   x,
   y,
-  objectives = define_objectives(losses = c("sensitivity", "specificity", "auc")),
+  objectives = define_objectives(metrics = c("sensitivity", "specificity", "auc")),
   cohort = NULL,
   assay = NULL,
   scoring_fn = NULL,

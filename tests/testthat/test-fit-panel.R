@@ -120,7 +120,7 @@ test_that("fit_panel selects solution automatically", {
   opt <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
     feature_transform = "none",
@@ -148,7 +148,7 @@ test_that("fit_panel selects specified solution", {
   opt <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
     feature_transform = "none",
@@ -176,7 +176,7 @@ test_that("fit_panel accepts explicit features", {
   opt <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
     feature_transform = "none",
@@ -202,7 +202,7 @@ test_that("fit_panel with regularized = TRUE produces cv.glmnet model", {
   opt <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
     feature_transform = "none",
@@ -226,7 +226,7 @@ test_that("fit_panel with regularized = FALSE produces glm model", {
   opt <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
     feature_transform = "none",
@@ -314,7 +314,7 @@ test_that("new workflow: optimize_panel -> fit_panel -> evaluate_panel", {
   opt <- optimize_panel(
     x = x_train,
     y = y_train,
-    objectives = define_objectives(losses = c("sensitivity", "specificity")),
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 3,
     feature_pool = colnames(x)[seq_len(10)],
     feature_transform = "none",

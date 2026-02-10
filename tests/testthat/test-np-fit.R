@@ -101,7 +101,7 @@ test_that("fit_np_panel with minimize_FPR = TRUE returns TransferablePanelResult
     feature_pool = feature_pool,
     feature_transform = "none",
     objectives = define_objectives(
-      losses = c("sensitivity", "specificity")
+      metrics = c("sensitivity", "specificity")
     ),
     nsga_control = list(popSize = 20, maxiter = 5)
   )
@@ -141,7 +141,7 @@ test_that("fit_np_panel with minimize_FPR = FALSE flips labels correctly", {
     feature_pool = feature_pool,
     feature_transform = "none",
     objectives = define_objectives(
-      losses = c("sensitivity", "specificity")
+      metrics = c("sensitivity", "specificity")
     ),
     nsga_control = list(popSize = 20, maxiter = 5)
   )
@@ -181,7 +181,7 @@ test_that("fit_np_panel with explicit features works", {
     feature_pool = feature_pool,
     feature_transform = "none",
     objectives = define_objectives(
-      losses = c("sensitivity", "specificity")
+      metrics = c("sensitivity", "specificity")
     ),
     nsga_control = list(popSize = 20, maxiter = 5)
   )
@@ -225,7 +225,7 @@ test_that("evaluate_panel works with npc model", {
     feature_pool = feature_pool,
     feature_transform = "none",
     objectives = define_objectives(
-      losses = c("sensitivity", "specificity")
+      metrics = c("sensitivity", "specificity")
     ),
     nsga_control = list(popSize = 20, maxiter = 5)
   )

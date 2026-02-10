@@ -1,16 +1,16 @@
 #' Define optimization objectives.
 #'
 #' Assemble a list of objective descriptors ready for consumption by the
-#' optimization engine. Built-in losses are pulled from the registry created in
+#' optimization engine. Built-in metrics are pulled from the registry created in
 #' [`build_objectives()`]; custom entries may be appended for experimental goals.
 #'
-#' @param losses Character vector of registered loss names (default:
+#' @param metrics Character vector of registered metric names (default:
 #'   `c("sensitivity", "specificity")`).
 #' @param custom Optional named list of objective descriptors with elements
 #'   `label`, `direction`, and `fun`.
-#' @param params Named list of additional argument lists for specific losses
+#' @param params Named list of additional argument lists for specific metrics
 #'   (e.g., custom cutoff probabilities for sensitivity).
-#' @param directions Optional named vector overriding loss directions.
+#' @param directions Optional named vector overriding metric directions.
 #' @param cutoff_strategy Strategy for computing classification cutoff. One of:
 #'   \describe{
 #'     \item{"fixed"}{Use `cutoff_prob` parameter (default 0.5)}
@@ -21,7 +21,7 @@
 #'   `cutoff_strategy = "fixed"`.
 #' @return Named list of objective descriptors.
 #' @export
-define_objectives <- function(losses = c("sensitivity", "specificity"),
+define_objectives <- function(metrics = c("sensitivity", "specificity"),
                               custom = NULL,
                               params = list(),
                               directions = NULL,
@@ -29,23 +29,23 @@ define_objectives <- function(losses = c("sensitivity", "specificity"),
                               cutoff_prob = 0.5) {
   cutoff_strategy <- match.arg(cutoff_strategy)
 
-  # Add cutoff_strategy to params for losses that use cutoffs
-  cutoff_losses <- c("sensitivity", "specificity", "balanced_accuracy")
+  # Add cutoff_strategy to params for metrics that use cutoffs
+  cutoff_metrics <- c("sensitivity", "specificity", "balanced_accuracy")
 
-  for (loss_name in intersect(losses, cutoff_losses)) {
-    if (is.null(params[[loss_name]])) {
-      params[[loss_name]] <- list()
+  for (metric_name in intersect(metrics, cutoff_metrics)) {
+    if (is.null(params[[metric_name]])) {
+      params[[metric_name]] <- list()
     }
     # Only set if not already specified
-    if (is.null(params[[loss_name]]$cutoff_strategy)) {
-      params[[loss_name]]$cutoff_strategy <- cutoff_strategy
+    if (is.null(params[[metric_name]]$cutoff_strategy)) {
+      params[[metric_name]]$cutoff_strategy <- cutoff_strategy
     }
-    if (is.null(params[[loss_name]]$cutoff_prob)) {
-      params[[loss_name]]$cutoff_prob <- cutoff_prob
+    if (is.null(params[[metric_name]]$cutoff_prob)) {
+      params[[metric_name]]$cutoff_prob <- cutoff_prob
     }
   }
 
-  objectives <- build_objectives(losses, params = params, directions = directions)
+  objectives <- build_objectives(metrics, params = params, directions = directions)
 
   if (!is.null(custom)) {
     stopifnot(is.list(custom))
@@ -66,38 +66,38 @@ define_objectives <- function(losses = c("sensitivity", "specificity"),
 
 #' Minimum metric constraint constructor.
 #'
-#' Create a boolean constraint that requires a registered loss to meet or exceed
-#' (or undercut, for minimised losses) a specified threshold during optimisation.
+#' Create a boolean constraint that requires a registered metric to meet or exceed
+#' (or undercut, for minimised metrics) a specified threshold during optimisation.
 #' These constraints can be supplied to [optimize_panel()] via its `constraints`
 #' argument.
 #'
-#' @param loss Character scalar naming a registered loss function.
+#' @param metric Character scalar naming a registered metric function.
 #' @param threshold Numeric scalar describing the required metric level.
 #' @param params Optional named list of additional parameters forwarded to the
-#'   loss function (e.g., cutoff probabilities for sensitivity).
+#'   metric function (e.g., cutoff probabilities for sensitivity).
 #' @param label Optional human-readable label for the constraint; defaults to
-#'   `paste0("min_", loss, "_", threshold)`.
+#'   `paste0("min_", metric, "_", threshold)`.
 #' @return A constraint descriptor (list) with elements `label`, `fun`,
-#'   `threshold`, `loss`, and `direction`.
+#'   `threshold`, `metric`, and `direction`.
 #' @export
-min_metric_constraint <- function(loss,
+min_metric_constraint <- function(metric,
                                   threshold,
                                   params = list(),
                                   label = NULL) {
-  stopifnot(is.character(loss), length(loss) == 1L, nzchar(loss))
+  stopifnot(is.character(metric), length(metric) == 1L, nzchar(metric))
   if (!is.numeric(threshold) || length(threshold) != 1L || !is.finite(threshold)) {
     stop("`threshold` must be a finite numeric scalar.", call. = FALSE)
   }
 
-  # Check if loss is cutoff-dependent and warn
+  # Check if metric is cutoff-dependent and warn
 
-  registry <- loss_registry()
-  if (!loss %in% names(registry)) {
-    stop(sprintf("Loss '%s' is not registered.", loss), call. = FALSE)
+  registry <- metric_registry()
+  if (!metric %in% names(registry)) {
+    stop(sprintf("Metric '%s' is not registered.", metric), call. = FALSE)
   }
-  if (isTRUE(registry[[loss]]$cutoff_dependent)) {
+  if (isTRUE(registry[[metric]]$cutoff_dependent)) {
     warning(
-      sprintf("Loss '%s' depends on a probability cutoff. ", loss),
+      sprintf("Metric '%s' depends on a probability cutoff. ", metric),
       "Constraint behavior depends on the cutoff_prob parameter (default 0.5), ",
       "which may not reflect the ROC trade-off you want. Consider using ",
       "cutoff-free metrics like 'auc', 'pauc', or 'specificity_at_sensitivity' ",
@@ -111,15 +111,15 @@ min_metric_constraint <- function(loss,
   }
   param_list <- list()
   if (length(params)) {
-    param_list[[loss]] <- params
+    param_list[[metric]] <- params
   }
-  entry <- build_objectives(losses = loss, params = param_list)[[loss]]
+  entry <- build_objectives(metrics = metric, params = param_list)[[metric]]
   direction <- entry$direction
 
   if (is.null(label) || !nzchar(label)) {
     label <- sprintf(
       "min_%s_%s",
-      loss,
+      metric,
       format(threshold, trim = TRUE, scientific = FALSE)
     )
   }
@@ -147,7 +147,7 @@ min_metric_constraint <- function(loss,
     label = label,
     fun = fun,
     threshold = threshold,
-    loss = loss,
+    metric = metric,
     direction = direction
   )
 }

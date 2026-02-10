@@ -156,11 +156,11 @@ evaluate_panel_by_cohort <- function(panel,
 
     metric_values <- vapply(metrics, function(m) {
       switch(m,
-        sensitivity = loss_sensitivity(truth = yi, scores = scores,
+        sensitivity = metric_sensitivity(truth = yi, scores = scores,
                                         cutoff_prob = cutoff_prob, positive = positive),
-        specificity = loss_specificity(truth = yi, scores = scores,
+        specificity = metric_specificity(truth = yi, scores = scores,
                                         cutoff_prob = cutoff_prob, positive = positive),
-        auc = loss_auc(truth = yi, scores = scores, positive = positive),
+        auc = metric_auc(truth = yi, scores = scores, positive = positive),
         stop(sprintf("Unknown metric: %s", m), call. = FALSE)
       )
     }, numeric(1))

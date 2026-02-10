@@ -10,7 +10,7 @@ NULL
 #'
 #' Computes the classification threshold that achieves a target sensitivity
 #' level on the ROC curve. This is essential when using ROC-based optimization
-#' objectives like [loss_specificity_at_sensitivity()], where the optimization
+#' objectives like [metric_specificity_at_sensitivity()], where the optimization
 #' finds panels that perform well at a specific sensitivity level, but the
 #' default evaluation cutoff (0.5) may correspond to a different operating point.
 #'
@@ -37,11 +37,11 @@ NULL
 #'   }
 #' @export
 #' @seealso [evaluate_panel()] to evaluate with a specific cutoff,
-#'   [loss_specificity_at_sensitivity()] for the optimization objective.
+#'   [metric_specificity_at_sensitivity()] for the optimization objective.
 #' @examples
 #' # After optimizing with specificity_at_sensitivity objective:
 #' # result <- optimize_panel(x, y, objectives = build_objectives(
-#' #   losses = c("specificity_at_sensitivity", "num_features")
+#' #   metrics = c("specificity_at_sensitivity", "num_features")
 #' # ))
 #' #
 #' # Find the threshold for 90% sensitivity:
@@ -148,7 +148,7 @@ find_threshold_for_sensitivity <- function(panel,
 #' Convenience wrapper that combines [find_threshold_for_sensitivity()] and
 #' [evaluate_panel()] to evaluate a panel at the operating point corresponding
 #' to a target sensitivity level. This is the recommended way to evaluate
-#' panels optimized with [loss_specificity_at_sensitivity()].
+#' panels optimized with [metric_specificity_at_sensitivity()].
 #'
 #' @inheritParams find_threshold_for_sensitivity
 #' @param objectives Optional override for objectives. Defaults to sensitivity,
@@ -162,7 +162,7 @@ find_threshold_for_sensitivity <- function(panel,
 #' @examples
 #' # After optimizing with specificity_at_sensitivity:
 #' # result <- optimize_panel(x, y, objectives = build_objectives(
-#' #   losses = c("specificity_at_sensitivity", "num_features")
+#' #   metrics = c("specificity_at_sensitivity", "num_features")
 #' # ))
 #' #
 #' # Evaluate at 90% sensitivity operating point:
@@ -172,7 +172,7 @@ evaluate_panel_at_sensitivity <- function(panel,
                                            y,
                                            target_sensitivity = 0.90,
                                            objectives = define_objectives(
-                                             losses = c("sensitivity", "specificity", "auc")
+                                             metrics = c("sensitivity", "specificity", "auc")
                                            ),
                                            positive = NULL,
                                            feature_transform = NULL,

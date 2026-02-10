@@ -1,10 +1,10 @@
-#' Discrimination Loss Functions
+#' Discrimination Metric Functions
 #'
-#' Threshold-free loss functions that measure classifier discrimination
+#' Threshold-free metric functions that measure classifier discrimination
 #' ability without requiring a probability cutoff. Includes AUC, partial AUC,
 #' specificity at fixed sensitivity, and panel size metrics.
 #'
-#' @name loss_discrimination
+#' @name metric_discrimination
 NULL
 
 #' Area Under the ROC Curve (AUC)
@@ -19,7 +19,7 @@ NULL
 #' @param positive Label treated as the positive ("event") class.
 #' @return AUC between 0 and 1, or `NA_real_` if computation fails.
 #' @export
-loss_auc <- function(truth, scores = NULL, selected = NULL,
+metric_auc <- function(truth, scores = NULL, selected = NULL,
                      positive = "Yes") {
   if (!requireNamespace("pROC", quietly = TRUE)) {
     stop("The 'pROC' package is required for AUC computation. ",
@@ -66,7 +66,7 @@ loss_auc <- function(truth, scores = NULL, selected = NULL,
 #' contexts where high sensitivity is mandatory. Uses [pROC::auc()] with
 #' `partial.auc.focus = "sens"`.
 #'
-#' @inheritParams loss_auc
+#' @inheritParams metric_auc
 #' @param sens_floor Minimum sensitivity threshold defining the pAUC region
 #'   (default 0.90). The partial AUC is computed only where sensitivity >= this
 #'   value.
@@ -74,7 +74,7 @@ loss_auc <- function(truth, scores = NULL, selected = NULL,
 #'   partial AUC to 0-1 scale (default TRUE).
 #' @return Partial AUC value, or `NA_real_` if computation fails.
 #' @export
-loss_pauc <- function(truth, scores = NULL, selected = NULL,
+metric_pauc <- function(truth, scores = NULL, selected = NULL,
                       positive = "Yes", sens_floor = 0.90,
                       partial_auc_correct = TRUE) {
   if (!requireNamespace("pROC", quietly = TRUE)) {
@@ -132,24 +132,24 @@ loss_pauc <- function(truth, scores = NULL, selected = NULL,
 #' at that point. If the exact target sensitivity cannot be achieved,
 #' pROC interpolates to the nearest achievable point.
 #'
-#' @inheritParams loss_auc
+#' @inheritParams metric_auc
 #' @param target_sensitivity The sensitivity threshold at which to evaluate
 #'   specificity (default 0.90). Must be between 0 and 1.
 #' @return Specificity at the target sensitivity, or `NA_real_` if computation
 #'   fails (e.g., degenerate ROC curve with no class separation).
-#' @seealso [loss_pauc()] for partial AUC in the high-sensitivity region,
-#'   [loss_sensitivity()] and [loss_specificity()] for threshold-based metrics.
+#' @seealso [metric_pauc()] for partial AUC in the high-sensitivity region,
+#'   [metric_sensitivity()] and [metric_specificity()] for threshold-based metrics.
 #' @export
 #' @examples
 #' truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
 #' scores <- c(runif(50, 0, 0.6), runif(50, 0.4, 1))
 #'
 #' # Specificity when sensitivity is fixed at 90%
-#' loss_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.90)
+#' metric_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.90)
 #'
 #' # Specificity when sensitivity is fixed at 95%
-#' loss_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.95)
-loss_specificity_at_sensitivity <- function(truth, scores = NULL, selected = NULL,
+#' metric_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.95)
+metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = NULL,
                                              positive = "Yes",
                                              target_sensitivity = 0.90) {
   if (!requireNamespace("pROC", quietly = TRUE)) {
@@ -218,7 +218,7 @@ loss_specificity_at_sensitivity <- function(truth, scores = NULL, selected = NUL
 #' @param ... Additional arguments (ignored).
 #' @return Count of selected biomarkers.
 #' @export
-loss_num_features <- function(truth = NULL, scores = NULL, selected = NULL, ...) {
+metric_num_features <- function(truth = NULL, scores = NULL, selected = NULL, ...) {
   if (is.null(selected)) {
     return(0)
   }
