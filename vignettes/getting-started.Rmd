@@ -36,14 +36,14 @@ library(biomarkerPanels)
 `biomarkerPanels` helps researchers build compact biomarker signatures when
 multiple cohorts are available and the number of measured features greatly
 exceeds the number of samples. The package delegates the heavy lift of
-multi-objective search to the `mco::nsga2()` algorithm while exposing a friendly
-interface for selecting loss functions, restricting the feature pool, and
+multi-objective search to `rmoo` (NSGA-II/NSGA-III) while exposing a friendly
+interface for selecting metrics, restricting the feature pool, and
 summarising the resulting Pareto front.
 
 This vignette walks through three steps:
 
 1. Prepare multi-cohort expression data.
-2. Assemble objectives from the loss-function registry.
+2. Assemble objectives from the metric registry.
 3. Run `optimize_panel()` to discover candidate panels and inspect the results.
 
 ## 1. Load a Multi-cohort Dataset
@@ -86,11 +86,11 @@ stored as factors with levels `"No"` and `"Yes"`.
 
 ## 2. Configure Objectives
 
-Loss functions are registered in an extensible registry. You can inspect the
-available metrics with `loss_registry()`.
+Metrics are registered in an extensible registry. You can inspect the
+available metrics with `metric_registry()`.
 
 ```{r registry}
-names(loss_registry())
+names(metric_registry())
 ```
 
 To emphasise clinical utility we combine sensitivity, specificity, and a panel
@@ -98,7 +98,7 @@ size penalty. We also tighten the classification probability cutoff for sensitiv
 
 ```{r objectives}
 objectives <- define_objectives(
-  losses = c("sensitivity", "specificity", "num_features"),
+  metrics = c("sensitivity", "specificity", "num_features"),
   params = list(sensitivity = list(cutoff_prob = 0.6))
 )
 objectives[["sensitivity"]]$direction
@@ -110,12 +110,11 @@ shifts. These metrics automatically receive cohort labels during optimisation.
 
 ```{r transfer-objectives, eval=FALSE}
 transfer_objectives <- define_objectives(
-  losses = c(
-    "min_cohort_sensitivity",
-    "min_cohort_specificity",
-    "cohort_sensitivity_gap",
-    "max_cohort_brier",
-    "max_cohort_mean_shift"
+  metrics = c(
+    "min_cohort_auc",
+    "cohort_auc_gap",
+    "cohort_auc_var",
+    "max_cohort_brier"
   )
 )
 ```
@@ -223,8 +222,8 @@ result_glm <- optimize_panel(
 
 ## Next Steps
 
-- Explore additional loss functions by registering custom metrics with
-  `register_loss_function()`.
+- Explore additional metrics by registering custom ones with
+  `register_metric()`.
 - Integrate domain-specific scoring via `scoring_fn` to reflect laboratory or
   clinical decision rules.
 - Run `BiocCheck::BiocCheck()` and `R CMD check` before submitting to

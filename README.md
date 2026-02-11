@@ -13,7 +13,7 @@ Multi-objective optimization for discovering compact biomarker panels from high-
 - **Hard constraints**: Enforce minimum performance thresholds (e.g., sensitivity >= 0.90) during optimization
 - **Multi-cohort support**: Built-in transferability objectives penalize cross-site performance gaps
 - **Batch effect mitigation**: Pairwise feature ratios dampen distributional shifts across cohorts
-- **Extensible loss registry**: Add custom objectives with `register_loss_function()`
+- **Extensible metric registry**: Add custom objectives with `register_metric()`
 - **Bioconductor integration**: Native support for `SummarizedExperiment` inputs
 - **Pareto front selection**: Choose final panels by sensitivity, feature frequency, or pathway enrichment
 
@@ -36,7 +36,7 @@ library(biomarkerPanels)
 
 # Define objectives to optimize
 objectives <- define_objectives(
-  losses = c("sensitivity", "specificity", "num_features")
+  metrics = c("sensitivity", "specificity", "num_features")
 )
 
 # Run NSGA-II optimization (returns Pareto front, no model)
@@ -76,7 +76,7 @@ result <- optimize_panel(
   x = list(site_A = mat1, site_B = mat2, site_C = mat3),
   y = list(site_A = y1, site_B = y2, site_C = y3),
   objectives = define_objectives(
-    losses = c("sensitivity", "min_cohort_auc", "num_features")
+    metrics = c("sensitivity", "min_cohort_auc", "num_features")
   ),
   max_features = 8
 )
@@ -110,7 +110,7 @@ result <- optimize_panel(x, y, feature_pool = top_de, ...)
 | `select_panel_inclusion_frequency()` | Select solution by feature frequency across solutions |
 | `get_top_de_features()` | Pre-filter features via differential expression |
 | `select_transferable_features()` | Pre-filter features by cross-cohort stability |
-| `loss_registry()` | View all available objective functions |
+| `metric_registry()` | View all available objective functions |
 
 ## 📊 Available Objectives
 
@@ -125,7 +125,7 @@ result <- optimize_panel(x, y, feature_pool = top_de, ...)
 | `cohort_auc_gap` | Max AUC difference between cohorts | minimize |
 | `cohort_auc_var` | Variance of per-cohort AUC values | minimize |
 
-See `loss_registry()` for the complete list.
+See `metric_registry()` for the complete list.
 
 ## 🙋 FAQ
 
@@ -144,7 +144,7 @@ NSGA-II (default) works well for 2-3 objectives. NSGA-III provides better divers
 **Q: How do I add a custom objective?**
 
 ```r
-register_loss_function(
+register_metric(
   name = "my_metric",
   fun = function(truth, scores, selected, ...) { ... },
   direction = "maximize"
