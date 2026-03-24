@@ -29,3 +29,6 @@ inst/benchmarks/
 
 # Installation
 *.tar.gz
+
+*.Rproj
+.agents

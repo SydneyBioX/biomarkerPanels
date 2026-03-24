@@ -29,8 +29,10 @@
 }
 
 #' @title Compute pairwise difference between matrix columns (C++)
-NULL
-
+#' @param x A numeric matrix
+#' @param col_names Character vector of column names
+#' @return A matrix of pairwise differences
+#' @keywords internal
 .pairwise_col_diff_cpp <- function(x, col_names) {
     .Call(`_biomarkerPanels_pairwise_col_diff_cpp`, x, col_names)
 }

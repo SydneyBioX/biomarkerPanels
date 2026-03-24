@@ -2,11 +2,11 @@
 using namespace Rcpp;
 
 //' @title Compute pairwise difference between matrix columns (C++)
- //' @param x A numeric matrix
- //' @param col_names Character vector of column names
- //' @return A matrix of pairwise differences
- //' @keywords internal
- // [[Rcpp::export(.pairwise_col_diff_cpp)]]
+//' @param x A numeric matrix
+//' @param col_names Character vector of column names
+//' @return A matrix of pairwise differences
+//' @keywords internal
+// [[Rcpp::export(.pairwise_col_diff_cpp)]]
  NumericMatrix pairwise_col_diff_cpp(NumericMatrix x, CharacterVector col_names) {
    int n = x.nrow();
    int p = x.ncol();
@@ -17,11 +17,11 @@ using namespace Rcpp;
      Rcpp::stop("Too many feature pairs for pairwise aggregation");
    }
    int n_pairs = static_cast<int>(n_pairs_ll);
-   
+
    // Pre-allocate result
    NumericMatrix result(n, n_pairs);
    CharacterVector result_names(n_pairs);
-   
+
    int idx = 0;
    for (int i = 0; i < p - 1; i++) {
      for (int j = i + 1; j < p; j++) {
@@ -36,7 +36,7 @@ using namespace Rcpp;
        idx++;
      }
    }
-   
+
    colnames(result) = result_names;
    return result;
  }
