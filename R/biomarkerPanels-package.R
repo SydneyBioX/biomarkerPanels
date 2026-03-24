@@ -12,6 +12,5 @@
 #' * Optimization engines (`optimize_panel`).
 #' * Evaluation utilities (`evaluate_panel`, `plot_pareto_front`).
 #'
-#' @docType package
-#' @name biomarkerPanels
-NULL
+#' @keywords internal
+"_PACKAGE"
