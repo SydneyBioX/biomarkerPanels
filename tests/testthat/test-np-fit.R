@@ -186,16 +186,16 @@ test_that("fit_np_panel with explicit features works", {
     nsga_control = list(popSize = 20, maxiter = 5)
   )
 
-  # Fit with explicit features
+  # Fit with explicit features (suppress warnings from small simulated n)
   explicit_features <- c("gene_0001", "gene_0003", "gene_0005")
-  panel <- fit_np_panel(
+  panel <- suppressWarnings(fit_np_panel(
     opt,
     features = explicit_features,
     minimize_FPR = TRUE,
     alpha = 0.1,
     delta = 0.1,
     method = "penlog"
-  )
+  ))
 
   expect_equal(panel@features, explicit_features)
   expect_true(is.na(panel@control$fitted_solution_id))

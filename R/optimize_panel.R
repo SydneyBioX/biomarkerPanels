@@ -343,7 +343,19 @@ optimize_panel <- function(x, y,
     # Sort by descending weight for consistent output ordering
     selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
     selected_base_features <- feature_names_pool[selected_idx]
+    
+    # Ensure reference feature is always passed down to the transform
+    ref_col <- attr(x_raw, "reference_feature")
+    if (!is.null(ref_col) && !(ref_col %in% selected_base_features)) {
+      selected_base_features <- c(ref_col, selected_base_features)
+    }
+    
     x_base_selected <- x_pool[, selected_base_features, drop = FALSE]
+
+    # Restore reference_feature attribute if present on raw data
+    if (!is.null(ref_col)) {
+      attr(x_base_selected, "reference_feature") <- ref_col
+    }
 
     # Step 2: Apply feature transform ON-THE-FLY to selected base features
     if (feature_transform != "none" && ncol(x_base_selected) >= 2L) {

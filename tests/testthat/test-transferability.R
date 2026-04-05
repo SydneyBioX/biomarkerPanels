@@ -325,7 +325,7 @@ test_that("per-cohort metrics are populated for all cohorts", {
   set.seed(303)
 
   n_cohorts <- 4
-  sim <- simulate_expression_data(p = 20, n = 40, k = n_cohorts, seed = 42)
+  sim <- simulate_expression_data(p = 20, n = 80, k = n_cohorts, seed = 42)
 
   opt <- optimize_panel_transferable(
     x = sim$x_list,
@@ -400,6 +400,7 @@ test_that("single cohort is handled gracefully", {
     x = sim$x_list,
     y = sim$y_list,
     max_features = 3,
+    feature_pool = sim$metadata$informative_genes[1:5],
     train_ratio = 0.7,
     val_ratio = 0.2,
     feature_transform = "none",

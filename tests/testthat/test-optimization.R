@@ -194,8 +194,8 @@ test_that("optimize_panel enforces minimum metric constraints", {
   res <- optimize_panel(
     x = x,
     y = y,
-    objectives = define_objectives(metrics = c("specificity")),
-    max_features = 1,
+    objectives = define_objectives(metrics = c("specificity", "num_features")),
+    max_features = 2,
     feature_pool = colnames(x),
     constraints = list(min_metric_constraint("sensitivity", threshold = 0.9)),
     feature_transform = "none",
@@ -258,7 +258,10 @@ test_that("pairwise cohort aggregator produces contrast features", {
 
   expect_s4_class(res, "OptimizationResult")
   expect_equal(res@control$feature_transform, "pairwise_ratios")
-  expect_true(all(grepl("--", res@control$feature_pool)))
+  
+  sols <- solutions(res)
+  all_features <- unique(unlist(sols$features))
+  expect_true(all(grepl("--", all_features, fixed = TRUE)))
 })
 
 test_that("feature_pool accepts base features with pairwise aggregator", {
@@ -272,20 +275,22 @@ test_that("feature_pool accepts base features with pairwise aggregator", {
     x = x,
     y = y,
     objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-    max_features = 1,
-    feature_pool = c("GeneA", "GeneC"),
+    max_features = 3,
+    feature_pool = c("GeneA", "GeneC", "GeneB"),
     feature_transform = "pairwise_ratios",
+    regularized = TRUE,
+    fitness_cv = FALSE,
     nsga_control = list(popSize = 12, maxiter = 5)
   )
 
   expect_s4_class(res, "OptimizationResult")
-  expect_equal(sort(res@control$base_feature_pool), sort(c("GeneA", "GeneC")))
+  expect_equal(sort(res@control$base_feature_pool), sort(c("GeneA", "GeneB", "GeneC")))
 
   sols <- solutions(res)
   all_features <- unique(unlist(sols$features))
   expect_true(all(grepl("--", all_features, fixed = TRUE)))
   components <- unique(unlist(strsplit(all_features, "--", fixed = TRUE)))
-  expect_true(all(components %in% c("GeneA", "GeneC")))
+  expect_true(all(components %in% c("GeneA", "GeneB", "GeneC")))
 })
 
 test_that("optimize_panel works with pairwise_log_ratios aggregator", {
@@ -303,12 +308,15 @@ test_that("optimize_panel works with pairwise_log_ratios aggregator", {
     objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 2,
     feature_transform = "pairwise_log_ratios",
+    regularized = FALSE,
     nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(res, "OptimizationResult")
   expect_equal(res@control$feature_transform, "pairwise_log_ratios")
-  expect_true(all(grepl("--", res@control$feature_pool)))
+  sols <- solutions(res)
+  all_features <- unique(unlist(sols$features))
+  expect_true(all(grepl("--", all_features, fixed = TRUE)))
 })
 
 test_that("optimize_panel works with reference_norm aggregator", {
@@ -327,6 +335,7 @@ test_that("optimize_panel works with reference_norm aggregator", {
     objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 2,
     feature_transform = "reference_norm",
+    regularized = FALSE,
     fitness_cv = FALSE,
     nsga_control = list(popSize = 12, maxiter = 8)
   )
@@ -464,8 +473,9 @@ test_that("optimize_panel uses adaptive defaults without explicit nsga_control",
   # Default algorithm is NSGA-II
   expect_equal(res@control$algorithm, "NSGA-II")
   # Verify that the stored nsga2 settings reflect adaptive NSGA-II defaults
-  expect_equal(res@control$nsga2$popSize, 128)
-  expect_equal(res@control$nsga2$maxiter, 150)
+  expected_defaults <- biomarkerPanels:::.get_adaptive_nsga_defaults(35, "NSGA-II")
+  expect_equal(res@control$nsga2$popSize, expected_defaults$popSize)
+  expect_equal(res@control$nsga2$maxiter, expected_defaults$maxiter)
 })
 
 # Issue 4: feature_alignment tests

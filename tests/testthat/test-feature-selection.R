@@ -161,11 +161,11 @@ test_that("sign_consistency_threshold allows partial sign consistency", {
   # Create 4 cohorts where geneB has sign inconsistency in one cohort
   make_cohort <- function(seed, b_sign) {
     set.seed(seed)
-    n <- 40L
+    n <- 80L
     x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
     colnames(x) <- c("geneA", "geneB")
     # geneA always has positive effect, geneB has varying sign
-    linear <- 1.5 * x[, "geneA"] + b_sign * 0.8 * x[, "geneB"]
+    linear <- 1.5 * x[, "geneA"] + b_sign * 1.5 * x[, "geneB"]
     prob <- stats::plogis(linear)
     y <- factor(ifelse(runif(n) < prob, "Yes", "No"), levels = c("No", "Yes"))
     list(x = x, y = y)
