@@ -25,7 +25,8 @@ Imports:
     limma,
     glmnet,
     pROC, 
-    MASS
+    MASS,
+    ecr
 Suggests:
     testthat (>= 3.0.0),
     covr,
