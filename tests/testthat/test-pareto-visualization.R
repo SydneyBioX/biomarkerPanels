@@ -13,7 +13,7 @@ test_that("plot_pareto_front rejects non-OptimizationResult input", {
 # Build once, reuse across tests. Uses simulate_expression_data() from helper.
 
 .make_pareto_fixture <- function() {
-  sim <- simulate_expression_data(p = 200L, n = 60L, k = 2L, seed = 42L)
+  sim <- simulate_expression_data(p = 50L, n = 200L, k = 2L, seed = 42L)
   # Use single matrix (no cohort dummies) so held-out eval works cleanly
   x_all <- sim$x_list[[1]]
   y_all <- sim$y_list[[1]]

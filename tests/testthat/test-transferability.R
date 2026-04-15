@@ -177,7 +177,7 @@ test_that("optimize_panel_transferable returns OptimizationResult", {
   set.seed(789)
 
   # Create multi-cohort data
-  sim <- simulate_expression_data(p = 30, n = 60, k = 3, seed = 42)
+  sim <- simulate_expression_data(p = 30, n = 200, k = 3, seed = 42)
 
   result <- optimize_panel_transferable(
     x = sim$x_list,
@@ -225,7 +225,7 @@ test_that("feature selection uses training data only (no leakage)", {
   skip_slow_tests()
   set.seed(101)
 
-  sim <- simulate_expression_data(p = 25, n = 50, k = 2, seed = 42)
+  sim <- simulate_expression_data(p = 25, n = 200, k = 2, seed = 42)
 
   # Run with automatic feature selection (feature_pool = NULL)
   result <- optimize_panel_transferable(
@@ -257,7 +257,7 @@ test_that("full pipeline: optimize -> fit -> calibrate -> evaluate", {
   skip_slow_tests()
   set.seed(202)
 
-  sim <- simulate_expression_data(p = 20, n = 50, k = 2, seed = 42)
+  sim <- simulate_expression_data(p = 20, n = 200, k = 2, seed = 42)
 
   opt <- optimize_panel_transferable(
     x = sim$x_list,
@@ -308,7 +308,7 @@ test_that("full pipeline: optimize -> fit -> calibrate -> evaluate", {
   expect_named(wv, c("sensitivity", "specificity"))
 
   # Evaluate on new data
-  sim_new <- simulate_expression_data(p = 20, n = 30, k = 1, seed = 99)
+  sim_new <- simulate_expression_data(p = 20, n = 200, k = 1, seed = 99)
   eval_result <- evaluate_panel(
     calibrated,
     x = sim_new$x_list[[1]],
@@ -325,7 +325,7 @@ test_that("per-cohort metrics are populated for all cohorts", {
   set.seed(303)
 
   n_cohorts <- 4
-  sim <- simulate_expression_data(p = 20, n = 80, k = n_cohorts, seed = 42)
+  sim <- simulate_expression_data(p = 20, n = 200, k = n_cohorts, seed = 42)
 
   opt <- optimize_panel_transferable(
     x = sim$x_list,
@@ -355,7 +355,7 @@ test_that("evaluate_panel works with calibrated TransferablePanelResult", {
   skip_slow_tests()
   set.seed(404)
 
-  sim <- simulate_expression_data(p = 20, n = 50, k = 2, seed = 42)
+  sim <- simulate_expression_data(p = 20, n = 200, k = 2, seed = 42)
 
   opt <- optimize_panel_transferable(
     x = sim$x_list,
@@ -377,7 +377,7 @@ test_that("evaluate_panel works with calibrated TransferablePanelResult", {
   )
 
   # Create new validation data
-  sim_new <- simulate_expression_data(p = 20, n = 30, k = 1, seed = 99)
+  sim_new <- simulate_expression_data(p = 20, n = 200, k = 1, seed = 99)
 
   eval_result <- evaluate_panel(
     calibrated,
@@ -394,7 +394,7 @@ test_that("single cohort is handled gracefully", {
   skip_slow_tests()
   set.seed(505)
 
-  sim <- simulate_expression_data(p = 20, n = 60, k = 1, seed = 42)
+  sim <- simulate_expression_data(p = 20, n = 200, k = 1, seed = 42)
 
   opt <- optimize_panel_transferable(
     x = sim$x_list,
@@ -430,7 +430,7 @@ test_that("single cohort is handled gracefully", {
 })
 
 test_that("invalid ratios are rejected by optimize_panel_transferable", {
-  sim <- simulate_expression_data(p = 10, n = 50, k = 2, seed = 42)
+  sim <- simulate_expression_data(p = 10, n = 200, k = 2, seed = 42)
 
   expect_error(
     optimize_panel_transferable(

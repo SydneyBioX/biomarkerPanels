@@ -2,7 +2,7 @@ test_that("optimize_panel returns an OptimizationResult", {
   skip_slow_tests()
   set.seed(123)
 
-  sim <- simulate_expression_data(p = 30, n = 25, k = 1, seed = 42)
+  sim <- simulate_expression_data(p = 30, n = 200, k = 1, seed = 42)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
 
@@ -37,17 +37,17 @@ test_that("num_features objective allows variable panel sizes", {
   skip_slow_tests()
   set.seed(999)
   # Create data with varying signal strength across features
-  n <- 40L
+  n <- 200L
   p <- 10L
   x <- matrix(rnorm(n * p), nrow = n, ncol = p)
   colnames(x) <- paste0("gene_", seq_len(p))
   y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
   # Strong signal on first 2 genes
-  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 3
+  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 0.5
   # Moderate signal on genes 3-5
-  x[y == "Yes", 3:5] <- x[y == "Yes", 3:5] + 1.5
+  x[y == "Yes", 3:5] <- x[y == "Yes", 3:5] + 0.3
   # Weak signal on genes 6-8
-  x[y == "Yes", 6:8] <- x[y == "Yes", 6:8] + 0.5
+  x[y == "Yes", 6:8] <- x[y == "Yes", 6:8] + 0.1
 
   res <- optimize_panel(
     x = x,
@@ -84,12 +84,12 @@ test_that("num_features objective allows variable panel sizes", {
 
 test_that("all Pareto solutions have consistent feature counts", {
   set.seed(123)
-  n <- 20L
+  n <- 200L
   p <- 6L
   x <- matrix(rnorm(n * p), nrow = n)
   colnames(x) <- paste0("g", seq_len(p))
   y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
-  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 2
+  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 0.5
 
   res <- optimize_panel(
     x = x,
@@ -97,7 +97,7 @@ test_that("all Pareto solutions have consistent feature counts", {
     objectives = define_objectives(metrics = c("sensitivity", "num_features")),
     max_features = 4,
     feature_transform = "none",
-    nsga_control = list(popSize = 8, maxiter = 5)
+    nsga_control = list(popSize = 12, maxiter = 5)
   )
 
   sols <- solutions(res)
@@ -144,7 +144,7 @@ test_that("optimize_panel intersects feature sets across cohorts", {
   skip_slow_tests()
   make_cohort <- function(seed, cols) {
     set.seed(seed)
-    n <- 40L
+    n <- 200L
     x <- matrix(rnorm(n * length(cols)), nrow = n, ncol = length(cols))
     colnames(x) <- cols
     linear <- 0.9 * x[, "gene_common1"] - 0.7 * x[, "gene_common2"]
@@ -184,12 +184,12 @@ test_that("min_metric_constraint builds feasible constraint", {
 test_that("optimize_panel enforces minimum metric constraints", {
   skip_slow_tests()
   set.seed(5001)
-  n <- 60L
+  n <- 200L
   x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
   colnames(x) <- c("gene_common1", "gene_common2")
   y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
-  x[y == "Yes", "gene_common1"] <- x[y == "Yes", "gene_common1"] + 3
-  x[y == "No", "gene_common1"] <- x[y == "No", "gene_common1"] - 3
+  x[y == "Yes", "gene_common1"] <- x[y == "Yes", "gene_common1"] + 0.5
+  x[y == "No", "gene_common1"] <- x[y == "No", "gene_common1"] - 0.5
 
   res <- optimize_panel(
     x = x,
@@ -214,7 +214,7 @@ test_that("optimize_panel enforces minimum metric constraints", {
 test_that("optimize_panel errors when constraints infeasible", {
   skip_slow_tests()
   set.seed(5002)
-  n <- 40L
+  n <- 200L
   x <- matrix(rnorm(n * 3), nrow = n, ncol = 3)
   colnames(x) <- c("gene_common1", "gene_common2", "gene_common3")
   y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
@@ -239,12 +239,14 @@ test_that("pairwise cohort aggregator produces contrast features", {
   set.seed(1234)
   make_mat <- function(seed) {
     set.seed(seed)
-    m <- matrix(rnorm(30), nrow = 10, ncol = 3)
+    m <- matrix(rnorm(600), nrow = 200, ncol = 3)
     colnames(m) <- c("A", "B", "C")
+    # Add signal so cv.glmnet selects a feature
+    m[1:100, "A"] <- m[1:100, "A"] + 0.5
     m
   }
   x_list <- list(make_mat(1), make_mat(2))
-  y_list <- lapply(1:2, function(i) factor(rep(c("No", "Yes"), length.out = 10), levels = c("No", "Yes")))
+  y_list <- lapply(1:2, function(i) factor(rep(c("No", "Yes"), length.out = 200), levels = c("No", "Yes")))
 
   res <- optimize_panel(
     x = x_list,
@@ -267,9 +269,10 @@ test_that("pairwise cohort aggregator produces contrast features", {
 test_that("feature_pool accepts base features with pairwise aggregator", {
   skip_slow_tests()
   set.seed(777)
-  x <- matrix(rnorm(60), nrow = 20, ncol = 3)
+  x <- matrix(rnorm(600), nrow = 200, ncol = 3)
   colnames(x) <- c("GeneA", "GeneB", "GeneC")
-  y <- factor(sample(c("No", "Yes"), 20, replace = TRUE), levels = c("No", "Yes"))
+  y <- factor(rep(c("No", "Yes"), each = 100), levels = c("No", "Yes"))
+  x[1:100, "GeneA"] <- x[1:100, "GeneA"] + 0.5
 
   res <- optimize_panel(
     x = x,
@@ -296,7 +299,7 @@ test_that("feature_pool accepts base features with pairwise aggregator", {
 test_that("optimize_panel works with pairwise_log_ratios aggregator", {
   skip_slow_tests()
   set.seed(456)
-  sim <- simulate_expression_data(p = 20, n = 30, k = 1, seed = 43)
+  sim <- simulate_expression_data(p = 20, n = 200, k = 1, seed = 43)
   x <- sim$x_list[[1]]
   # Ensure positive values for log-ratios
   x <- abs(x) + 1
@@ -322,7 +325,7 @@ test_that("optimize_panel works with pairwise_log_ratios aggregator", {
 test_that("optimize_panel works with reference_norm aggregator", {
   skip_slow_tests()
   set.seed(789)
-  sim <- simulate_expression_data(p = 15, n = 25, k = 1, seed = 44)
+  sim <- simulate_expression_data(p = 15, n = 200, k = 1, seed = 44)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
 
@@ -347,7 +350,7 @@ test_that("optimize_panel works with reference_norm aggregator", {
 test_that("optimize_panel rejects unregistered aggregator", {
   skip_slow_tests()
   set.seed(123)
-  sim <- simulate_expression_data(p = 10, n = 20, k = 1, seed = 45)
+  sim <- simulate_expression_data(p = 10, n = 200, k = 1, seed = 45)
 
   expect_error(
     optimize_panel(
@@ -356,7 +359,7 @@ test_that("optimize_panel rejects unregistered aggregator", {
       objectives = define_objectives(metrics = c("sensitivity", "specificity")),
       max_features = 2,
       feature_transform = "nonexistent_transform",
-      nsga_control = list(popSize = 8, maxiter = 5)
+      nsga_control = list(popSize = 12, maxiter = 5)
     ),
     "Unknown feature transform"
   )
@@ -374,7 +377,7 @@ test_that("custom aggregator can be registered and used", {
   register_feature_transform("center_features", custom_agg, "Center each feature", overwrite = TRUE)
 
   set.seed(321)
-  sim <- simulate_expression_data(p = 10, n = 20, k = 1, seed = 46)
+  sim <- simulate_expression_data(p = 10, n = 200, k = 1, seed = 46)
 
   res <- optimize_panel(
     x = sim$x_list[[1]],
@@ -455,7 +458,7 @@ test_that(".compute_nsga3_partitions returns appropriate values", {
 test_that("optimize_panel uses adaptive defaults without explicit nsga_control", {
   skip_extended_tests()  # Very slow: popSize=156, maxiter=180
   set.seed(999)
-  sim <- simulate_expression_data(p = 40, n = 30, k = 1, seed = 99)
+  sim <- simulate_expression_data(p = 40, n = 200, k = 1, seed = 99)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
 
@@ -484,7 +487,7 @@ test_that("feature_alignment = 'majority' keeps features in >= 50% cohorts", {
   # Create 4 cohorts with varying feature overlap
   make_cohort <- function(seed, features) {
     set.seed(seed)
-    n <- 40L
+    n <- 200L
     x <- matrix(rnorm(n * length(features)), nrow = n, ncol = length(features))
     colnames(x) <- features
     linear <- 0.8 * x[, "common1"] + 0.5 * x[, "common2"]
@@ -503,15 +506,17 @@ test_that("feature_alignment = 'majority' keeps features in >= 50% cohorts", {
   x_list <- lapply(cohorts, `[[`, "x")
   y_list <- lapply(cohorts, `[[`, "y")
 
-  res <- optimize_panel(
-    x = x_list,
-    y = y_list,
-    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-    max_features = 2,
-    feature_transform = "none",
-    feature_alignment = "majority",
-    nsga_control = list(popSize = 12, maxiter = 8)
-  )
+  expect_warning({
+    res <- optimize_panel(
+      x = x_list,
+      y = y_list,
+      objectives = define_objectives(metrics = c("sensitivity", "specificity")),
+      max_features = 2,
+      feature_transform = "none",
+      feature_alignment = "majority",
+      nsga_control = list(popSize = 12, maxiter = 8)
+    )
+  }, regexp = "Imputing")
 
   expect_s4_class(res, "OptimizationResult")
   expect_equal(res@control$feature_alignment, "majority")
@@ -527,7 +532,7 @@ test_that("feature_alignment = 'intersection' is default and drops partial featu
   skip_slow_tests()
   make_cohort <- function(seed, features) {
     set.seed(seed)
-    n <- 30L
+    n <- 200L
     x <- matrix(rnorm(n * length(features)), nrow = n, ncol = length(features))
     colnames(x) <- features
     y <- factor(sample(c("No", "Yes"), n, replace = TRUE), levels = c("No", "Yes"))
@@ -560,7 +565,7 @@ test_that("feature_alignment = 'intersection' is default and drops partial featu
 test_that("regularized = TRUE uses regularized scoring during optimization", {
   skip_slow_tests()
   set.seed(123)
-  sim <- simulate_expression_data(p = 20, n = 40, k = 1, seed = 42)
+  sim <- simulate_expression_data(p = 20, n = 200, k = 1, seed = 42)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
 
@@ -584,7 +589,7 @@ test_that("regularized = TRUE uses regularized scoring during optimization", {
 test_that("regularized = FALSE uses unregularized scoring", {
   skip_slow_tests()
   set.seed(456)
-  sim <- simulate_expression_data(p = 20, n = 40, k = 1, seed = 43)
+  sim <- simulate_expression_data(p = 20, n = 200, k = 1, seed = 43)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
 
@@ -608,7 +613,7 @@ test_that("regularized = FALSE uses unregularized scoring", {
 test_that("optimize_panel uses NSGA-II by default", {
   skip_slow_tests()
   set.seed(123)
-  sim <- simulate_expression_data(p = 15, n = 25, k = 1, seed = 42)
+  sim <- simulate_expression_data(p = 15, n = 200, k = 1, seed = 42)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
 
@@ -631,7 +636,7 @@ test_that("optimize_panel respects explicit NSGA-III algorithm selection", {
   skip("NSGA-III has known bug in rmoo 0.3.0")
   skip_slow_tests()
   set.seed(456)
-  sim <- simulate_expression_data(p = 15, n = 25, k = 1, seed = 43)
+  sim <- simulate_expression_data(p = 15, n = 200, k = 1, seed = 43)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
 
@@ -679,13 +684,13 @@ test_that(".generate_sparse_suggestions creates diverse panel sizes", {
 test_that("adaptive threshold produces variable panel sizes", {
   skip_slow_tests()
   set.seed(123)
-  n <- 60L
+  n <- 200L
   p <- 30L
   x <- matrix(rnorm(n * p), nrow = n)
   colnames(x) <- paste0("gene_", seq_len(p))
   y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
   # Strong signal on first 5 genes
-  x[y == "Yes", 1:5] <- x[y == "Yes", 1:5] + 2
+  x[y == "Yes", 1:5] <- x[y == "Yes", 1:5] + 0.5
 
   res <- optimize_panel(
     x = x,
@@ -714,12 +719,12 @@ test_that("adaptive threshold produces variable panel sizes", {
 test_that("fixed threshold 0.5 is backward compatible", {
   skip_slow_tests()
   set.seed(456)
-  n <- 40L
+  n <- 200L
   p <- 15L
   x <- matrix(rnorm(n * p), nrow = n)
   colnames(x) <- paste0("gene_", seq_len(p))
   y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
-  x[y == "Yes", 1:3] <- x[y == "Yes", 1:3] + 2
+  x[y == "Yes", 1:3] <- x[y == "Yes", 1:3] + 0.5
 
   res <- optimize_panel(
     x = x,
@@ -744,12 +749,12 @@ test_that("fixed threshold 0.5 is backward compatible", {
 
 test_that("selection_threshold stored in control slot", {
   set.seed(42)
-  n <- 20L
+  n <- 200L
   p <- 6L
   x <- matrix(rnorm(n * p), nrow = n)
   colnames(x) <- paste0("g", seq_len(p))
   y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
-  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 2
+  x[y == "Yes", 1:2] <- x[y == "Yes", 1:2] + 0.5
 
   # Test with adaptive
   res_adaptive <- optimize_panel(
@@ -759,7 +764,7 @@ test_that("selection_threshold stored in control slot", {
     max_features = 4,
     feature_transform = "none",
     selection_threshold = "adaptive",
-    nsga_control = list(popSize = 8, maxiter = 5)
+    nsga_control = list(popSize = 12, maxiter = 5)
   )
   expect_equal(res_adaptive@control$selection_threshold, "adaptive")
 
@@ -771,7 +776,7 @@ test_that("selection_threshold stored in control slot", {
     max_features = 4,
     feature_transform = "none",
     selection_threshold = 0.6,
-    nsga_control = list(popSize = 8, maxiter = 5)
+    nsga_control = list(popSize = 12, maxiter = 5)
   )
   expect_equal(res_fixed@control$selection_threshold, 0.6)
 })

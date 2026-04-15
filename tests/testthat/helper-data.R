@@ -35,7 +35,7 @@ skip_extended_tests <- function() {
 # @param seed Optional random seed for reproducibility.
 # @param shift_scale Magnitude of dataset-specific feature shifts.
 # @return A list with x_list, y_list, and metadata.
-simulate_expression_data <- function(p = 5000L, n = 100L, k = 4L, seed = NULL,
+simulate_expression_data <- function(p = 50L, n = 200L, k = 4L, seed = NULL,
                                      shift_scale = 0.6) {
   if (!is.null(seed)) {
     set.seed(seed)
@@ -67,7 +67,7 @@ simulate_expression_data <- function(p = 5000L, n = 100L, k = 4L, seed = NULL,
   informative_count <- min(60L, p)
   informative_idx <- sample(p, informative_count)
   beta <- stats::rnorm(length(informative_idx), mean = 0, sd = 0.25)
-  signal_shift <- rep(c(2.0, -2.0), length.out = length(informative_idx))
+  signal_shift <- rep(c(0.25, -0.25), length.out = length(informative_idx))
 
   generate_labels <- function(x_matrix) {
     eta <- as.numeric(x_matrix[, informative_idx, drop = FALSE] %*% beta)

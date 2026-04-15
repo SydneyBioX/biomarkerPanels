@@ -400,14 +400,13 @@ test_that("find_threshold_for_sensitivity achieves target sensitivity", {
   panel_features <- c("g1", "g2")
 
   # Create well-separated data for reliable ROC
+  # Create well-separated data for reliable ROC
   set.seed(456)
-  n <- 100
+  n <- 200
   x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
   colnames(x) <- c("g1", "g2")
-  # Create signal: g1 predicts outcome
-  linear <- 2 * x[, "g1"]
-  prob <- stats::plogis(linear)
-  y <- factor(ifelse(prob > 0.5, "Yes", "No"), levels = c("No", "Yes"))
+  y <- factor(rep(c("No", "Yes"), each = n/2), levels = c("No", "Yes"))
+  x[(n/2 + 1):n, "g1"] <- x[(n/2 + 1):n, "g1"] + 2.0
 
   panel <- .create_test_panel_with_model(panel_features, x, y)
 
@@ -451,12 +450,11 @@ test_that("evaluate_panel_at_sensitivity combines threshold finding and evaluati
   panel_features <- c("g1", "g2")
 
   set.seed(789)
-  n <- 100
+  n <- 200
   x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
   colnames(x) <- c("g1", "g2")
-  linear <- 2 * x[, "g1"]
-  prob <- stats::plogis(linear)
-  y <- factor(ifelse(prob > 0.5, "Yes", "No"), levels = c("No", "Yes"))
+  y <- factor(rep(c("No", "Yes"), each = n/2), levels = c("No", "Yes"))
+  x[(n/2 + 1):n, "g1"] <- x[(n/2 + 1):n, "g1"] + 2.0
 
   panel <- .create_test_panel_with_model(panel_features, x, y)
 
@@ -486,12 +484,12 @@ test_that("evaluate_panel_at_sensitivity uses correct threshold vs default", {
 
   # Create well-separated data for reliable threshold adjustment
   set.seed(999)
-  n <- 100
+  n <- 200
   x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
   colnames(x) <- c("g1", "g2")
-  y <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
+  y <- factor(c(rep("No", 100), rep("Yes", 100)), levels = c("No", "Yes"))
   # Add strong signal: Yes samples have substantially higher g1
-  x[51:100, "g1"] <- x[51:100, "g1"] + 3
+  x[101:200, "g1"] <- x[101:200, "g1"] + 2.5
 
   panel <- .create_test_panel_with_model(panel_features, x, y)
 

@@ -89,7 +89,7 @@ test_that("fit_np_panel with minimize_FPR = TRUE returns TransferablePanelResult
 
   # Create small test data
   set.seed(42)
-  sim <- simulate_expression_data(p = 50, n = 40, k = 2, seed = 42)
+  sim <- simulate_expression_data(p = 50, n = 200, k = 2, seed = 42)
 
   # Get a small feature pool
   feature_pool <- colnames(sim$x_list[[1]])[1:20]
@@ -131,7 +131,7 @@ test_that("fit_np_panel with minimize_FPR = FALSE flips labels correctly", {
   skip_slow_tests()
 
   set.seed(123)
-  sim <- simulate_expression_data(p = 50, n = 40, k = 2, seed = 123)
+  sim <- simulate_expression_data(p = 50, n = 200, k = 2, seed = 123)
 
   feature_pool <- colnames(sim$x_list[[1]])[1:20]
 
@@ -171,7 +171,7 @@ test_that("fit_np_panel with explicit features works", {
   skip_slow_tests()
 
   set.seed(456)
-  sim <- simulate_expression_data(p = 50, n = 40, k = 2, seed = 456)
+  sim <- simulate_expression_data(p = 50, n = 200, k = 2, seed = 456)
 
   feature_pool <- colnames(sim$x_list[[1]])[1:20]
 
@@ -207,7 +207,7 @@ test_that("evaluate_panel works with npc model", {
   skip_slow_tests()
 
   set.seed(789)
-  sim <- simulate_expression_data(p = 50, n = 40, k = 3, seed = 789)
+  sim <- simulate_expression_data(p = 50, n = 200, k = 3, seed = 789)
 
   # Use first 2 cohorts for training
   x_train_list <- sim$x_list[1:2]
