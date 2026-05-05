@@ -183,7 +183,7 @@ select_denominator_features <- function(
       pure_batch_pcs <- as.integer(gsub("PC", "", top_lda_pcs))
     } else {
       # Last resort: use top variance PCs with any batch association
-      pure_batch_pcs <- which(pc_diagnostics$batch_pvalue < 0.50)[1:min(3L, n_pcs)]
+      pure_batch_pcs <- head(which(pc_diagnostics$batch_pvalue < 0.50), 3L)
     }
   }
 

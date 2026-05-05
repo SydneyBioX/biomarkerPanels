@@ -215,3 +215,96 @@ test_that("sign_consistency_threshold allows partial sign consistency", {
   # Verify sign_agreement column exists and has proper values
   expect_true("sign_agreement" %in% names(result_lenient$scores))
 })
+
+# ==============================================================================
+# select_discriminative_features tests
+# ==============================================================================
+
+test_that("select_discriminative_features ranks signal gene above offset gene", {
+  fixture <- make_ratio_fixture()
+  x_list <- lapply(fixture$cohorts, `[[`, "x")
+  y_list <- lapply(fixture$cohorts, `[[`, "y")
+
+  result <- select_discriminative_features(
+    x_list, y_list,
+    n_features = 4,
+    min_auc = 0.5
+  )
+
+  expect_type(result$features, "character")
+  expect_true(length(result$features) >= 1)
+  expect_true("gene1" %in% result$features)
+
+  # gene1 (strong signal) should rank above gene2 (cohort offset, weaker signal)
+  scores <- result$scores
+  gene1_score <- scores$score[scores$feature == "gene1"]
+  gene2_score <- scores$score[scores$feature == "gene2"]
+  expect_gt(gene1_score, gene2_score)
+
+  # gene1 has different shifts per cohort (2.5 vs 2.0), so its cohort_disc
+  # should be higher than gene4 (no cohort-dependent shift)
+  gene1_cd <- scores$cohort_disc[scores$feature == "gene1"]
+  gene4_cd <- scores$cohort_disc[scores$feature == "gene4"]
+  expect_gt(gene1_cd, gene4_cd)
+
+  # Return structure matches expected pattern
+  expect_named(result, c("features", "scores", "per_cohort_auc", "settings"))
+  expect_true(all(c("feature", "mean_auc", "sd_auc", "min_auc",
+    "cohort_disc", "score") %in% names(result$scores)))
+  expect_equal(ncol(result$per_cohort_auc), 2)
+})
+
+test_that("select_discriminative_features respects min_auc filter", {
+  fixture <- make_ratio_fixture()
+  x_list <- lapply(fixture$cohorts, `[[`, "x")
+  y_list <- lapply(fixture$cohorts, `[[`, "y")
+
+  result_strict <- select_discriminative_features(
+    x_list, y_list,
+    n_features = 4,
+    min_auc = 0.95
+  )
+
+  result_lenient <- select_discriminative_features(
+    x_list, y_list,
+    n_features = 4,
+    min_auc = 0.5
+  )
+
+  expect_true(length(result_strict$features) <= length(result_lenient$features))
+  if (nrow(result_strict$scores) > 0) {
+    expect_true(all(result_strict$scores$mean_auc >= 0.95))
+  }
+})
+
+test_that("select_discriminative_features works with single cohort", {
+  fixture <- make_ratio_fixture()
+  x <- fixture$cohorts[[1]]$x
+  y <- fixture$cohorts[[1]]$y
+
+  result <- select_discriminative_features(x, y, n_features = 3, min_auc = 0.5)
+
+  expect_type(result$features, "character")
+  # With single cohort, cohort_disc should be 0 and sd_auc should be 0
+  expect_true(all(result$scores$cohort_disc == 0))
+  expect_true(all(result$scores$sd_auc == 0))
+})
+
+test_that("select_discriminative_features validates parameters", {
+  fixture <- make_ratio_fixture()
+  x_list <- lapply(fixture$cohorts, `[[`, "x")
+  y_list <- lapply(fixture$cohorts, `[[`, "y")
+
+  expect_error(
+    select_discriminative_features(x_list, y_list, lambda_cohort = "bad"),
+    "`lambda_cohort` must be a numeric scalar"
+  )
+  expect_error(
+    select_discriminative_features(x_list, y_list, lambda_sd = c(1, 2)),
+    "`lambda_sd` must be a numeric scalar"
+  )
+  expect_error(
+    select_discriminative_features(x_list, y_list, min_auc = 1.5),
+    "`min_auc` must be a numeric scalar"
+  )
+})

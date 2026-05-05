@@ -24,6 +24,15 @@
 #' @param point_alpha Numeric; point transparency. Default `0.7`.
 #' @param viridis_option Character; viridis palette name. Default `"plasma"`.
 #' @param title Character or `NULL`; plot title. Auto-generated when `NULL`.
+#' @param xlab Character or `NULL`; x-axis label. Defaults to `x_metric`.
+#' @param ylab Character or `NULL`; y-axis label. Defaults to `y_metric`.
+#' @param color_label Character or `NULL`; color legend label. Defaults to
+#'   `color_by`.
+#' @param connect Logical; if `TRUE`, connect points with a line sorted by the
+#'   x-axis metric. Default `FALSE`.
+#' @param on_error One of `"warn"` or `"stop"`. Controls behaviour when a
+#'   solution fails evaluation. `"warn"` (default) skips the solution with a
+#'   warning; `"stop"` raises an error immediately.
 #' @param regularized Logical; passed to [fit_panel()]. Default `TRUE`.
 #' @param verbose Logical; print progress messages. Default `interactive()`.
 #' @return A `ggplot` object. The underlying metrics data frame is accessible
@@ -47,6 +56,11 @@ plot_pareto_front <- function(optimization_result,
                               point_alpha = 0.7,
                               viridis_option = "plasma",
                               title = NULL,
+                              xlab = NULL,
+                              ylab = NULL,
+                              color_label = NULL,
+                              connect = FALSE,
+                              on_error = c("warn", "stop"),
                               regularized = TRUE,
                               verbose = interactive()) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
@@ -55,6 +69,7 @@ plot_pareto_front <- function(optimization_result,
   if (!inherits(optimization_result, "OptimizationResult")) {
     stop("`optimization_result` must be an OptimizationResult.", call. = FALSE)
   }
+  on_error <- match.arg(on_error)
 
   # Resolve held-out data
   if (is.null(x) || is.null(y)) {
@@ -82,7 +97,7 @@ plot_pareto_front <- function(optimization_result,
 
     rows[[i]] <- tryCatch({
       panel <- fit_panel(optimization_result, solution_id = sid,
-                         regularized = regularized, validate_fitness = FALSE)
+                         regularized = regularized)
       ev <- evaluate_panel(panel, x, y)
 
       data.frame(
@@ -95,6 +110,10 @@ plot_pareto_front <- function(optimization_result,
         stringsAsFactors = FALSE
       )
     }, error = function(e) {
+      if (on_error == "stop") {
+        stop("Failed on solution ", sid, ": ", conditionMessage(e),
+             call. = FALSE)
+      }
       warning("Solution ", sid, " failed: ", conditionMessage(e), call. = FALSE)
       NULL
     })
@@ -116,9 +135,20 @@ plot_pareto_front <- function(optimization_result,
   p <- ggplot2::ggplot(plot_df, do.call(ggplot2::aes, aes_args)) +
     ggplot2::geom_point(size = point_size, alpha = point_alpha)
 
+  if (connect) {
+    sorted_df <- plot_df[order(plot_df[[x_metric]]), , drop = FALSE]
+    p <- p + ggplot2::geom_line(
+      data = sorted_df,
+      ggplot2::aes(x = .data[[x_metric]], y = .data[[y_metric]]),
+      inherit.aes = FALSE,
+      alpha = 0.5
+    )
+  }
+
   if (!is.null(color_by) && is.numeric(plot_df[[color_by]])) {
+    color_name <- if (!is.null(color_label)) color_label else color_by
     p <- p + ggplot2::scale_color_viridis_c(
-      name = color_by, option = viridis_option
+      name = color_name, option = viridis_option
     )
   }
 
@@ -127,7 +157,10 @@ plot_pareto_front <- function(optimization_result,
     p <- p + ggplot2::coord_cartesian(xlim = c(0, 1), ylim = c(0, 1))
   }
 
-  p + ggplot2::labs(x = x_metric, y = y_metric, title = title) +
+  x_label <- if (!is.null(xlab)) xlab else x_metric
+  y_label <- if (!is.null(ylab)) ylab else y_metric
+
+  p + ggplot2::labs(x = x_label, y = y_label, title = title) +
     ggplot2::theme_bw(base_size = 12)
 }
 

@@ -39,7 +39,7 @@ objectives <- define_objectives(
   metrics = c("sensitivity", "specificity", "num_features")
 )
 
-# Run NSGA-II optimization (returns Pareto front, no model)
+# Run NSGA-III optimization (returns Pareto front, no model)
 opt_result <- optimize_panel(
   x = train_matrix,
   y = train_response,
@@ -139,7 +139,7 @@ objectives <- define_ruleout_objectives(min_sensitivity = 0.95)
 
 **Q: Should I use NSGA-II or NSGA-III?**
 
-NSGA-II (default) works well for 2-3 objectives. NSGA-III provides better diversity for many-objective problems (4+).
+NSGA-III (default) provides better Pareto front diversity via reference-point selection and is recommended for many-objective problems (3+). NSGA-II uses crowding distance and is typically adequate for 2 objectives; pass `algorithm = "NSGA-II"` to select it explicitly.
 
 **Q: How do I add a custom objective?**
 

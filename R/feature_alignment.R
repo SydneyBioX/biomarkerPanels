@@ -155,7 +155,7 @@ NULL
     missing <- ordered_features[!ordered_features %in% mat_features]
     if (length(missing)) {
       warning(
-        "Imputing ", length(missing), " missing feature(s) using cohort median. ",
+        "Imputing ", length(missing), " missing feature(s) using per-sample median. ",
         "Missing: ", paste(head(missing, 5), collapse = ", "),
         if (length(missing) > 5) paste0("... and ", length(missing) - 5, " more") else "",
         ". Consider using feature_alignment = 'intersection' for strict matching.",
@@ -163,12 +163,14 @@ NULL
       )
       present_features <- ordered_features[ordered_features %in% mat_features]
       if (length(present_features) > 0) {
-        cohort_median <- median(result[, present_features, drop = FALSE], na.rm = TRUE)
-        if (is.na(cohort_median)) cohort_median <- 0
+        per_sample_median <- apply(
+          result[, present_features, drop = FALSE], 1, median, na.rm = TRUE
+        )
+        per_sample_median[is.na(per_sample_median)] <- 0
       } else {
-        cohort_median <- 0
+        per_sample_median <- rep(0, nrow(result))
       }
-      result[, missing] <- cohort_median
+      result[, missing] <- per_sample_median
     }
 
     result

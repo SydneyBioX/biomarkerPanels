@@ -338,3 +338,71 @@ test_that("new workflow: optimize_panel -> fit_panel -> evaluate_panel", {
   expect_true("roc" %in% names(eval_res))
   expect_true(all(eval_res$scores >= 0 & eval_res$scores <= 1))
 })
+
+# ============================================================================
+# Input validation tests (silent failure audit fixes)
+# ============================================================================
+
+test_that("fit_panel validates regularized_alpha range", {
+  solutions_df <- data.frame(
+    solution_id = 1L,
+    sensitivity = 0.8,
+    specificity = 0.7,
+    stringsAsFactors = FALSE
+  )
+  solutions_df$features <- I(list(c("g1", "g2")))
+  solutions_df$base_features <- I(list(c("g1", "g2")))
+
+  opt <- new(
+    "OptimizationResult",
+    solutions = solutions_df,
+    feature_pool = c("g1", "g2"),
+    control = list(max_features = 3, feature_transform = "none"),
+    training_signature = list(n = 20, p = 2),
+    aggregated_x = matrix(rnorm(40), nrow = 20, ncol = 2,
+                          dimnames = list(NULL, c("g1", "g2"))),
+    aggregated_y = factor(rep(c("No", "Yes"), each = 10), levels = c("No", "Yes")),
+    aggregated_cohort = factor(rep("cohort_01", 20))
+  )
+
+  expect_error(fit_panel(opt, regularized_alpha = -0.1), "regularized_alpha")
+  expect_error(fit_panel(opt, regularized_alpha = 1.5), "regularized_alpha")
+})
+
+test_that("fit_panel validates cv_folds minimum", {
+  solutions_df <- data.frame(
+    solution_id = 1L,
+    sensitivity = 0.8,
+    specificity = 0.7,
+    stringsAsFactors = FALSE
+  )
+  solutions_df$features <- I(list(c("g1", "g2")))
+  solutions_df$base_features <- I(list(c("g1", "g2")))
+
+  opt <- new(
+    "OptimizationResult",
+    solutions = solutions_df,
+    feature_pool = c("g1", "g2"),
+    control = list(max_features = 3, feature_transform = "none"),
+    training_signature = list(n = 20, p = 2),
+    aggregated_x = matrix(rnorm(40), nrow = 20, ncol = 2,
+                          dimnames = list(NULL, c("g1", "g2"))),
+    aggregated_y = factor(rep(c("No", "Yes"), each = 10), levels = c("No", "Yes")),
+    aggregated_cohort = factor(rep("cohort_01", 20))
+  )
+
+  expect_error(fit_panel(opt, cv_folds = 1L), "cv_folds")
+  expect_error(fit_panel(opt, cv_folds = 0L), "cv_folds")
+})
+
+test_that(".fit_final_model_cv warns on insufficient data for CV", {
+  set.seed(42)
+  x_small <- matrix(rnorm(12), nrow = 4, ncol = 3,
+                    dimnames = list(NULL, c("a", "b", "c")))
+  y_small <- factor(c("No", "Yes", "No", "Yes"), levels = c("No", "Yes"))
+
+  expect_warning(
+    .fit_final_model_cv(x_small, y_small, cv_folds = 5L),
+    "Too few samples"
+  )
+})

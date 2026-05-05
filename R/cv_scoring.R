@@ -1,6 +1,6 @@
 #' Cross-Validation Scoring Functions
 #'
-#' Internal functions for computing cross-validated scores during NSGA-II
+#' Internal functions for computing cross-validated scores during NSGA
 #' optimization. These functions prevent overfitting by using out-of-fold
 #' predictions for fitness evaluation.
 #'

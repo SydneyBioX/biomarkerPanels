@@ -21,17 +21,11 @@ NULL
 .select_np_threshold <- function(scores, truth, alpha = 0.15, delta = 0.05) {
   # Check if nproc is available
   if (!requireNamespace("nproc", quietly = TRUE)) {
-    warning(
-      "Package 'nproc' not available. Using fallback threshold of 0.5. ",
-      "Install nproc via install.packages('nproc') for NP threshold selection.",
+    stop(
+      "Package 'nproc' is required for NP threshold selection. ",
+      "Install it via install.packages('nproc').",
       call. = FALSE
     )
-    return(list(
-      threshold = 0.5,
-      method = "fallback",
-      alpha = alpha,
-      delta = delta
-    ))
   }
 
   tryCatch(
@@ -74,17 +68,10 @@ NULL
       )
     },
     error = function(e) {
-      warning(
+      stop(
         "NP threshold selection failed: ", conditionMessage(e),
-        ". Using fallback threshold of 0.5.",
+        "\nEnsure scores and truth vectors are valid for NP classification.",
         call. = FALSE
-      )
-      list(
-        threshold = 0.5,
-        method = "fallback",
-        alpha = alpha,
-        delta = delta,
-        error = conditionMessage(e)
       )
     }
   )
@@ -199,6 +186,14 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
                             np_alpha = 0.15, np_delta = 0.05) {
   if (!inherits(panel, "BiomarkerPanelResult")) {
     stop("`panel` must be a BiomarkerPanelResult from fit_panel().", call. = FALSE)
+  }
+  if (!is.numeric(np_alpha) || length(np_alpha) != 1L ||
+      is.na(np_alpha) || np_alpha <= 0 || np_alpha >= 1) {
+    stop("`np_alpha` must be a single numeric value in (0, 1).", call. = FALSE)
+  }
+  if (!is.numeric(np_delta) || length(np_delta) != 1L ||
+      is.na(np_delta) || np_delta <= 0 || np_delta >= 1) {
+    stop("`np_delta` must be a single numeric value in (0, 1).", call. = FALSE)
   }
 
   # Get base features and feature transform from panel

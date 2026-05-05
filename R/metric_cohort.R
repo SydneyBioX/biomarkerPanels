@@ -54,18 +54,18 @@ NULL
 
     # Compute per-cohort values
     # Preserve factor levels when subsetting to avoid re-inferring classes
-    # tryCatch guards against base_metric errors (e.g., metric_auc when a cohort
-    # has 0 positives or 0 negatives)
     values <- vapply(levels(cohort), function(level) {
       idx <- !is.na(cohort) & cohort == level
       if (!any(idx)) return(NA_real_)
       # Subset and preserve factor levels
       truth_subset <- factor(truth[idx], levels = truth_levels)
-      tryCatch(
-        base_metric(truth_subset, scores[idx], selected = selected,
-                  positive = positive, ...),
-        error = function(e) NA_real_
-      )
+      # Return NA when a cohort lacks both classes (e.g., all positive),
+      # but let genuine errors propagate
+      pos_n <- sum(truth_subset == positive)
+      neg_n <- sum(truth_subset != positive)
+      if (pos_n == 0L || neg_n == 0L) return(NA_real_)
+      base_metric(truth_subset, scores[idx], selected = selected,
+                  positive = positive)
     }, numeric(1))
 
     if (all(is.na(values))) return(NA_real_)

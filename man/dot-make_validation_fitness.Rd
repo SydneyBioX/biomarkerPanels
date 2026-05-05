@@ -18,7 +18,8 @@
   regularized,
   alpha,
   feature_transform = "none",
-  min_features_required = NULL
+  min_features_required = NULL,
+  selection_threshold = "adaptive"
 )
 }
 \arguments{
@@ -49,6 +50,8 @@
 \item{feature_transform}{Name of the feature transform to apply.}
 
 \item{min_features_required}{Minimum number of base features.}
+
+\item{selection_threshold}{Either \code{"adaptive"} or a fixed numeric threshold.}
 }
 \value{
 List with \code{wrapper} (fitness for rmoo) and \code{evaluate} (full eval).

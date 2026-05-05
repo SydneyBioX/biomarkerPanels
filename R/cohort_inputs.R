@@ -11,7 +11,7 @@ NULL
 #' Prepare Cohort Inputs for Optimization
 #'
 #' Main internal function that processes input data (single or multi-cohort)
-#' and prepares it for NSGA-II optimization. Handles feature extraction,
+#' and prepares it for NSGA optimization. Handles feature extraction,
 #' alignment, transformation, and response standardization.
 #'
 #' @param x Matrix-like object, SummarizedExperiment, or list of such objects.
@@ -252,7 +252,7 @@ NULL
     if (is.null(assay)) {
       assay <- assays[1]
     }
-    return(SummarizedExperiment::assay(x, assay))
+    return(t(SummarizedExperiment::assay(x, assay)))
   }
   if (is.data.frame(x)) {
     x <- as.matrix(x)
@@ -260,6 +260,16 @@ NULL
   if (!is.matrix(x)) {
     stop("`x` must be a matrix-like object.", call. = FALSE)
   }
+  na_before <- sum(is.na(x))
   mode(x) <- "numeric"
+  na_after <- sum(is.na(x))
+  if (na_after > na_before) {
+    warning(
+      "Coercing matrix to numeric introduced ",
+      na_after - na_before, " NA value(s). ",
+      "Check that input data contains only numeric values.",
+      call. = FALSE
+    )
+  }
   x
 }

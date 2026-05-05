@@ -11,13 +11,14 @@ metric_num_features(truth = NULL, scores = NULL, selected = NULL, ...)
 
 \item{scores}{Ignored; kept for signature compatibility.}
 
-\item{selected}{Vector of selected features (character, numeric, or logical).}
+\item{selected}{Vector of selected base features (character, numeric, or logical).}
 
 \item{...}{Additional arguments (ignored).}
 }
 \value{
-Count of selected biomarkers.
+Count of selected base biomarkers (genes).
 }
 \description{
-Panel Size Penalty
+Counts the number of base features (individual genes) in a panel, not
+transformed features such as pairwise ratios.
 }

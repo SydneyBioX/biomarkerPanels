@@ -1,6 +1,6 @@
-#' Optimize Biomarker Panels with NSGA-II
+#' Optimize Biomarker Panels with NSGA-III / NSGA-II
 #'
-#' Wrapper around [rmoo::nsga2()] (or [rmoo::nsga3()]) that composes registered
+#' Wrapper around [rmoo::nsga3()] (or [rmoo::nsga2()]) that composes registered
 #' metric functions into a multi-objective search for compact biomarker panels.
 #' Candidate solutions are represented as weights over a feature pool; features
 #' with weight > 0.5 are included in the panel (up to `max_features`). This
@@ -49,22 +49,23 @@
 #' @param scoring_fn Function producing per-sample scores from the selected
 #'   features. Signature:
 #'   `function(x_selected, selected_features, truth, cohort = NULL, ...)`.
-#' @param algorithm Multi-objective optimization algorithm. `"NSGA-II"` (default)
-#'   uses crowding distance for diversity preservation. `"NSGA-III"` uses
-#'   reference-point-based selection for many-objective problems but has a bug
-#'   in rmoo 0.3.0 (use NSGA-II as workaround).
-#' @param nsga_control Named list of arguments passed to [rmoo::nsga2()] (or
-#'   [rmoo::nsga3()]). For NSGA-III, `n_partitions` controls reference point
+#' @param algorithm Multi-objective optimization algorithm. `"NSGA-III"`
+#'   (default) uses reference-point-based selection and gives better Pareto
+#'   front diversity for many-objective problems (3+ objectives). `"NSGA-II"`
+#'   uses crowding distance for diversity preservation and is typically
+#'   adequate for 2 objectives.
+#' @param nsga_control Named list of arguments passed to [rmoo::nsga3()] (or
+#'   [rmoo::nsga2()]). For NSGA-III, `n_partitions` controls reference point
 #'   density (default computed from number of objectives). Defaults to adaptive
 #'   values based on feature pool size. Note: `parallel = TRUE` is not recommended
 #'   as it is slower than sequential execution due to overhead.
 #' @param assay For `SummarizedExperiment` inputs, assay name or index to use.
 #' @param seed Optional integer seed for reproducibility. When provided, sets
-#'   the random seed before running NSGA-II optimization. This ensures
+#'   the random seed before running NSGA optimization. This ensures
 #'   reproducible results across runs. If `NULL` (default), no seed is set and
 #'   results may vary between runs.
 #' @param fitness_cv Logical; if `TRUE` (default), use cross-validation when
-#'   evaluating candidate solutions during NSGA-II optimization. This prevents
+#'   evaluating candidate solutions during NSGA optimization. This prevents
 #'   overfitting by computing objective metrics on held-out fold predictions
 #'   rather than in-sample predictions. Recommended for fair comparison with
 #'   regularized methods like Lasso.
@@ -100,7 +101,7 @@ optimize_panel <- function(x, y,
                            feature_alignment = "intersection",
                            constraints = list(),
                            scoring_fn = NULL,
-                           algorithm = c("NSGA-II", "NSGA-III"),
+                           algorithm = c("NSGA-III", "NSGA-II"),
                            nsga_control = list(),
                            assay = NULL,
                            seed = NULL,
@@ -128,6 +129,23 @@ optimize_panel <- function(x, y,
       "Use register_feature_transform() to add custom transforms.",
       call. = FALSE
     )
+  }
+  if (!is.numeric(fitness_cv_folds) || length(fitness_cv_folds) != 1L ||
+      is.na(fitness_cv_folds) || fitness_cv_folds < 2L) {
+    stop("`fitness_cv_folds` must be an integer >= 2.", call. = FALSE)
+  }
+  if (!is.numeric(regularized_alpha) || length(regularized_alpha) != 1L ||
+      is.na(regularized_alpha) || regularized_alpha < 0 || regularized_alpha > 1) {
+    stop("`regularized_alpha` must be a single numeric value in [0, 1].", call. = FALSE)
+  }
+  if (!identical(selection_threshold, "adaptive")) {
+    st <- suppressWarnings(as.numeric(selection_threshold))
+    if (is.na(st) || st <= 0 || st >= 1) {
+      stop(
+        "`selection_threshold` must be \"adaptive\" or a numeric value in (0, 1).",
+        call. = FALSE
+      )
+    }
   }
 
   inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, transform = "none",
@@ -270,6 +288,11 @@ optimize_panel <- function(x, y,
 
   # Create CV folds for fitness evaluation (if enabled)
   cv_fold_ids <- NULL
+  if (!fitness_cv) {
+    warning("fitness_cv = FALSE: NSGA will use in-sample scoring, which risks ",
+            "overfitting during optimization. Consider fitness_cv = TRUE for ",
+            "more reliable panel selection.", call. = FALSE)
+  }
   if (fitness_cv) {
     n_samples <- nrow(x_pool)
     if (n_samples < fitness_cv_folds * 2L) {
@@ -397,13 +420,13 @@ optimize_panel <- function(x, y,
            call. = FALSE)
     }
 
-    # Step 4: Evaluate constraints on TRANSFORMED features
+    # Step 4: Evaluate constraints
     constraint_results <- if (length(constraint_specs)) {
       setNames(vapply(seq_along(constraint_specs), function(j) {
         res <- constraint_specs[[j]]$fun(
           truth = truth,
           scores = scores,
-          selected = selected_features,
+          selected = selected_base_features,
           cohort = cohort,
           x = x_selected
         )
@@ -415,11 +438,13 @@ optimize_panel <- function(x, y,
     feasible <- if (length(constraint_results)) all(constraint_results) else TRUE
 
     # Step 5: Evaluate objectives on TRANSFORMED features
+    # Pass base features as `selected` so metric_num_features counts genes,
+    # not pairwise ratios. Other metrics ignore `selected`.
     metrics <- vapply(objectives, function(obj) {
       obj$fun(
         truth,
         scores,
-        selected = selected_features,
+        selected = selected_base_features,
         cohort = cohort,
         x = x_selected
       )
@@ -545,6 +570,14 @@ optimize_panel <- function(x, y,
   solutions <- solutions[feasible_vec]
   metric_matrix <- do.call(rbind, lapply(solutions, `[[`, "metrics"))
   colnames(metric_matrix) <- names(objectives)
+
+  # Post-filter dominated solutions: re-evaluation may shift metrics (e.g. due
+
+  # to non-deterministic inner CV in glmnet), introducing dominated solutions
+  # into what was originally a rank-1 front.
+  nondom_idx <- .filter_dominated(metric_matrix, objective_directions)
+  solutions <- solutions[nondom_idx]
+  metric_matrix <- metric_matrix[nondom_idx, , drop = FALSE]
 
   # Build solutions data frame in wide format (one row per solution)
   solutions_df <- data.frame(

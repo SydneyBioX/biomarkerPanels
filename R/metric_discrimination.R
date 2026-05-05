@@ -196,7 +196,14 @@ metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = N
     # coords returns a data.frame; extract specificity
     spec_value <- coords_result$specificity
 
-    if (length(spec_value) == 0 || is.na(spec_value)) {
+    if (length(spec_value) == 0L) {
+      return(NA_real_)
+    }
+    # pROC::coords may return multiple rows; take best specificity
+    if (length(spec_value) > 1L) {
+      spec_value <- max(spec_value, na.rm = TRUE)
+    }
+    if (is.na(spec_value)) {
       return(NA_real_)
     }
 
@@ -212,11 +219,14 @@ metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = N
 
 #' Panel Size Penalty
 #'
+#' Counts the number of base features (individual genes) in a panel, not
+#' transformed features such as pairwise ratios.
+#'
 #' @param truth Ignored; kept for signature compatibility.
 #' @param scores Ignored; kept for signature compatibility.
-#' @param selected Vector of selected features (character, numeric, or logical).
+#' @param selected Vector of selected base features (character, numeric, or logical).
 #' @param ... Additional arguments (ignored).
-#' @return Count of selected biomarkers.
+#' @return Count of selected base biomarkers (genes).
 #' @export
 metric_num_features <- function(truth = NULL, scores = NULL, selected = NULL, ...) {
   if (is.null(selected)) {

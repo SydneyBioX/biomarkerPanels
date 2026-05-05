@@ -32,7 +32,8 @@ Suggests:
     rmarkdown,
     ggplot2,
     BiocStyle,
-    nproc
+    nproc,
+    ruv
 LinkingTo:
     Rcpp
 biocViews: Software, Classification, FeatureExtraction, ROC, Biomarker

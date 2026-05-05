@@ -58,6 +58,11 @@ evaluate_panel <- function(panel, x, y,
                            positive = NULL) {
   stopifnot(inherits(panel, "BiomarkerPanelResult"))
 
+  if (!is.numeric(cutoff_prob) || length(cutoff_prob) != 1L ||
+      is.na(cutoff_prob) || cutoff_prob <= 0 || cutoff_prob >= 1) {
+    stop("`cutoff_prob` must be a single numeric value in (0, 1).", call. = FALSE)
+  }
+
   # Use stored positive class from training if not explicitly specified
   if (is.null(positive)) {
     stored_positive <- panel@control$positive_class
@@ -198,24 +203,18 @@ evaluate_panel <- function(panel, x, y,
 
         # Verify the mapping matches what the model expects
         if (!setequal(expected_names, feature_cols)) {
-          # Names don't match - this could happen if features were renamed
-          # differently during training. Try position-based mapping as fallback.
-          if (length(feature_cols) == ncol(x_selected)) {
-            warning(
-              "Feature name mismatch between training and validation. ",
-              "Using positional mapping (verify features are aligned).",
-              call. = FALSE
-            )
-            names(newdata) <- feature_cols
-          } else {
-            stop("Cannot match validation features to model features.")
-          }
-        } else {
-          # Names match - ensure same order as model expects
-          names(newdata) <- expected_names
-          # Reorder to match model's feature order
-          newdata <- newdata[, feature_cols, drop = FALSE]
+          stop(
+            "Feature name mismatch between training and validation. ",
+            "Expected: ", paste(head(feature_cols, 10), collapse = ", "),
+            if (length(feature_cols) > 10) "..." else "", ". ",
+            "Got: ", paste(head(expected_names, 10), collapse = ", "),
+            if (length(expected_names) > 10) "..." else "",
+            call. = FALSE
+          )
         }
+        # Names match -- ensure same order as model expects
+        names(newdata) <- expected_names
+        newdata <- newdata[, feature_cols, drop = FALSE]
 
         # If model was trained with cohort, always use reference level so
         # predictions are cohort-agnostic. Cohort-aware metrics split downstream.
