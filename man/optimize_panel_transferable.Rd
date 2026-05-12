@@ -27,7 +27,8 @@ optimize_panel_transferable(
   selection_threshold = "adaptive",
   n_top_features = 50L,
   fitness_mode = c("within_cohort_val", "within_cohort_rotating", "loco"),
-  n_val_splits = 10L
+  n_val_splits = 10L,
+  record_history = FALSE
 )
 }
 \arguments{
@@ -103,6 +104,13 @@ actually optimizes for. Requires \verb{>=2} cohorts.}
 
 \item{n_val_splits}{Number of rotating train/val splits to pre-compute
 when \code{fitness_mode = "within_cohort_rotating"} (default 10).}
+
+\item{record_history}{Logical; if \code{TRUE}, capture the population, fitness,
+and NSGA rank at every generation and attach the result to the returned
+\code{OptimizationResult}. Retrieve via \code{\link[=nsga_history]{nsga_history()}}. Default \code{FALSE}.
+Adds modest overhead (one matrix copy per generation) and is intended for
+diagnostic / visualization use, e.g. plotting how the Pareto front
+evolves over \code{maxiter}.}
 }
 \value{
 An \code{OptimizationResult} containing Pareto-optimal solutions and

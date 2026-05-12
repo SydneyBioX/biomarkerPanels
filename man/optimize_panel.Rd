@@ -23,7 +23,8 @@ optimize_panel(
   fitness_cv_folds = 5L,
   regularized = TRUE,
   regularized_alpha = 0.5,
-  selection_threshold = "adaptive"
+  selection_threshold = "adaptive",
+  record_history = FALSE
 )
 }
 \arguments{
@@ -119,6 +120,13 @@ that allows variable panel sizes in the Pareto front. Fixed thresholds
 improve accuracy. Adaptive selection finds natural breakpoints in the
 weight distribution, enabling the \code{num_features} objective to drive panel
 size diversity.}
+
+\item{record_history}{Logical; if \code{TRUE}, capture the population, fitness,
+and NSGA rank at every generation and attach the result to the returned
+\code{OptimizationResult}. Retrieve via \code{\link[=nsga_history]{nsga_history()}}. Default \code{FALSE}.
+Adds modest overhead (one matrix copy per generation) and is intended for
+diagnostic / visualization use, e.g. plotting how the Pareto front
+evolves over \code{maxiter}.}
 }
 \value{
 An \code{OptimizationResult} containing the Pareto-optimal solutions.

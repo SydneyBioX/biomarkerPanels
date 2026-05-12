@@ -1,3 +1,184 @@
+#' Animate Pareto Front Evolution Alongside Feature Inclusion
+#'
+#' Two-panel animated GIF showing how the rank-1 (Pareto) population evolves
+#' across NSGA generations: the left panel plots the Pareto front in
+#' objective space, the right panel plots inclusion frequency of base
+#' features in that generation's Pareto solutions. Both axes (Pareto-panel
+#' x/y, frequency-panel features) are held fixed across frames so the
+#' animation is comparable frame-to-frame.
+#'
+#' Requires the optimization to have been run with `record_history = TRUE`.
+#' The set of features shown on the right panel is the top-N base features
+#' by total appearances across the rank-1 population of all recorded
+#' generations; features not present in a given generation drop to zero.
+#'
+#' @param optimization_result An `OptimizationResult` from [optimize_panel()].
+#' @param x_metric,y_metric Objective names for the Pareto panel axes.
+#'   Defaults `"sensitivity"` / `"specificity"`.
+#' @param top_n_features Integer; number of features to display on the
+#'   right panel. Default `15`.
+#' @param generations One of: `NULL` (all recorded generations, default), a
+#'   single integer `n` giving the number of evenly-spaced frames to render,
+#'   or an integer vector of specific generation numbers.
+#' @param fps Numeric; animation frames per second. Default `4`.
+#' @param width,height Frame dimensions in pixels. Default `1000` x `500`.
+#' @param point_size Point size in the Pareto panel. Default `3`.
+#' @param viridis_option Viridis palette for coloring by panel size. Default
+#'   `"plasma"`.
+#' @param path Optional file path to write the GIF to. Default `NULL`
+#'   (in-memory only).
+#' @return A `magick-image` representing the animated GIF.
+#' @export
+#' @seealso [optimize_panel()], [nsga_history()], [hypervolume_history()]
+#' @examples
+#' \dontrun{
+#' opt <- optimize_panel(x, y, record_history = TRUE)
+#' anim <- plot_pareto_evolution(opt)
+#' anim  # display in RStudio viewer
+#' plot_pareto_evolution(opt, path = "evolution.gif")
+#' }
+plot_pareto_evolution <- function(optimization_result,
+                                  x_metric = "sensitivity",
+                                  y_metric = "specificity",
+                                  top_n_features = 15L,
+                                  generations = NULL,
+                                  fps = 4,
+                                  width = 1000,
+                                  height = 500,
+                                  point_size = 3,
+                                  viridis_option = "plasma",
+                                  path = NULL) {
+  for (pkg in c("ggplot2", "patchwork", "magick")) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      stop("Package '", pkg, "' is required for plot_pareto_evolution(). ",
+           "Install with install.packages('", pkg, "').", call. = FALSE)
+    }
+  }
+  if (!inherits(optimization_result, "OptimizationResult")) {
+    stop("`optimization_result` must be an OptimizationResult.", call. = FALSE)
+  }
+
+  hist <- nsga_history(optimization_result)
+  if (!is.data.frame(hist) || !nrow(hist)) {
+    stop("No NSGA history recorded. Re-run optimize_panel() with ",
+         "record_history = TRUE.", call. = FALSE)
+  }
+  for (col in c(x_metric, y_metric, "is_pareto", "generation",
+                "base_features", "n_features")) {
+    if (!col %in% names(hist)) {
+      stop("Column '", col, "' missing from nsga_history().", call. = FALSE)
+    }
+  }
+
+  pareto_hist <- hist[hist$is_pareto, , drop = FALSE]
+  if (!nrow(pareto_hist)) {
+    stop("No rank-1 individuals in recorded history.", call. = FALSE)
+  }
+
+  all_gens <- sort(unique(pareto_hist$generation))
+  if (is.null(generations)) {
+    gens <- all_gens
+  } else if (length(generations) == 1L && is.numeric(generations) &&
+             !is.na(generations) && generations >= 1L &&
+             generations == as.integer(generations)) {
+    n_target <- as.integer(generations)
+    if (n_target >= length(all_gens)) {
+      gens <- all_gens
+    } else {
+      idx <- unique(round(seq.int(1, length(all_gens), length.out = n_target)))
+      gens <- all_gens[idx]
+    }
+  } else {
+    gens <- intersect(as.integer(generations), all_gens)
+    if (!length(gens)) {
+      stop("None of the requested generations were recorded.", call. = FALSE)
+    }
+  }
+
+  all_feats <- unlist(pareto_hist$base_features, use.names = FALSE)
+  if (!length(all_feats)) {
+    stop("Recorded Pareto solutions contain no base features.", call. = FALSE)
+  }
+  feat_tab <- sort(table(all_feats), decreasing = TRUE)
+  top_n <- min(as.integer(top_n_features), length(feat_tab))
+  top_feats <- names(feat_tab)[seq_len(top_n)]
+
+  bounded <- c("sensitivity", "specificity", "auc")
+  axis_range <- function(metric) {
+    if (metric %in% bounded) return(c(0, 1))
+    rng <- range(pareto_hist[[metric]], finite = TRUE)
+    pad <- max(diff(rng) * 0.05, .Machine$double.eps)
+    c(rng[1L] - pad, rng[2L] + pad)
+  }
+  xlim <- axis_range(x_metric)
+  ylim <- axis_range(y_metric)
+  n_feat_range <- range(pareto_hist$n_features, finite = TRUE)
+
+  frames <- magick::image_graph(width = width, height = height, res = 96)
+  tryCatch({
+    for (g in gens) {
+      pareto_g <- pareto_hist[pareto_hist$generation == g, , drop = FALSE]
+
+      p_pareto <- ggplot2::ggplot(
+        pareto_g,
+        ggplot2::aes(x = .data[[x_metric]],
+                     y = .data[[y_metric]],
+                     color = .data[["n_features"]])
+      ) +
+        ggplot2::geom_point(size = point_size, alpha = 0.85) +
+        ggplot2::scale_color_viridis_c(
+          name = "Panel size",
+          option = viridis_option,
+          limits = n_feat_range
+        ) +
+        ggplot2::coord_cartesian(xlim = xlim, ylim = ylim) +
+        ggplot2::labs(
+          x = x_metric, y = y_metric,
+          title = sprintf("Pareto front - generation %d", g)
+        ) +
+        ggplot2::theme_bw(base_size = 12)
+
+      feat_in_gen <- unlist(pareto_g$base_features, use.names = FALSE)
+      counts <- as.integer(table(factor(feat_in_gen, levels = top_feats)))
+      freq_df <- data.frame(
+        feature = factor(top_feats, levels = rev(top_feats)),
+        proportion = counts / max(nrow(pareto_g), 1L),
+        stringsAsFactors = FALSE
+      )
+
+      p_freq <- ggplot2::ggplot(
+        freq_df,
+        ggplot2::aes(x = .data[["proportion"]], y = .data[["feature"]])
+      ) +
+        ggplot2::geom_col(fill = "#377EB8", width = 0.7) +
+        ggplot2::scale_x_continuous(
+          limits = c(0, 1),
+          labels = function(z) paste0(round(z * 100), "%"),
+          expand = ggplot2::expansion(mult = c(0, 0.02))
+        ) +
+        ggplot2::labs(
+          x = "Inclusion frequency",
+          y = NULL,
+          title = sprintf("Top-%d Pareto features (%d solutions)",
+                          length(top_feats), nrow(pareto_g))
+        ) +
+        ggplot2::theme_minimal(base_size = 12) +
+        ggplot2::theme(
+          panel.grid.major.y = ggplot2::element_blank(),
+          panel.grid.minor = ggplot2::element_blank()
+        )
+
+      print(patchwork::wrap_plots(p_pareto, p_freq, ncol = 2L))
+    }
+  }, finally = grDevices::dev.off())
+
+  anim <- magick::image_animate(frames, fps = fps, optimize = FALSE)
+  if (!is.null(path)) {
+    magick::image_write(anim, path = path)
+  }
+  anim
+}
+
 #' Plot Pareto Front on Held-Out Data
 #'
 #' Fits and evaluates every Pareto-optimal solution from [optimize_panel()] on

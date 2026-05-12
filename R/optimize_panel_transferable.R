@@ -61,6 +61,12 @@
 #'   actually optimizes for. Requires `>=2` cohorts.
 #' @param n_val_splits Number of rotating train/val splits to pre-compute
 #'   when `fitness_mode = "within_cohort_rotating"` (default 10).
+#' @param record_history Logical; if `TRUE`, capture the population, fitness,
+#'   and NSGA rank at every generation and attach the result to the returned
+#'   `OptimizationResult`. Retrieve via [nsga_history()]. Default `FALSE`.
+#'   Adds modest overhead (one matrix copy per generation) and is intended for
+#'   diagnostic / visualization use, e.g. plotting how the Pareto front
+#'   evolves over `maxiter`.
 #' @return An `OptimizationResult` containing Pareto-optimal solutions and
 #'   held-out data for downstream calibration. Use [summarize_solutions()] to
 #'   inspect solutions, [fit_panel()] to fit a model, [calibrate_panel()] for
@@ -91,7 +97,8 @@ optimize_panel_transferable <- function(
   selection_threshold = "adaptive",
   n_top_features = 50L,
   fitness_mode = c("within_cohort_val", "within_cohort_rotating", "loco"),
-  n_val_splits = 10L
+  n_val_splits = 10L,
+  record_history = FALSE
 ) {
   algorithm <- match.arg(algorithm)
   fitness_mode <- match.arg(fitness_mode)
@@ -279,6 +286,84 @@ optimize_panel_transferable <- function(
   nsga_defaults <- .get_adaptive_nsga_defaults(decision_dim, algorithm)
   nsga_args <- utils::modifyList(nsga_defaults, nsga_control)
 
+  # Hoisted: needed both by the per-generation history monitor (to convert
+  # minimised fitness back to user-facing direction) and by the post-run
+  # dominance filter further down.
+  objective_directions <- vapply(objectives, `[[`, character(1), "direction")
+
+  # Mirror of the selection logic used inside each fitness factory's closure,
+  # used to materialise per-generation history. Same params + same algorithm
+  # ⇒ same base features as NSGA actually scored.
+  select_base_features <- function(decision_vec) {
+    n_pool <- length(base_feature_pool)
+    if (identical(selection_threshold, "adaptive")) {
+      ord <- order(decision_vec, base_feature_pool,
+                   decreasing = c(TRUE, FALSE), method = "radix")
+      sorted_weights <- decision_vec[ord]
+      if (n_pool > max_features) {
+        top_n <- min(max_features + 5L, n_pool)
+        weight_diffs <- -diff(sorted_weights[seq_len(top_n)])
+        search_range <- seq(min_features_required, top_n - 1L)
+        if (length(search_range) > 0L) {
+          gap_idx <- which.max(weight_diffs[search_range])
+          natural_cutoff <- min_features_required + gap_idx
+        } else {
+          natural_cutoff <- min_features_required
+        }
+        n_selected <- max(min_features_required,
+                          min(natural_cutoff, max_features))
+      } else {
+        above_median <- sum(decision_vec > 0.5)
+        n_selected <- max(min_features_required,
+                          min(above_median, max_features))
+      }
+      selected_idx <- ord[seq_len(n_selected)]
+    } else {
+      threshold <- as.numeric(selection_threshold)
+      above_threshold <- which(decision_vec > threshold)
+      if (length(above_threshold) < min_features_required) {
+        ord <- order(decision_vec, base_feature_pool,
+                     decreasing = c(TRUE, FALSE), method = "radix")
+        selected_idx <- ord[seq_len(min(min_features_required, length(ord)))]
+      } else if (length(above_threshold) > max_features) {
+        weights_above <- decision_vec[above_threshold]
+        names_above <- base_feature_pool[above_threshold]
+        ord <- order(weights_above, names_above,
+                     decreasing = c(TRUE, FALSE), method = "radix")
+        selected_idx <- above_threshold[ord[seq_len(max_features)]]
+      } else {
+        selected_idx <- above_threshold
+      }
+    }
+    selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
+    base_feature_pool[selected_idx]
+  }
+
+  # Optional per-generation history capture (see optimize_panel() for rationale).
+  history_buffer <- new.env(parent = emptyenv())
+  history_buffer$gens <- list()
+  history_monitor <- function(object, ...) {
+    iter <- object@iter
+    fit <- object@fitness
+    pop <- object@population
+    if (is.null(dim(fit))) fit <- matrix(fit, nrow = 1L)
+    if (is.null(dim(pop))) pop <- matrix(pop, nrow = 1L)
+    fr <- as.integer(object@front)
+    for (j in seq_along(objective_directions)) {
+      if (objective_directions[j] == "maximize") fit[, j] <- -fit[, j]
+    }
+    colnames(fit) <- names(objectives)
+    history_buffer$gens[[length(history_buffer$gens) + 1L]] <- list(
+      iter = as.integer(iter),
+      fit = fit,
+      front = fr,
+      pop = pop
+    )
+    invisible(NULL)
+  }
+
+  monitor_arg <- if (isTRUE(record_history)) history_monitor else FALSE
+
   nsga_params <- c(
     list(
       type = "real-valued",
@@ -286,7 +371,7 @@ optimize_panel_transferable <- function(
       nObj = length(objectives),
       lower = rep(0, decision_dim),
       upper = rep(1, decision_dim),
-      monitor = FALSE,
+      monitor = monitor_arg,
       summary = FALSE
     ),
     nsga_args
@@ -334,7 +419,6 @@ optimize_panel_transferable <- function(
   }
   solutions <- solutions[feasible_vec]
 
-  objective_directions <- vapply(objectives, `[[`, character(1), "direction")
   metric_matrix <- do.call(rbind, lapply(solutions, `[[`, "metrics"))
   colnames(metric_matrix) <- names(objectives)
 
@@ -406,6 +490,29 @@ optimize_panel_transferable <- function(
     cohort_labels = partitions$cohort_names
   )
 
+  # Materialize per-generation history if it was captured.
+  history_out <- if (isTRUE(record_history) && length(history_buffer$gens)) {
+    gen_dfs <- lapply(history_buffer$gens, function(g) {
+      n_ind <- nrow(g$pop)
+      bf <- lapply(seq_len(n_ind), function(i) select_base_features(g$pop[i, ]))
+      df <- data.frame(
+        generation = g$iter,
+        individual = seq_len(n_ind),
+        rank = g$front,
+        is_pareto = g$front == 1L,
+        g$fit,
+        n_features = lengths(bf),
+        check.names = FALSE,
+        stringsAsFactors = FALSE
+      )
+      df$base_features <- bf
+      df
+    })
+    do.call(rbind, gen_dfs)
+  } else {
+    list()
+  }
+
   new("OptimizationResult",
       solutions = solutions_df,
       feature_pool = base_feature_pool,
@@ -413,7 +520,8 @@ optimize_panel_transferable <- function(
       training_signature = training_signature,
       aggregated_x = combined_x,
       aggregated_y = combined_y,
-      aggregated_cohort = combined_cohort)
+      aggregated_cohort = combined_cohort,
+      history = history_out)
 }
 
 
