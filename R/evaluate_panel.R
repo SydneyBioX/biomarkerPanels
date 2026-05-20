@@ -147,15 +147,22 @@ evaluate_panel <- function(panel, x, y,
     stop("Panel has no selected features.", call. = FALSE)
   }
 
-  # Verify feature names match model expectations
+  # Verify feature names match model expectations. CPOP-style panels store a
+  # subset of all possible pair features; in that case subset the transformed
+  # matrix down to the expected columns rather than warning.
   expected_features <- panel@features
   if (!setequal(selected, expected_features)) {
-    warning(
-      "Transformed feature names differ from model training. ",
-      "Expected: ", paste(expected_features, collapse = ", "), ". ",
-      "Got: ", paste(selected, collapse = ", "), ".",
-      call. = FALSE
-    )
+    if (all(expected_features %in% selected)) {
+      x_selected <- x_selected[, expected_features, drop = FALSE]
+      selected <- expected_features
+    } else {
+      warning(
+        "Transformed feature names differ from model training. ",
+        "Expected: ", paste(expected_features, collapse = ", "), ". ",
+        "Got: ", paste(selected, collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
   }
 
   # Determine how to compute scores

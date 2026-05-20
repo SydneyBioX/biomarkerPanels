@@ -17,6 +17,10 @@
 #'   features. The feature transform is applied on-the-fly during [fit_panel()].
 #' @slot aggregated_y Training response vector (factor).
 #' @slot aggregated_cohort Cohort membership factor for training samples.
+#' @slot history Optional per-generation NSGA history. Empty list when
+#'   `record_history = FALSE` (default); otherwise a data frame with columns
+#'   `generation`, `individual`, `rank`, `is_pareto`, and one column per
+#'   objective (in user-facing direction). See [nsga_history()].
 #' @export
 setClass(
   "OptimizationResult",
@@ -27,8 +31,10 @@ setClass(
     training_signature = "list",
     aggregated_x = "ANY",
     aggregated_y = "ANY",
-    aggregated_cohort = "ANY"
-  )
+    aggregated_cohort = "ANY",
+    history = "ANY"
+  ),
+  prototype = list(history = list())
 )
 
 #' Solutions Accessor
@@ -118,6 +124,38 @@ setMethod(
       stop("solution_id must be between 1 and ", nrow(object@solutions), call. = FALSE)
     }
     object@solutions$base_features[[solution_id]]
+  }
+)
+
+#' NSGA Generation History
+#'
+#' Retrieve the per-generation NSGA population recorded during optimization.
+#' Only populated when [optimize_panel()] was called with
+#' `record_history = TRUE`.
+#'
+#' @param object An `OptimizationResult`.
+#' @return A data frame with one row per individual per generation. Columns:
+#'   `generation` (integer), `individual` (row in the population),
+#'   `rank` (integer NSGA rank, 1 = Pareto-optimal), `is_pareto` (logical),
+#'   one column per objective with values in the user-facing direction (i.e.
+#'   maximize objectives are reported on their original scale, not the
+#'   negated minimization form rmoo uses internally), `n_features` (panel
+#'   size), and `base_features` (a list-column of character vectors giving
+#'   the base feature names selected for each individual). Returns an empty
+#'   data frame if no history was recorded.
+#' @export
+setGeneric("nsga_history", function(object) standardGeneric("nsga_history"))
+
+#' @describeIn nsga_history Return the per-generation NSGA history data frame.
+#' @export
+setMethod(
+  "nsga_history",
+  signature = "OptimizationResult",
+  definition = function(object) {
+    h <- object@history
+    if (is.data.frame(h)) return(h)
+    if (is.null(h) || !length(h)) return(data.frame())
+    h
   }
 )
 

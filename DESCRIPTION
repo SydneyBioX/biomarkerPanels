@@ -33,7 +33,8 @@ Suggests:
     ggplot2,
     BiocStyle,
     nproc,
-    ruv
+    ruv,
+    emoa
 LinkingTo:
     Rcpp
 biocViews: Software, Classification, FeatureExtraction, ROC, Biomarker
@@ -43,3 +44,45 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 URL: https://github.com/SydneyBioX/biomarkerPanels
 BugReports: https://github.com/SydneyBioX/biomarkerPanels/issues
+Collate: 
+    'RcppExports.R'
+    'biomarkerPanels-package.R'
+    'cohort_inputs.R'
+    'cpop_fit.R'
+    'cpop_select.R'
+    'cpop_step2.R'
+    'cv_scoring.R'
+    'data_partitioning.R'
+    'de_analysis.R'
+    'denominator_features.R'
+    'discriminative_features.R'
+    'dual_stream_ratios.R'
+    'evaluate_cohorts.R'
+    'evaluate_panel.R'
+    'evaluate_sensitivity.R'
+    'feature_alignment.R'
+    'feature_stability.R'
+    'feature_transforms.R'
+    'fitness_rotating_validation.R'
+    'panel_class.R'
+    'hypervolume.R'
+    'metric_classification.R'
+    'metric_cohort.R'
+    'metric_cohort_transferability.R'
+    'metric_difficulty.R'
+    'metric_discrimination.R'
+    'metric_registry.R'
+    'model_fitting.R'
+    'np_fit.R'
+    'np_utils.R'
+    'nsga_config.R'
+    'objectives.R'
+    'optimize_panel.R'
+    'optimize_panel_transferable.R'
+    'panel_summarization.R'
+    'ruv_features.R'
+    'threshold_calibration.R'
+    'transferable_features.R'
+    'utils.R'
+    'utils_validation.R'
+    'visualization.R'

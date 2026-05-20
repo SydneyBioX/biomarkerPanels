@@ -78,6 +78,12 @@
 #' @param regularized_alpha Elastic net mixing parameter when `regularized = TRUE`.
 #'   `alpha = 1` is lasso, `alpha = 0` is ridge, and values in between give
 #'   elastic net. Default is 0.5 (elastic net).
+#' @param record_history Logical; if `TRUE`, capture the population, fitness,
+#'   and NSGA rank at every generation and attach the result to the returned
+#'   `OptimizationResult`. Retrieve via [nsga_history()]. Default `FALSE`.
+#'   Adds modest overhead (one matrix copy per generation) and is intended for
+#'   diagnostic / visualization use, e.g. plotting how the Pareto front
+#'   evolves over `maxiter`.
 #' @param selection_threshold Either a fixed numeric threshold in (0,1) for
 #'   feature selection, or `"adaptive"` (default) to use gap-based selection
 #'   that allows variable panel sizes in the Pareto front. Fixed thresholds
@@ -109,7 +115,8 @@ optimize_panel <- function(x, y,
                            fitness_cv_folds = 5L,
                            regularized = TRUE,
                            regularized_alpha = 0.5,
-                           selection_threshold = "adaptive") {
+                           selection_threshold = "adaptive",
+                           record_history = FALSE) {
   algorithm <- match.arg(algorithm)
   feature_alignment <- match.arg(feature_alignment)
   if (!requireNamespace("rmoo", quietly = TRUE)) {
@@ -308,24 +315,22 @@ optimize_panel <- function(x, y,
   # min_features_for_regularized is already computed above
   min_features_required <- min_features_for_regularized
 
-  evaluate_candidate <- function(decision_vec) {
-    # feature_names_pool contains BASE feature names
-    feature_names_pool <- colnames(x_pool)
-    n_pool <- length(feature_names_pool)
+  # Map a decision-weight vector to the ordered base feature names that NSGA
+  # would select for it. Used by both fitness evaluation and per-generation
+  # history materialization, so the recorded base_features always reflect
+  # exactly what the optimizer chose.
+  feature_names_pool_outer <- colnames(x_pool)
+  n_pool_outer <- length(feature_names_pool_outer)
 
-    # Step 1: Select BASE features using decision weights
+  select_base_features <- function(decision_vec) {
     if (identical(selection_threshold, "adaptive")) {
-      # Adaptive: select based on largest gap in sorted weights
-      # This allows the GA to "encode" panel size in the weight distribution
-      ord <- order(decision_vec, feature_names_pool,
+      ord <- order(decision_vec, feature_names_pool_outer,
                    decreasing = c(TRUE, FALSE), method = "radix")
       sorted_weights <- decision_vec[ord]
 
-      if (n_pool > max_features) {
-        top_n <- min(max_features + 5L, n_pool)
+      if (n_pool_outer > max_features) {
+        top_n <- min(max_features + 5L, n_pool_outer)
         weight_diffs <- -diff(sorted_weights[seq_len(top_n)])
-
-        # Find largest gap after min_features_required
         search_range <- seq(min_features_required, top_n - 1L)
         if (length(search_range) > 0L) {
           gap_idx <- which.max(weight_diffs[search_range])
@@ -340,21 +345,17 @@ optimize_panel <- function(x, y,
         n_selected <- max(min_features_required, min(above_median, max_features))
       }
       selected_idx <- ord[seq_len(n_selected)]
-
     } else {
-      # Fixed threshold (backward compatible)
       threshold <- as.numeric(selection_threshold)
       above_threshold <- which(decision_vec > threshold)
 
       if (length(above_threshold) < min_features_required) {
-        # Fallback: take top min_features_required by weight
-        ord <- order(decision_vec, feature_names_pool,
+        ord <- order(decision_vec, feature_names_pool_outer,
                      decreasing = c(TRUE, FALSE), method = "radix")
         selected_idx <- ord[seq_len(min(min_features_required, length(ord)))]
       } else if (length(above_threshold) > max_features) {
-        # Cap at max_features, using feature names for reproducible tie-breaking
         weights_above <- decision_vec[above_threshold]
-        names_above <- feature_names_pool[above_threshold]
+        names_above <- feature_names_pool_outer[above_threshold]
         ord <- order(weights_above, names_above,
                      decreasing = c(TRUE, FALSE), method = "radix")
         selected_idx <- above_threshold[ord[seq_len(max_features)]]
@@ -362,10 +363,12 @@ optimize_panel <- function(x, y,
         selected_idx <- above_threshold
       }
     }
-
-    # Sort by descending weight for consistent output ordering
     selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
-    selected_base_features <- feature_names_pool[selected_idx]
+    feature_names_pool_outer[selected_idx]
+  }
+
+  evaluate_candidate <- function(decision_vec) {
+    selected_base_features <- select_base_features(decision_vec)
     x_base_selected <- x_pool[, selected_base_features, drop = FALSE]
 
     # Step 2: Apply feature transform ON-THE-FLY to selected base features
@@ -500,6 +503,34 @@ optimize_panel <- function(x, y,
     t(apply(x, 1, evaluate_single))
   }
 
+  # Optional per-generation history capture. We build a closure that pushes
+  # each generation's population, fitness, and front into a parent-scope env.
+  # The decision-weight matrix is needed to reconstruct base_features post-run
+  # (we don't compute features inside the monitor to keep per-iter overhead low).
+  history_buffer <- new.env(parent = emptyenv())
+  history_buffer$gens <- list()
+  history_monitor <- function(object, ...) {
+    iter <- object@iter
+    fit <- object@fitness
+    pop <- object@population
+    if (is.null(dim(fit))) fit <- matrix(fit, nrow = 1L)
+    if (is.null(dim(pop))) pop <- matrix(pop, nrow = 1L)
+    fr <- as.integer(object@front)
+    for (j in seq_along(objective_directions)) {
+      if (objective_directions[j] == "maximize") fit[, j] <- -fit[, j]
+    }
+    colnames(fit) <- names(objectives)
+    history_buffer$gens[[length(history_buffer$gens) + 1L]] <- list(
+      iter = as.integer(iter),
+      fit = fit,
+      front = fr,
+      pop = pop
+    )
+    invisible(NULL)
+  }
+
+  monitor_arg <- if (isTRUE(record_history)) history_monitor else FALSE
+
   nsga_params <- c(
     list(
       type = "real-valued",
@@ -507,7 +538,7 @@ optimize_panel <- function(x, y,
       nObj = length(objectives),
       lower = rep(0, decision_dim),
       upper = rep(1, decision_dim),
-      monitor = FALSE,
+      monitor = monitor_arg,
       summary = FALSE
     ),
     nsga_args
@@ -633,6 +664,31 @@ optimize_panel <- function(x, y,
     cohort_counts = inputs$cohort_counts
   )
 
+  # Materialize per-generation history if it was captured. For each individual
+  # we run the same selection logic the optimizer used to derive base_features,
+  # so the recorded panels exactly match what NSGA was scoring.
+  history_out <- if (isTRUE(record_history) && length(history_buffer$gens)) {
+    gen_dfs <- lapply(history_buffer$gens, function(g) {
+      n_ind <- nrow(g$pop)
+      bf <- lapply(seq_len(n_ind), function(i) select_base_features(g$pop[i, ]))
+      df <- data.frame(
+        generation = g$iter,
+        individual = seq_len(n_ind),
+        rank = g$front,
+        is_pareto = g$front == 1L,
+        g$fit,
+        n_features = lengths(bf),
+        check.names = FALSE,
+        stringsAsFactors = FALSE
+      )
+      df$base_features <- bf
+      df
+    })
+    do.call(rbind, gen_dfs)
+  } else {
+    list()
+  }
+
   # Return OptimizationResult (no model fitting)
   # Note: aggregated_x now stores RAW (untransformed) base features
   # Transform is applied on-the-fly during fit_panel() and evaluate_panel()
@@ -644,6 +700,7 @@ optimize_panel <- function(x, y,
     training_signature = training_signature,
     aggregated_x = x_pool,  # Raw base features (transform applied later)
     aggregated_y = truth,
-    aggregated_cohort = cohort
+    aggregated_cohort = cohort,
+    history = history_out
   )
 }

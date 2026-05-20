@@ -29,3 +29,4 @@ inst/benchmarks/
 
 # Installation
 *.tar.gz
+*.md
