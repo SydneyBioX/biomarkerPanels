@@ -35,7 +35,9 @@ Suggests:
     BiocStyle,
     nproc,
     ruv,
-    emoa
+    emoa,
+    patchwork,
+    magick
 LinkingTo:
     Rcpp
 biocViews: Software, Classification, FeatureExtraction, ROC, Biomarker
