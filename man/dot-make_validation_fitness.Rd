@@ -19,7 +19,9 @@
   alpha,
   feature_transform = "none",
   min_features_required = NULL,
-  selection_threshold = "adaptive"
+  selection_threshold = "adaptive",
+  cache_fitness = TRUE,
+  cache_max_entries = Inf
 )
 }
 \arguments{
@@ -52,6 +54,10 @@
 \item{min_features_required}{Minimum number of base features.}
 
 \item{selection_threshold}{Either \code{"adaptive"} or a fixed numeric threshold.}
+
+\item{cache_fitness}{Logical; cache duplicate selected panels during fitness.}
+
+\item{cache_max_entries}{Maximum entries retained in the fitness cache.}
 }
 \value{
 List with \code{wrapper} (fitness for rmoo) and \code{evaluate} (full eval).

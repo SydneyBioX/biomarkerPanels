@@ -24,6 +24,7 @@ Imports:
     rmoo,
     limma,
     glmnet,
+    MASS,
     pROC
 Suggests:
     testthat (>= 3.0.0),
@@ -63,6 +64,7 @@ Collate:
     'feature_alignment.R'
     'feature_stability.R'
     'feature_transforms.R'
+    'fitness_cache_utils.R'
     'fitness_rotating_validation.R'
     'panel_class.R'
     'hypervolume.R'

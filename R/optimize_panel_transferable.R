@@ -61,6 +61,11 @@
 #'   actually optimizes for. Requires `>=2` cohorts.
 #' @param n_val_splits Number of rotating train/val splits to pre-compute
 #'   when `fitness_mode = "within_cohort_rotating"` (default 10).
+#' @param cache_fitness Logical; if `TRUE` (default), cache candidate fitness
+#'   by selected base-feature panel within each validation context. Set
+#'   `FALSE` for intentionally stochastic custom objectives.
+#' @param cache_max_entries Maximum number of selected-panel entries retained
+#'   per fitness cache. Defaults to `Inf`.
 #' @param record_history Logical; if `TRUE`, capture the population, fitness,
 #'   and NSGA rank at every generation and attach the result to the returned
 #'   `OptimizationResult`. Retrieve via [nsga_history()]. Default `FALSE`.
@@ -98,6 +103,8 @@ optimize_panel_transferable <- function(
   n_top_features = 50L,
   fitness_mode = c("within_cohort_val", "within_cohort_rotating", "loco"),
   n_val_splits = 10L,
+  cache_fitness = TRUE,
+  cache_max_entries = Inf,
   record_history = FALSE
 ) {
   algorithm <- match.arg(algorithm)
@@ -133,6 +140,7 @@ optimize_panel_transferable <- function(
       )
     }
   }
+  .validate_cache_controls(cache_fitness, cache_max_entries)
 
   # 1. Validate partition ratios
   .validate_partition_ratios(train_ratio, val_ratio)
@@ -226,7 +234,9 @@ optimize_panel_transferable <- function(
       alpha = regularized_alpha,
       feature_transform = feature_transform,
       min_features_required = min_features_required,
-      selection_threshold = selection_threshold
+      selection_threshold = selection_threshold,
+      cache_fitness = cache_fitness,
+      cache_max_entries = cache_max_entries
     )
   } else if (fitness_mode == "loco") {
     # Pool train+val per cohort; LOCO loop provides the held-out evaluation.
@@ -259,7 +269,9 @@ optimize_panel_transferable <- function(
       alpha = regularized_alpha,
       feature_transform = feature_transform,
       min_features_required = min_features_required,
-      selection_threshold = selection_threshold
+      selection_threshold = selection_threshold,
+      cache_fitness = cache_fitness,
+      cache_max_entries = cache_max_entries
     )
   } else {
     fitness_fn <- .make_validation_fitness(
@@ -277,7 +289,9 @@ optimize_panel_transferable <- function(
       alpha = regularized_alpha,
       feature_transform = feature_transform,
       min_features_required = min_features_required,
-      selection_threshold = selection_threshold
+      selection_threshold = selection_threshold,
+      cache_fitness = cache_fitness,
+      cache_max_entries = cache_max_entries
     )
   }
 
@@ -291,52 +305,16 @@ optimize_panel_transferable <- function(
   # dominance filter further down.
   objective_directions <- vapply(objectives, `[[`, character(1), "direction")
 
-  # Mirror of the selection logic used inside each fitness factory's closure,
-  # used to materialise per-generation history. Same params + same algorithm
-  # ⇒ same base features as NSGA actually scored.
+  # Same shared selector used by the fitness factories, materialized here for
+  # per-generation history.
+  panel_selector <- .make_panel_selector(
+    feature_pool = base_feature_pool,
+    max_features = max_features,
+    min_features_required = min_features_required,
+    selection_threshold = selection_threshold
+  )
   select_base_features <- function(decision_vec) {
-    n_pool <- length(base_feature_pool)
-    if (identical(selection_threshold, "adaptive")) {
-      ord <- order(decision_vec, base_feature_pool,
-                   decreasing = c(TRUE, FALSE), method = "radix")
-      sorted_weights <- decision_vec[ord]
-      if (n_pool > max_features) {
-        top_n <- min(max_features + 5L, n_pool)
-        weight_diffs <- -diff(sorted_weights[seq_len(top_n)])
-        search_range <- seq(min_features_required, top_n - 1L)
-        if (length(search_range) > 0L) {
-          gap_idx <- which.max(weight_diffs[search_range])
-          natural_cutoff <- min_features_required + gap_idx
-        } else {
-          natural_cutoff <- min_features_required
-        }
-        n_selected <- max(min_features_required,
-                          min(natural_cutoff, max_features))
-      } else {
-        above_median <- sum(decision_vec > 0.5)
-        n_selected <- max(min_features_required,
-                          min(above_median, max_features))
-      }
-      selected_idx <- ord[seq_len(n_selected)]
-    } else {
-      threshold <- as.numeric(selection_threshold)
-      above_threshold <- which(decision_vec > threshold)
-      if (length(above_threshold) < min_features_required) {
-        ord <- order(decision_vec, base_feature_pool,
-                     decreasing = c(TRUE, FALSE), method = "radix")
-        selected_idx <- ord[seq_len(min(min_features_required, length(ord)))]
-      } else if (length(above_threshold) > max_features) {
-        weights_above <- decision_vec[above_threshold]
-        names_above <- base_feature_pool[above_threshold]
-        ord <- order(weights_above, names_above,
-                     decreasing = c(TRUE, FALSE), method = "radix")
-        selected_idx <- above_threshold[ord[seq_len(max_features)]]
-      } else {
-        selected_idx <- above_threshold
-      }
-    }
-    selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
-    base_feature_pool[selected_idx]
+    panel_selector(decision_vec)$base_features
   }
 
   # Optional per-generation history capture (see optimize_panel() for rationale).
@@ -461,6 +439,8 @@ optimize_panel_transferable <- function(
     response_levels = levels(train_inputs$truth),
     seed = seed,
     selection_threshold = selection_threshold,
+    cache_fitness = cache_fitness,
+    cache_max_entries = cache_max_entries,
     regularized = regularized,
     regularized_alpha = if (regularized) regularized_alpha else NULL,
     fitness_mode = fitness_mode,
@@ -550,6 +530,8 @@ optimize_panel_transferable <- function(
 #' @param feature_transform Name of the feature transform to apply.
 #' @param min_features_required Minimum number of base features.
 #' @param selection_threshold Either `"adaptive"` or a fixed numeric threshold.
+#' @param cache_fitness Logical; cache duplicate selected panels during fitness.
+#' @param cache_max_entries Maximum entries retained in the fitness cache.
 #' @return List with `wrapper` (fitness for rmoo) and `evaluate` (full eval).
 #' @keywords internal
 .make_validation_fitness <- function(
@@ -559,7 +541,9 @@ optimize_panel_transferable <- function(
   regularized, alpha,
   feature_transform = "none",
   min_features_required = NULL,
-  selection_threshold = "adaptive"
+  selection_threshold = "adaptive",
+  cache_fitness = TRUE,
+  cache_max_entries = Inf
 ) {
   objective_directions <- vapply(objectives, `[[`, character(1), "direction")
   constraint_specs <- .normalize_constraints(constraints)
@@ -568,75 +552,38 @@ optimize_panel_transferable <- function(
     min_features_required <- if (regularized) 2L else 1L
   }
 
-  evaluate_candidate <- function(decision_vec) {
-    feature_names_pool <- feature_pool
-    n_pool <- length(feature_names_pool)
+  panel_selector <- .make_panel_selector(
+    feature_pool = feature_pool,
+    max_features = max_features,
+    min_features_required = min_features_required,
+    selection_threshold = selection_threshold
+  )
+  transform_panel <- .make_panel_transformer(
+    matrices = list(train = train_x, val = val_x),
+    feature_transform = feature_transform,
+    cache_max_entries = cache_max_entries
+  )
+  objective_cache <- .new_fitness_cache(cache_max_entries)
+  glm_design_terms <- if (!regularized) {
+    .prepare_glm_design_terms(
+      cohort_train = train_cohort,
+      cohort_new = val_cohort,
+      predict_cohort = "reference"
+    )
+  } else {
+    NULL
+  }
 
-    if (identical(selection_threshold, "adaptive")) {
-      # Adaptive: select based on largest gap in sorted weights
-      ord <- order(decision_vec, feature_names_pool,
-                   decreasing = c(TRUE, FALSE), method = "radix")
-      sorted_weights <- decision_vec[ord]
-
-      if (n_pool > max_features) {
-        top_n <- min(max_features + 5L, n_pool)
-        weight_diffs <- -diff(sorted_weights[seq_len(top_n)])
-
-        search_range <- seq(min_features_required, top_n - 1L)
-        if (length(search_range) > 0L) {
-          gap_idx <- which.max(weight_diffs[search_range])
-          natural_cutoff <- min_features_required + gap_idx
-        } else {
-          natural_cutoff <- min_features_required
-        }
-        n_selected <- min(natural_cutoff, max_features)
-        n_selected <- max(n_selected, min_features_required)
-      } else {
-        above_median <- sum(decision_vec > 0.5)
-        n_selected <- max(min_features_required, min(above_median, max_features))
-      }
-      selected_idx <- ord[seq_len(n_selected)]
-    } else {
-      # Fixed threshold
-      threshold <- as.numeric(selection_threshold)
-      above_threshold <- which(decision_vec > threshold)
-
-      if (length(above_threshold) < min_features_required) {
-        ord <- order(decision_vec, feature_names_pool,
-          decreasing = c(TRUE, FALSE),
-          method = "radix"
-        )
-        selected_idx <- ord[seq_len(min(min_features_required, length(ord)))]
-      } else if (length(above_threshold) > max_features) {
-        weights_above <- decision_vec[above_threshold]
-        names_above <- feature_names_pool[above_threshold]
-        ord <- order(weights_above, names_above,
-          decreasing = c(TRUE, FALSE),
-          method = "radix"
-        )
-        selected_idx <- above_threshold[ord[seq_len(max_features)]]
-      } else {
-        selected_idx <- above_threshold
-      }
+  evaluate_candidate <- function(decision_vec = NULL, selection = NULL) {
+    if (is.null(selection)) {
+      selection <- panel_selector(decision_vec)
     }
+    selected_base_features <- selection$base_features
 
-    selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
-    selected_base_features <- feature_names_pool[selected_idx]
-
-    # Extract base features from both sets
-    x_train_base <- train_x[, selected_base_features, drop = FALSE]
-    x_val_base <- val_x[, selected_base_features, drop = FALSE]
-
-    # Apply transform on-the-fly (mirrors optimize_panel.R)
-    if (feature_transform != "none" && ncol(x_train_base) >= 2L) {
-      x_train_sel <- .apply_feature_transform_single(x_train_base, feature_transform)
-      x_val_sel <- .apply_feature_transform_single(x_val_base, feature_transform)
-      selected_features <- colnames(x_train_sel)
-    } else {
-      x_train_sel <- x_train_base
-      x_val_sel <- x_val_base
-      selected_features <- selected_base_features
-    }
+    transformed <- transform_panel(selected_base_features)
+    x_train_sel <- transformed$matrices$train
+    x_val_sel <- transformed$matrices$val
+    selected_features <- transformed$features
 
     tryCatch(
       {
@@ -645,12 +592,19 @@ optimize_panel_transferable <- function(
             x_train_sel, train_y, train_cohort,
             alpha = alpha
           )
+          # Predict on validation data
+          val_scores <- .predict_from_model(fit, x_val_sel, cohort = val_cohort)
         } else {
-          fit <- .fit_final_model(x_train_sel, train_y, train_cohort)
+          val_scores <- .fit_predict_binomial_glm(
+            x_train = x_train_sel,
+            truth = train_y,
+            x_new = x_val_sel,
+            cohort_train = train_cohort,
+            cohort_new = val_cohort,
+            predict_cohort = "reference",
+            design_terms = glm_design_terms
+          )
         }
-
-        # Predict on validation data
-        val_scores <- .predict_from_model(fit, x_val_sel, cohort = val_cohort)
 
         # Compute constraints on validation data
         constraint_results <- if (length(constraint_specs)) {
@@ -711,29 +665,27 @@ optimize_panel_transferable <- function(
   # from Inf values, causing "missing value where TRUE/FALSE needed" errors
   .PENALTY <- 1e6
 
-  evaluate_single <- function(decision_vec) {
-    evaluated <- evaluate_candidate(decision_vec)
+  evaluate_single <- function(decision_vec = NULL, selection = NULL) {
+    evaluated <- evaluate_candidate(decision_vec = decision_vec,
+                                    selection = selection)
     if (length(constraint_specs) && !evaluated$feasible) {
       return(rep(.PENALTY, length(objectives)))
     }
-    metrics <- evaluated$metrics
-    converted <- mapply(function(val, dir) {
-      if (is.na(val) || is.infinite(val)) {
-        return(.PENALTY)
-      }
-      if (dir == "maximize") {
-        return(-val)
-      }
-      val
-    }, val = metrics, dir = objective_directions, SIMPLIFY = TRUE, USE.NAMES = FALSE)
-    as.numeric(converted)
+    .convert_metrics_to_objectives(evaluated$metrics, objective_directions,
+                                   penalty = .PENALTY)
   }
 
   objective_wrapper <- function(x, ...) {
-    if (is.null(dim(x))) {
-      return(evaluate_single(x))
-    }
-    t(apply(x, 1, evaluate_single))
+    .evaluate_fitness_population(
+      x = x,
+      selector = panel_selector,
+      evaluate_selection = function(selection) {
+        evaluate_single(selection = selection)
+      },
+      n_objectives = length(objectives),
+      cache = objective_cache,
+      cache_fitness = cache_fitness
+    )
   }
 
   list(
@@ -768,6 +720,8 @@ optimize_panel_transferable <- function(
 #' @param feature_transform Name of the feature transform to apply on-the-fly.
 #' @param min_features_required Minimum base features per candidate.
 #' @param selection_threshold `"adaptive"` or a numeric gate in (0, 1).
+#' @param cache_fitness Logical; cache duplicate selected panels during fitness.
+#' @param cache_max_entries Maximum entries retained in the fitness cache.
 #' @return List with `wrapper` (vectorized NSGA fitness) and `evaluate`
 #'   (single-candidate evaluator returning full diagnostics).
 #' @keywords internal
@@ -777,7 +731,9 @@ optimize_panel_transferable <- function(
   regularized, alpha,
   feature_transform = "none",
   min_features_required = NULL,
-  selection_threshold = "adaptive"
+  selection_threshold = "adaptive",
+  cache_fitness = TRUE,
+  cache_max_entries = Inf
 ) {
   objective_directions <- vapply(objectives, `[[`, character(1), "direction")
   constraint_specs <- .normalize_constraints(constraints)
@@ -796,61 +752,44 @@ optimize_panel_transferable <- function(
   fold_rows <- lapply(cohort_levels, function(lv) which(cohort == lv))
   names(fold_rows) <- cohort_levels
 
-  select_base_indices <- function(decision_vec) {
-    n_pool <- length(feature_pool)
-    if (identical(selection_threshold, "adaptive")) {
-      ord <- order(decision_vec, feature_pool,
-                   decreasing = c(TRUE, FALSE), method = "radix")
-      sorted_weights <- decision_vec[ord]
-      if (n_pool > max_features) {
-        top_n <- min(max_features + 5L, n_pool)
-        weight_diffs <- -diff(sorted_weights[seq_len(top_n)])
-        search_range <- seq(min_features_required, top_n - 1L)
-        if (length(search_range) > 0L) {
-          gap_idx <- which.max(weight_diffs[search_range])
-          natural_cutoff <- min_features_required + gap_idx
-        } else {
-          natural_cutoff <- min_features_required
-        }
-        n_selected <- max(min_features_required,
-                          min(natural_cutoff, max_features))
-      } else {
-        above_median <- sum(decision_vec > 0.5)
-        n_selected <- max(min_features_required,
-                          min(above_median, max_features))
-      }
-      ord[seq_len(n_selected)]
-    } else {
-      threshold <- as.numeric(selection_threshold)
-      above <- which(decision_vec > threshold)
-      if (length(above) < min_features_required) {
-        ord <- order(decision_vec, feature_pool,
-                     decreasing = c(TRUE, FALSE), method = "radix")
-        ord[seq_len(min(min_features_required, length(ord)))]
-      } else if (length(above) > max_features) {
-        ord <- order(decision_vec[above], feature_pool[above],
-                     decreasing = c(TRUE, FALSE), method = "radix")
-        above[ord[seq_len(max_features)]]
-      } else {
-        above
-      }
-    }
+  panel_selector <- .make_panel_selector(
+    feature_pool = feature_pool,
+    max_features = max_features,
+    min_features_required = min_features_required,
+    selection_threshold = selection_threshold
+  )
+  transform_panel <- .make_panel_transformer(
+    matrices = list(x = x),
+    feature_transform = feature_transform,
+    cache_max_entries = cache_max_entries
+  )
+  objective_cache <- .new_fitness_cache(cache_max_entries)
+  fold_glm_design_terms <- if (!regularized) {
+    lapply(cohort_levels, function(lv) {
+      test_idx <- fold_rows[[lv]]
+      train_idx <- setdiff(seq_len(nrow(x)), test_idx)
+      .prepare_glm_design_terms(
+        cohort_train = cohort[train_idx],
+        cohort_new = cohort[test_idx],
+        predict_cohort = "reference"
+      )
+    })
+  } else {
+    NULL
+  }
+  if (!is.null(fold_glm_design_terms)) {
+    names(fold_glm_design_terms) <- cohort_levels
   }
 
-  evaluate_candidate <- function(decision_vec) {
-    selected_idx <- select_base_indices(decision_vec)
-    selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
-    selected_base_features <- feature_pool[selected_idx]
-
-    x_base <- x[, selected_base_features, drop = FALSE]
-
-    if (feature_transform != "none" && ncol(x_base) >= 2L) {
-      x_transformed <- .apply_feature_transform_single(x_base, feature_transform)
-      selected_features <- colnames(x_transformed)
-    } else {
-      x_transformed <- x_base
-      selected_features <- selected_base_features
+  evaluate_candidate <- function(decision_vec = NULL, selection = NULL) {
+    if (is.null(selection)) {
+      selection <- panel_selector(decision_vec)
     }
+    selected_base_features <- selection$base_features
+
+    transformed <- transform_panel(selected_base_features)
+    x_transformed <- transformed$matrices$x
+    selected_features <- transformed$features
 
     oof_scores <- rep(NA_real_, nrow(x_transformed))
 
@@ -870,10 +809,18 @@ optimize_panel_transferable <- function(
 
           if (regularized) {
             fit <- .fit_final_model_regularized(x_tr, train_y, coh_tr, alpha = alpha)
+            preds <- .predict_from_model(fit, x_te, cohort = cohort[test_idx])
           } else {
-            fit <- .fit_final_model(x_tr, train_y, coh_tr)
+            preds <- .fit_predict_binomial_glm(
+              x_train = x_tr,
+              truth = train_y,
+              x_new = x_te,
+              cohort_train = coh_tr,
+              cohort_new = cohort[test_idx],
+              predict_cohort = "reference",
+              design_terms = fold_glm_design_terms[[lv]]
+            )
           }
-          preds <- .predict_from_model(fit, x_te, cohort = cohort[test_idx])
           oof_scores[test_idx] <- as.numeric(preds)
         }
 
@@ -935,25 +882,27 @@ optimize_panel_transferable <- function(
 
   .PENALTY <- 1e6
 
-  evaluate_single <- function(decision_vec) {
-    evaluated <- evaluate_candidate(decision_vec)
+  evaluate_single <- function(decision_vec = NULL, selection = NULL) {
+    evaluated <- evaluate_candidate(decision_vec = decision_vec,
+                                    selection = selection)
     if (length(constraint_specs) && !evaluated$feasible) {
       return(rep(.PENALTY, length(objectives)))
     }
-    metrics <- evaluated$metrics
-    converted <- mapply(function(val, dir) {
-      if (is.na(val) || is.infinite(val)) return(.PENALTY)
-      if (dir == "maximize") return(-val)
-      val
-    }, val = metrics, dir = objective_directions, SIMPLIFY = TRUE, USE.NAMES = FALSE)
-    as.numeric(converted)
+    .convert_metrics_to_objectives(evaluated$metrics, objective_directions,
+                                   penalty = .PENALTY)
   }
 
   objective_wrapper <- function(x, ...) {
-    if (is.null(dim(x))) {
-      return(evaluate_single(x))
-    }
-    t(apply(x, 1, evaluate_single))
+    .evaluate_fitness_population(
+      x = x,
+      selector = panel_selector,
+      evaluate_selection = function(selection) {
+        evaluate_single(selection = selection)
+      },
+      n_objectives = length(objectives),
+      cache = objective_cache,
+      cache_fitness = cache_fitness
+    )
   }
 
   list(

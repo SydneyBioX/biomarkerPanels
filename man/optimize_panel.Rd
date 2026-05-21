@@ -24,6 +24,8 @@ optimize_panel(
   regularized = TRUE,
   regularized_alpha = 0.5,
   selection_threshold = "adaptive",
+  cache_fitness = TRUE,
+  cache_max_entries = Inf,
   record_history = FALSE
 )
 }
@@ -120,6 +122,14 @@ that allows variable panel sizes in the Pareto front. Fixed thresholds
 improve accuracy. Adaptive selection finds natural breakpoints in the
 weight distribution, enabling the \code{num_features} objective to drive panel
 size diversity.}
+
+\item{cache_fitness}{Logical; if \code{TRUE} (default), cache candidate fitness
+by selected base-feature panel within each evaluation context. Set
+\code{FALSE} for intentionally stochastic custom objectives or scoring
+functions.}
+
+\item{cache_max_entries}{Maximum number of selected-panel entries retained
+per fitness cache. Defaults to \code{Inf}.}
 
 \item{record_history}{Logical; if \code{TRUE}, capture the population, fitness,
 and NSGA rank at every generation and attach the result to the returned

@@ -16,7 +16,9 @@
   alpha,
   feature_transform = "none",
   min_features_required = NULL,
-  selection_threshold = "adaptive"
+  selection_threshold = "adaptive",
+  cache_fitness = TRUE,
+  cache_max_entries = Inf
 )
 }
 \arguments{
@@ -43,6 +45,10 @@
 \item{min_features_required}{Minimum base features per candidate.}
 
 \item{selection_threshold}{\code{"adaptive"} or a numeric gate in (0, 1).}
+
+\item{cache_fitness}{Logical; cache duplicate selected panels during fitness.}
+
+\item{cache_max_entries}{Maximum entries retained in the fitness cache.}
 }
 \value{
 List with \code{wrapper} (vectorized NSGA fitness) and \code{evaluate}

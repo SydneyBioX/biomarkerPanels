@@ -101,6 +101,8 @@ NULL
 #' @param feature_transform Name of the feature transform to apply.
 #' @param min_features_required Minimum base features per candidate.
 #' @param selection_threshold `"adaptive"` or a numeric gate in (0, 1).
+#' @param cache_fitness Logical; cache duplicate selected panels during fitness.
+#' @param cache_max_entries Maximum entries retained in the fitness cache.
 #' @return List with `wrapper` (vectorised NSGA fitness) and `evaluate`
 #'   (single-candidate evaluator averaged over all splits).
 #' @keywords internal
@@ -111,7 +113,9 @@ NULL
   regularized, alpha,
   feature_transform = "none",
   min_features_required = NULL,
-  selection_threshold = "adaptive"
+  selection_threshold = "adaptive",
+  cache_fitness = TRUE,
+  cache_max_entries = Inf
 ) {
   objective_directions <- vapply(objectives, `[[`, character(1), "direction")
   constraint_specs <- .normalize_constraints(constraints)
@@ -130,48 +134,32 @@ NULL
   batch_state <- new.env(parent = emptyenv())
   batch_state$idx <- 0L
 
-  .select_base_indices <- function(decision_vec) {
-    n_pool <- length(feature_pool)
-    if (identical(selection_threshold, "adaptive")) {
-      ord <- order(decision_vec, feature_pool,
-                   decreasing = c(TRUE, FALSE), method = "radix")
-      sorted_weights <- decision_vec[ord]
-      if (n_pool > max_features) {
-        top_n <- min(max_features + 5L, n_pool)
-        weight_diffs <- -diff(sorted_weights[seq_len(top_n)])
-        search_range <- seq(min_features_required, top_n - 1L)
-        if (length(search_range) > 0L) {
-          gap_idx <- which.max(weight_diffs[search_range])
-          natural_cutoff <- min_features_required + gap_idx
-        } else {
-          natural_cutoff <- min_features_required
-        }
-        n_selected <- max(min_features_required,
-                          min(natural_cutoff, max_features))
-      } else {
-        above_median <- sum(decision_vec > 0.5)
-        n_selected <- max(min_features_required,
-                          min(above_median, max_features))
-      }
-      ord[seq_len(n_selected)]
-    } else {
-      threshold <- as.numeric(selection_threshold)
-      above <- which(decision_vec > threshold)
-      if (length(above) < min_features_required) {
-        ord <- order(decision_vec, feature_pool,
-                     decreasing = c(TRUE, FALSE), method = "radix")
-        ord[seq_len(min(min_features_required, length(ord)))]
-      } else if (length(above) > max_features) {
-        ord <- order(decision_vec[above], feature_pool[above],
-                     decreasing = c(TRUE, FALSE), method = "radix")
-        above[ord[seq_len(max_features)]]
-      } else {
-        above
-      }
-    }
+  panel_selector <- .make_panel_selector(
+    feature_pool = feature_pool,
+    max_features = max_features,
+    min_features_required = min_features_required,
+    selection_threshold = selection_threshold
+  )
+  transform_panel <- .make_panel_transformer(
+    matrices = list(pool = pool_x),
+    feature_transform = feature_transform,
+    cache_max_entries = cache_max_entries
+  )
+  objective_cache <- .new_fitness_cache(cache_max_entries)
+  split_glm_design_terms <- if (!regularized) {
+    lapply(splits, function(split) {
+      .prepare_glm_design_terms(
+        cohort_train = pool_cohort[split$train],
+        cohort_new = pool_cohort[split$val],
+        predict_cohort = "reference"
+      )
+    })
+  } else {
+    NULL
   }
 
-  .score_on_split <- function(split, x_transformed, selected_base_features) {
+  .score_on_split <- function(split, x_transformed, selected_base_features,
+                              design_terms = NULL) {
     train_idx <- split$train
     val_idx <- split$val
     x_train <- x_transformed[train_idx, , drop = FALSE]
@@ -189,10 +177,18 @@ NULL
       fit <- .fit_final_model_regularized(
         x_train, y_train, coh_train, alpha = alpha
       )
+      val_scores <- .predict_from_model(fit, x_val, cohort = coh_val)
     } else {
-      fit <- .fit_final_model(x_train, y_train, coh_train)
+      val_scores <- .fit_predict_binomial_glm(
+        x_train = x_train,
+        truth = y_train,
+        x_new = x_val,
+        cohort_train = coh_train,
+        cohort_new = coh_val,
+        predict_cohort = "reference",
+        design_terms = design_terms
+      )
     }
-    val_scores <- .predict_from_model(fit, x_val, cohort = coh_val)
 
     constraint_results <- if (length(constraint_specs)) {
       setNames(vapply(seq_along(constraint_specs), function(j) {
@@ -233,33 +229,34 @@ NULL
     )
   }
 
-  .prepare_candidate <- function(decision_vec) {
-    selected_idx <- .select_base_indices(decision_vec)
-    selected_idx <- selected_idx[
-      order(decision_vec[selected_idx], decreasing = TRUE)
-    ]
-    selected_base_features <- feature_pool[selected_idx]
-    x_base <- pool_x[, selected_base_features, drop = FALSE]
-    if (feature_transform != "none" && ncol(x_base) >= 2L) {
-      x_transformed <- .apply_feature_transform_single(x_base, feature_transform)
-      selected_features <- colnames(x_transformed)
-    } else {
-      x_transformed <- x_base
-      selected_features <- selected_base_features
+  .prepare_candidate <- function(decision_vec = NULL, selection = NULL) {
+    if (is.null(selection)) {
+      selection <- panel_selector(decision_vec)
     }
+    selected_base_features <- selection$base_features
+    transformed <- transform_panel(selected_base_features)
     list(
       base_features = selected_base_features,
-      features = selected_features,
-      x_transformed = x_transformed
+      features = transformed$features,
+      x_transformed = transformed$matrices$pool
     )
   }
 
   # Evaluation on a single split — used per generation by the NSGA wrapper.
-  evaluate_on_split <- function(decision_vec, split) {
-    prep <- .prepare_candidate(decision_vec)
+  evaluate_on_split <- function(decision_vec = NULL, split, split_idx = NULL,
+                                selection = NULL) {
+    prep <- .prepare_candidate(decision_vec = decision_vec,
+                               selection = selection)
     tryCatch({
       result <- .score_on_split(
-        split, prep$x_transformed, prep$base_features
+        split,
+        prep$x_transformed,
+        prep$base_features,
+        design_terms = if (!is.null(split_idx) && !is.null(split_glm_design_terms)) {
+          split_glm_design_terms[[split_idx]]
+        } else {
+          NULL
+        }
       )
       if (is.null(result)) {
         return(list(
@@ -293,9 +290,18 @@ NULL
   # Evaluation averaged over all K splits — used for final Pareto metrics.
   evaluate_across_splits <- function(decision_vec) {
     prep <- .prepare_candidate(decision_vec)
-    per_split <- lapply(splits, function(split) {
+    per_split <- lapply(seq_along(splits), function(i) {
       tryCatch(
-        .score_on_split(split, prep$x_transformed, prep$base_features),
+        .score_on_split(
+          splits[[i]],
+          prep$x_transformed,
+          prep$base_features,
+          design_terms = if (!is.null(split_glm_design_terms)) {
+            split_glm_design_terms[[i]]
+          } else {
+            NULL
+          }
+        ),
         error = function(e) NULL
       )
     })
@@ -340,19 +346,20 @@ NULL
 
   .PENALTY <- 1e6
 
-  evaluate_single_for_wrapper <- function(decision_vec, split) {
-    evaluated <- evaluate_on_split(decision_vec, split)
+  evaluate_single_for_wrapper <- function(decision_vec = NULL, split,
+                                          split_idx = NULL,
+                                          selection = NULL) {
+    evaluated <- evaluate_on_split(
+      decision_vec = decision_vec,
+      split = split,
+      split_idx = split_idx,
+      selection = selection
+    )
     if (length(constraint_specs) && !evaluated$feasible) {
       return(rep(.PENALTY, length(objectives)))
     }
-    metrics <- evaluated$metrics
-    converted <- mapply(function(val, dir) {
-      if (is.na(val) || is.infinite(val)) return(.PENALTY)
-      if (dir == "maximize") return(-val)
-      val
-    }, val = metrics, dir = objective_directions,
-    SIMPLIFY = TRUE, USE.NAMES = FALSE)
-    as.numeric(converted)
+    .convert_metrics_to_objectives(evaluated$metrics, objective_directions,
+                                   penalty = .PENALTY)
   }
 
   objective_wrapper <- function(x, ...) {
@@ -362,12 +369,21 @@ NULL
     split_idx <- ((batch_state$idx - 1L) %% n_splits) + 1L
     current_split <- splits[[split_idx]]
 
-    if (is.null(dim(x))) {
-      return(evaluate_single_for_wrapper(x, current_split))
-    }
-    t(apply(x, 1, function(row) {
-      evaluate_single_for_wrapper(row, current_split)
-    }))
+    .evaluate_fitness_population(
+      x = x,
+      selector = panel_selector,
+      evaluate_selection = function(selection) {
+        evaluate_single_for_wrapper(
+          split = current_split,
+          split_idx = split_idx,
+          selection = selection
+        )
+      },
+      n_objectives = length(objectives),
+      cache = objective_cache,
+      cache_fitness = cache_fitness,
+      context = paste0("split", split_idx)
+    )
   }
 
   list(

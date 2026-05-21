@@ -10,7 +10,8 @@
   fold_ids,
   cohort = NULL,
   regularized = FALSE,
-  alpha = 0
+  alpha = 0,
+  glm_design_terms = NULL
 )
 }
 \arguments{
@@ -27,6 +28,9 @@ Default is FALSE.}
 
 \item{alpha}{Elastic net mixing parameter when regularized = TRUE
 (0 = ridge, 1 = lasso). Default is 0.}
+
+\item{glm_design_terms}{Optional precomputed GLM design terms for each fold
+when \code{regularized = FALSE}.}
 }
 \value{
 Numeric vector of out-of-fold predicted probabilities.

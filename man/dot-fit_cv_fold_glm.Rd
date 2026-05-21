@@ -4,7 +4,16 @@
 \alias{.fit_cv_fold_glm}
 \title{Fit GLM for a Single CV Fold}
 \usage{
-.fit_cv_fold_glm(x_train, y_train, x_test, cohort, train_idx, test_idx, fold)
+.fit_cv_fold_glm(
+  x_train,
+  y_train,
+  x_test,
+  cohort,
+  train_idx,
+  test_idx,
+  fold,
+  design_terms = NULL
+)
 }
 \arguments{
 \item{x_train}{Training feature matrix.}
@@ -20,6 +29,8 @@
 \item{test_idx}{Test sample indices.}
 
 \item{fold}{Fold number (for error messages).}
+
+\item{design_terms}{Optional precomputed GLM design terms for this fold.}
 }
 \value{
 Numeric vector of predictions for test fold.

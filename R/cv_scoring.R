@@ -44,10 +44,13 @@ NULL
 #'   Default is FALSE.
 #' @param alpha Elastic net mixing parameter when regularized = TRUE
 #'   (0 = ridge, 1 = lasso). Default is 0.
+#' @param glm_design_terms Optional precomputed GLM design terms for each fold
+#'   when `regularized = FALSE`.
 #' @return Numeric vector of out-of-fold predicted probabilities.
 #' @keywords internal
 .compute_cv_scores <- function(x_selected, truth, fold_ids, cohort = NULL,
-                               regularized = FALSE, alpha = 0) {
+                               regularized = FALSE, alpha = 0,
+                               glm_design_terms = NULL) {
   n <- length(truth)
 
   # Validate: must have features
@@ -79,8 +82,14 @@ NULL
       .fit_cv_fold_regularized(x_train, y_train, x_test, cohort,
                                train_idx, test_idx, fold, alpha)
     } else {
+      fold_design_terms <- if (!is.null(glm_design_terms)) {
+        glm_design_terms[[as.character(fold)]]
+      } else {
+        NULL
+      }
       .fit_cv_fold_glm(x_train, y_train, x_test, cohort,
-                       train_idx, test_idx, fold)
+                       train_idx, test_idx, fold,
+                       design_terms = fold_design_terms)
     }
 
     predictions[test_idx] <- y_pred
@@ -104,30 +113,22 @@ NULL
 #' @param train_idx Training sample indices.
 #' @param test_idx Test sample indices.
 #' @param fold Fold number (for error messages).
+#' @param design_terms Optional precomputed GLM design terms for this fold.
 #' @return Numeric vector of predictions for test fold.
 #' @keywords internal
 .fit_cv_fold_glm <- function(x_train, y_train, x_test, cohort,
-                             train_idx, test_idx, fold) {
+                             train_idx, test_idx, fold,
+                             design_terms = NULL) {
   tryCatch({
-    df_train <- data.frame(
-      .response = as.integer(y_train) - 1L,
-      as.data.frame(x_train, check.names = TRUE)
+    y_pred <- .fit_predict_binomial_glm(
+      x_train = x_train,
+      truth = y_train,
+      x_new = x_test,
+      cohort_train = if (!is.null(cohort)) cohort[train_idx] else NULL,
+      cohort_new = if (!is.null(cohort)) cohort[test_idx] else NULL,
+      predict_cohort = "observed",
+      design_terms = design_terms
     )
-
-    # Add cohort if available and has multiple levels
-    if (!is.null(cohort) && length(unique(cohort[train_idx])) > 1L) {
-      df_train$.cohort <- factor(cohort[train_idx])
-    }
-
-    fit <- stats::glm(.response ~ ., data = df_train, family = stats::binomial())
-
-    df_test <- data.frame(as.data.frame(x_test, check.names = TRUE))
-    if (!is.null(cohort) && ".cohort" %in% names(df_train)) {
-      df_test$.cohort <- factor(cohort[test_idx],
-                                levels = levels(df_train$.cohort))
-    }
-
-    y_pred <- stats::predict(fit, newdata = df_test, type = "response")
 
     if (anyNA(y_pred)) {
       stop("Model produced NA predictions for fold ", fold, ".", call. = FALSE)
@@ -257,17 +258,14 @@ NULL
 #' @keywords internal
 .score_glm <- function(x_selected, truth, cohort, n) {
   tryCatch({
-    df <- data.frame(
-      .response = as.integer(truth) - 1L,
-      as.data.frame(x_selected, check.names = TRUE)
+    predictions <- .fit_predict_binomial_glm(
+      x_train = x_selected,
+      truth = truth,
+      x_new = x_selected,
+      cohort_train = cohort,
+      cohort_new = cohort,
+      predict_cohort = "observed"
     )
-
-    if (!is.null(cohort) && length(unique(cohort)) > 1L) {
-      df$.cohort <- factor(cohort)
-    }
-
-    fit <- stats::glm(.response ~ ., data = df, family = stats::binomial())
-    predictions <- stats::predict(fit, type = "response")
 
     if (length(predictions) != n) {
       stop("Model predictions have incorrect length (expected ", n,

@@ -92,6 +92,12 @@
 #'   improve accuracy. Adaptive selection finds natural breakpoints in the
 #'   weight distribution, enabling the `num_features` objective to drive panel
 #'   size diversity.
+#' @param cache_fitness Logical; if `TRUE` (default), cache candidate fitness
+#'   by selected base-feature panel within each evaluation context. Set
+#'   `FALSE` for intentionally stochastic custom objectives or scoring
+#'   functions.
+#' @param cache_max_entries Maximum number of selected-panel entries retained
+#'   per fitness cache. Defaults to `Inf`.
 #' @return An `OptimizationResult` containing the Pareto-optimal solutions.
 #'   Use [summarize_solutions()] to inspect solutions and [fit_panel()] to
 #'   fit a model on a selected solution.
@@ -116,6 +122,8 @@ optimize_panel <- function(x, y,
                            regularized = TRUE,
                            regularized_alpha = 0.5,
                            selection_threshold = "adaptive",
+                           cache_fitness = TRUE,
+                           cache_max_entries = Inf,
                            record_history = FALSE) {
   algorithm <- match.arg(algorithm)
   feature_alignment <- match.arg(feature_alignment)
@@ -154,6 +162,7 @@ optimize_panel <- function(x, y,
       )
     }
   }
+  .validate_cache_controls(cache_fitness, cache_max_entries)
 
   inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, transform = "none",
                                        feature_alignment = feature_alignment)
@@ -315,72 +324,46 @@ optimize_panel <- function(x, y,
   # min_features_for_regularized is already computed above
   min_features_required <- min_features_for_regularized
 
-  # Map a decision-weight vector to the ordered base feature names that NSGA
-  # would select for it. Used by both fitness evaluation and per-generation
-  # history materialization, so the recorded base_features always reflect
-  # exactly what the optimizer chose.
-  feature_names_pool_outer <- colnames(x_pool)
-  n_pool_outer <- length(feature_names_pool_outer)
-
+  # Shared selector and transform cache used by fitness evaluation and
+  # history materialization.
+  panel_selector <- .make_panel_selector(
+    feature_pool = colnames(x_pool),
+    max_features = max_features,
+    min_features_required = min_features_required,
+    selection_threshold = selection_threshold
+  )
   select_base_features <- function(decision_vec) {
-    if (identical(selection_threshold, "adaptive")) {
-      ord <- order(decision_vec, feature_names_pool_outer,
-                   decreasing = c(TRUE, FALSE), method = "radix")
-      sorted_weights <- decision_vec[ord]
+    panel_selector(decision_vec)$base_features
+  }
+  transform_panel <- .make_panel_transformer(
+    matrices = list(x = x_pool),
+    feature_transform = feature_transform,
+    cache_max_entries = cache_max_entries
+  )
+  objective_cache <- .new_fitness_cache(cache_max_entries)
 
-      if (n_pool_outer > max_features) {
-        top_n <- min(max_features + 5L, n_pool_outer)
-        weight_diffs <- -diff(sorted_weights[seq_len(top_n)])
-        search_range <- seq(min_features_required, top_n - 1L)
-        if (length(search_range) > 0L) {
-          gap_idx <- which.max(weight_diffs[search_range])
-          natural_cutoff <- min_features_required + gap_idx
-        } else {
-          natural_cutoff <- min_features_required
-        }
-        n_selected <- min(natural_cutoff, max_features)
-        n_selected <- max(n_selected, min_features_required)
-      } else {
-        above_median <- sum(decision_vec > 0.5)
-        n_selected <- max(min_features_required, min(above_median, max_features))
-      }
-      selected_idx <- ord[seq_len(n_selected)]
-    } else {
-      threshold <- as.numeric(selection_threshold)
-      above_threshold <- which(decision_vec > threshold)
-
-      if (length(above_threshold) < min_features_required) {
-        ord <- order(decision_vec, feature_names_pool_outer,
-                     decreasing = c(TRUE, FALSE), method = "radix")
-        selected_idx <- ord[seq_len(min(min_features_required, length(ord)))]
-      } else if (length(above_threshold) > max_features) {
-        weights_above <- decision_vec[above_threshold]
-        names_above <- feature_names_pool_outer[above_threshold]
-        ord <- order(weights_above, names_above,
-                     decreasing = c(TRUE, FALSE), method = "radix")
-        selected_idx <- above_threshold[ord[seq_len(max_features)]]
-      } else {
-        selected_idx <- above_threshold
-      }
-    }
-    selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
-    feature_names_pool_outer[selected_idx]
+  cv_glm_design_terms <- NULL
+  if (fitness_cv && !is.null(cv_fold_ids) && !regularized) {
+    cv_glm_design_terms <- .prepare_cv_glm_design_terms(cohort, cv_fold_ids)
+  }
+  in_sample_glm_design_terms <- NULL
+  if (!fitness_cv && !regularized) {
+    in_sample_glm_design_terms <- .prepare_glm_design_terms(
+      cohort_train = cohort,
+      cohort_new = cohort,
+      predict_cohort = "observed"
+    )
   }
 
-  evaluate_candidate <- function(decision_vec) {
-    selected_base_features <- select_base_features(decision_vec)
-    x_base_selected <- x_pool[, selected_base_features, drop = FALSE]
-
-    # Step 2: Apply feature transform ON-THE-FLY to selected base features
-    if (feature_transform != "none" && ncol(x_base_selected) >= 2L) {
-      x_transformed <- .apply_feature_transform_single(x_base_selected, feature_transform)
-      selected_features <- colnames(x_transformed)  # e.g., "A--B" for pairwise
-      x_selected <- x_transformed
-    } else {
-      # No transform or single feature - use base features directly
-      x_selected <- x_base_selected
-      selected_features <- selected_base_features
+  evaluate_candidate <- function(decision_vec = NULL, selection = NULL) {
+    if (is.null(selection)) {
+      selection <- panel_selector(decision_vec)
     }
+    selected_base_features <- selection$base_features
+
+    transformed <- transform_panel(selected_base_features)
+    x_selected <- transformed$matrices$x
+    selected_features <- transformed$features
 
     # Step 3: Compute scores using CV (out-of-fold predictions) or in-sample
     if (fitness_cv && !is.null(cv_fold_ids)) {
@@ -391,19 +374,32 @@ optimize_panel <- function(x, y,
         fold_ids = cv_fold_ids,
         cohort = cohort,
         regularized = regularized,
-        alpha = regularized_alpha
+        alpha = regularized_alpha,
+        glm_design_terms = cv_glm_design_terms
       )
     } else {
       # In-sample scoring (for backward compatibility or small datasets)
       if (regularized || identical(scoring_fn, .default_scoring_fn)) {
-        scores <- .default_scoring_fn(
-          x_selected = x_selected,
-          selected_features = selected_features,
-          truth = truth,
-          cohort = cohort,
-          regularized = regularized,
-          alpha = regularized_alpha
-        )
+        scores <- if (!regularized) {
+          .fit_predict_binomial_glm(
+            x_train = x_selected,
+            truth = truth,
+            x_new = x_selected,
+            cohort_train = cohort,
+            cohort_new = cohort,
+            predict_cohort = "observed",
+            design_terms = in_sample_glm_design_terms
+          )
+        } else {
+          .default_scoring_fn(
+            x_selected = x_selected,
+            selected_features = selected_features,
+            truth = truth,
+            cohort = cohort,
+            regularized = regularized,
+            alpha = regularized_alpha
+          )
+        }
       } else {
         # Custom scoring function provided by user (only used when regularized = FALSE)
         score_args <- list(
@@ -469,38 +465,30 @@ optimize_panel <- function(x, y,
   .PENALTY <- 1e6
 
   # Evaluate a single decision vector and return converted objective values
-  evaluate_single <- function(decision_vec) {
-    evaluated <- evaluate_candidate(decision_vec)
+  evaluate_single <- function(decision_vec = NULL, selection = NULL) {
+    evaluated <- evaluate_candidate(decision_vec = decision_vec,
+                                    selection = selection)
     if (length(constraint_specs) && !evaluated$feasible) {
       return(rep(.PENALTY, length(objectives)))
     }
-    metrics <- evaluated$metrics
-    converted <- mapply(function(val, dir) {
-      # Handle NA, Inf, and -Inf explicitly
-      if (is.na(val)) {
-        return(.PENALTY)  # Treat NA as infeasible
-      }
-      if (is.infinite(val)) {
-        return(.PENALTY)
-      }
-      if (dir == "maximize") {
-        return(-val)
-      }
-      val
-    }, val = metrics, dir = objective_directions, SIMPLIFY = TRUE, USE.NAMES = FALSE)
-    as.numeric(converted)
+    .convert_metrics_to_objectives(evaluated$metrics, objective_directions,
+                                   penalty = .PENALTY)
   }
 
   # rmoo fitness function: can receive matrix (rows=individuals) or vector (single individual)
   # Must return matrix when receiving matrix input
   # Note: Accept ... to handle rmoo bug that passes reference_dirs to fitness
   objective_wrapper <- function(x, ...) {
-    if (is.null(dim(x))) {
-      # Single individual as vector
-      return(evaluate_single(x))
-    }
-    # Matrix input: evaluate each row and return matrix of objectives
-    t(apply(x, 1, evaluate_single))
+    .evaluate_fitness_population(
+      x = x,
+      selector = panel_selector,
+      evaluate_selection = function(selection) {
+        evaluate_single(selection = selection)
+      },
+      n_objectives = length(objectives),
+      cache = objective_cache,
+      cache_fitness = cache_fitness
+    )
   }
 
   # Optional per-generation history capture. We build a closure that pushes
@@ -647,6 +635,8 @@ optimize_panel <- function(x, y,
     # Store seed for reproducibility documentation
     seed = seed,
     selection_threshold = selection_threshold,
+    cache_fitness = cache_fitness,
+    cache_max_entries = cache_max_entries,
     regularized = regularized,
     regularized_alpha = if (regularized) regularized_alpha else NULL,
     objective_directions = objective_directions
