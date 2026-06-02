@@ -18,7 +18,8 @@ to deployable panel definitions.
 \itemize{
 \item Objective construction helpers (\code{define_objectives}).
 \item Optimization engines (\code{optimize_panel}).
-\item Evaluation utilities (\code{evaluate_panel}, \code{plot_pareto_front}).
+\item Evaluation utilities (\code{evaluate_panel}, \code{evaluate_pareto_solutions},
+\code{plot_pareto_front}).
 }
 }
 

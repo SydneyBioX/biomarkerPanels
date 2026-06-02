@@ -91,5 +91,6 @@ p$data     # access metrics data.frame
 }
 }
 \seealso{
-\code{\link[=optimize_panel]{optimize_panel()}}, \code{\link[=fit_panel]{fit_panel()}}, \code{\link[=evaluate_panel]{evaluate_panel()}}
+\code{\link[=evaluate_pareto_solutions]{evaluate_pareto_solutions()}}, \code{\link[=optimize_panel]{optimize_panel()}}, \code{\link[=fit_panel]{fit_panel()}},
+\code{\link[=evaluate_panel]{evaluate_panel()}}
 }

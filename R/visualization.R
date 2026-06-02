@@ -179,12 +179,11 @@ plot_pareto_evolution <- function(optimization_result,
   anim
 }
 
-#' Plot Pareto Front on Held-Out Data
+#' Evaluate Pareto Solutions on Held-Out Data
 #'
 #' Fits and evaluates every Pareto-optimal solution from [optimize_panel()] on
-#' held-out validation data and displays the trade-off between two metrics as a
-#' scatter plot. The underlying data frame is accessible via `$data` on the
-#' returned ggplot object.
+#' held-out validation data. This provides the metrics data frame used by
+#' [plot_pareto_front()] without requiring a plot.
 #'
 #' @param optimization_result An `OptimizationResult` from [optimize_panel()].
 #' @param x Held-out validation data: a matrix, data.frame,
@@ -194,59 +193,28 @@ plot_pareto_evolution <- function(optimization_result,
 #' @param y Held-out validation labels: a factor (or list of factors when `x`
 #'   is a list). When `NULL` (default), automatically uses held-out labels
 #'   stored by [optimize_panel_transferable()].
-#' @param x_metric Character; metric name for the x-axis. Must be one of
-#'   `"sensitivity"`, `"specificity"`, or `"auc"`. Default `"sensitivity"`.
-#' @param y_metric Character; metric name for the y-axis. Same options as
-#'   `x_metric`. Default `"specificity"`.
-#' @param color_by One of `"n_features"`, `"n_base_features"`, `"auc"`,
-#'   `"sensitivity"`, `"specificity"`, or `NULL` to disable. Default
-#'   `"n_features"`.
-#' @param point_size Numeric; point size. Default `4`.
-#' @param point_alpha Numeric; point transparency. Default `0.7`.
-#' @param viridis_option Character; viridis palette name. Default `"plasma"`.
-#' @param title Character or `NULL`; plot title. Auto-generated when `NULL`.
-#' @param xlab Character or `NULL`; x-axis label. Defaults to `x_metric`.
-#' @param ylab Character or `NULL`; y-axis label. Defaults to `y_metric`.
-#' @param color_label Character or `NULL`; color legend label. Defaults to
-#'   `color_by`.
-#' @param connect Logical; if `TRUE`, connect points with a line sorted by the
-#'   x-axis metric. Default `FALSE`.
 #' @param on_error One of `"warn"` or `"stop"`. Controls behaviour when a
 #'   solution fails evaluation. `"warn"` (default) skips the solution with a
 #'   warning; `"stop"` raises an error immediately.
 #' @param regularized Logical; passed to [fit_panel()]. Default `TRUE`.
 #' @param verbose Logical; print progress messages. Default `interactive()`.
-#' @return A `ggplot` object. The underlying metrics data frame is accessible
-#'   via `$data`.
+#' @return A data frame with one row per successfully evaluated solution and
+#'   columns `solution_id`, `n_features`, `n_base_features`, `sensitivity`,
+#'   `specificity`, and `auc`.
 #' @export
-#' @seealso [optimize_panel()], [fit_panel()], [evaluate_panel()]
+#' @seealso [optimize_panel()], [optimize_panel_transferable()], [fit_panel()],
+#'   [evaluate_panel()], [plot_pareto_front()]
 #' @examples
 #' \dontrun{
 #' opt <- optimize_panel(x_train, y_train, objectives = define_objectives())
-#' p <- plot_pareto_front(opt, x_test, y_test)
-#' p          # display plot
-#' p$data     # access metrics data.frame
+#' evaluate_pareto_solutions(opt, x_test, y_test)
 #' }
-plot_pareto_front <- function(optimization_result,
-                              x = NULL,
-                              y = NULL,
-                              x_metric = "sensitivity",
-                              y_metric = "specificity",
-                              color_by = "n_features",
-                              point_size = 4,
-                              point_alpha = 0.7,
-                              viridis_option = "plasma",
-                              title = NULL,
-                              xlab = NULL,
-                              ylab = NULL,
-                              color_label = NULL,
-                              connect = FALSE,
-                              on_error = c("warn", "stop"),
-                              regularized = TRUE,
-                              verbose = interactive()) {
-  if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("ggplot2 is required for plot_pareto_front()", call. = FALSE)
-  }
+evaluate_pareto_solutions <- function(optimization_result,
+                                      x = NULL,
+                                      y = NULL,
+                                      on_error = c("warn", "stop"),
+                                      regularized = TRUE,
+                                      verbose = interactive()) {
   if (!inherits(optimization_result, "OptimizationResult")) {
     stop("`optimization_result` must be an OptimizationResult.", call. = FALSE)
   }
@@ -304,7 +272,86 @@ plot_pareto_front <- function(optimization_result,
   if (length(rows) == 0L) {
     stop("All solutions failed evaluation.", call. = FALSE)
   }
-  plot_df <- do.call(rbind, rows)
+  do.call(rbind, rows)
+}
+
+#' Plot Pareto Front on Held-Out Data
+#'
+#' Fits and evaluates every Pareto-optimal solution from [optimize_panel()] on
+#' held-out validation data and displays the trade-off between two metrics as a
+#' scatter plot. The underlying data frame is accessible via `$data` on the
+#' returned ggplot object.
+#'
+#' @param optimization_result An `OptimizationResult` from [optimize_panel()].
+#' @param x Held-out validation data: a matrix, data.frame,
+#'   `SummarizedExperiment`, or list of such objects. When `NULL` (default),
+#'   automatically uses held-out data stored by
+#'   [optimize_panel_transferable()].
+#' @param y Held-out validation labels: a factor (or list of factors when `x`
+#'   is a list). When `NULL` (default), automatically uses held-out labels
+#'   stored by [optimize_panel_transferable()].
+#' @param x_metric Character; metric name for the x-axis. Must be one of
+#'   `"sensitivity"`, `"specificity"`, or `"auc"`. Default `"sensitivity"`.
+#' @param y_metric Character; metric name for the y-axis. Same options as
+#'   `x_metric`. Default `"specificity"`.
+#' @param color_by One of `"n_features"`, `"n_base_features"`, `"auc"`,
+#'   `"sensitivity"`, `"specificity"`, or `NULL` to disable. Default
+#'   `"n_features"`.
+#' @param point_size Numeric; point size. Default `4`.
+#' @param point_alpha Numeric; point transparency. Default `0.7`.
+#' @param viridis_option Character; viridis palette name. Default `"plasma"`.
+#' @param title Character or `NULL`; plot title. Auto-generated when `NULL`.
+#' @param xlab Character or `NULL`; x-axis label. Defaults to `x_metric`.
+#' @param ylab Character or `NULL`; y-axis label. Defaults to `y_metric`.
+#' @param color_label Character or `NULL`; color legend label. Defaults to
+#'   `color_by`.
+#' @param connect Logical; if `TRUE`, connect points with a line sorted by the
+#'   x-axis metric. Default `FALSE`.
+#' @param on_error One of `"warn"` or `"stop"`. Controls behaviour when a
+#'   solution fails evaluation. `"warn"` (default) skips the solution with a
+#'   warning; `"stop"` raises an error immediately.
+#' @param regularized Logical; passed to [fit_panel()]. Default `TRUE`.
+#' @param verbose Logical; print progress messages. Default `interactive()`.
+#' @return A `ggplot` object. The underlying metrics data frame is accessible
+#'   via `$data`.
+#' @export
+#' @seealso [evaluate_pareto_solutions()], [optimize_panel()], [fit_panel()],
+#'   [evaluate_panel()]
+#' @examples
+#' \dontrun{
+#' opt <- optimize_panel(x_train, y_train, objectives = define_objectives())
+#' p <- plot_pareto_front(opt, x_test, y_test)
+#' p          # display plot
+#' p$data     # access metrics data.frame
+#' }
+plot_pareto_front <- function(optimization_result,
+                              x = NULL,
+                              y = NULL,
+                              x_metric = "sensitivity",
+                              y_metric = "specificity",
+                              color_by = "n_features",
+                              point_size = 4,
+                              point_alpha = 0.7,
+                              viridis_option = "plasma",
+                              title = NULL,
+                              xlab = NULL,
+                              ylab = NULL,
+                              color_label = NULL,
+                              connect = FALSE,
+                              on_error = c("warn", "stop"),
+                              regularized = TRUE,
+                              verbose = interactive()) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("ggplot2 is required for plot_pareto_front()", call. = FALSE)
+  }
+  plot_df <- evaluate_pareto_solutions(
+    optimization_result,
+    x = x,
+    y = y,
+    on_error = on_error,
+    regularized = regularized,
+    verbose = verbose
+  )
 
   # Build plot
   if (is.null(title)) {

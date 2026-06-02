@@ -1,5 +1,12 @@
-# Tests for plot_pareto_front() visualization
+# Tests for Pareto solution evaluation and plot_pareto_front() visualization
 # These tests run real optimization + evaluation so are slow -- skip on CRAN.
+
+test_that("evaluate_pareto_solutions rejects non-OptimizationResult input", {
+  expect_error(
+    evaluate_pareto_solutions(data.frame(a = 1), matrix(1), factor("Yes")),
+    "OptimizationResult"
+  )
+})
 
 test_that("plot_pareto_front rejects non-OptimizationResult input", {
   skip_if_not_installed("ggplot2")
@@ -40,6 +47,45 @@ test_that("plot_pareto_front rejects non-OptimizationResult input", {
   )
   list(opt = opt, x_test = x_test, y_test = y_test)
 }
+
+test_that("evaluate_pareto_solutions returns held-out metrics", {
+  skip_slow_tests()
+
+  fix <- suppressWarnings(.make_pareto_fixture())
+
+  df <- suppressWarnings(
+    evaluate_pareto_solutions(
+      fix$opt, fix$x_test, fix$y_test,
+      regularized = FALSE, verbose = FALSE
+    )
+  )
+
+  expect_named(df, c("solution_id", "n_features", "n_base_features",
+                     "sensitivity", "specificity", "auc"))
+  expect_equal(nrow(df), n_solutions(fix$opt))
+  expect_equal(df$solution_id, solutions(fix$opt)$solution_id)
+  expect_true(all(df$sensitivity >= 0 & df$sensitivity <= 1))
+  expect_true(all(df$specificity >= 0 & df$specificity <= 1))
+  expect_true(all(df$auc >= 0 & df$auc <= 1))
+})
+
+test_that("evaluate_pareto_solutions uses stored held-out data", {
+  skip_slow_tests()
+
+  fix <- suppressWarnings(.make_pareto_fixture())
+  fix$opt@control$heldout_x <- fix$x_test
+  fix$opt@control$heldout_y <- fix$y_test
+
+  expect_message(
+    df <- suppressWarnings(
+      evaluate_pareto_solutions(
+        fix$opt, regularized = FALSE, verbose = TRUE
+      )
+    ),
+    "Using held-out data stored in OptimizationResult"
+  )
+  expect_equal(nrow(df), n_solutions(fix$opt))
+})
 
 test_that("plot_pareto_front returns ggplot with correct data columns", {
   skip_slow_tests()
