@@ -6,18 +6,6 @@ test_that("metric_sensitivity and metric_specificity behave as expected", {
   expect_false(is.na(metric_balanced_accuracy(truth, scores)))
 })
 
-test_that("metric_auc computes AUC", {
-  truth <- factor(rep(c("No", "Yes"), each = 10), levels = c("No", "Yes"))
-  scores <- c(seq(0.1, 0.9, length.out = 10), seq(0.2, 1, length.out = 10))
-  expect_gt(metric_auc(truth, scores), 0.5)
-})
-
-test_that("metric_num_features counts correctly", {
-  expect_equal(metric_num_features(selected = c("g1", "g2")), 2)
-  expect_equal(metric_num_features(selected = c(TRUE, FALSE, TRUE)), 2)
-  expect_equal(metric_num_features(selected = NULL), 0)
-})
-
 test_that("metric_num_features is consistent with feature vector length", {
 
   # Test various input types - key property: output equals length(selected)

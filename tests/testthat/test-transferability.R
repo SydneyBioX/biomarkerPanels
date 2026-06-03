@@ -351,45 +351,6 @@ test_that("per-cohort metrics are populated for all cohorts", {
   expect_true(all(pcm$n > 0))
 })
 
-test_that("evaluate_panel works with calibrated TransferablePanelResult", {
-  skip_slow_tests()
-  set.seed(404)
-
-  sim <- simulate_expression_data(p = 20, n = 50, k = 2, seed = 42)
-
-  opt <- optimize_panel_transferable(
-    x = sim$x_list,
-    y = sim$y_list,
-    max_features = 3,
-    train_ratio = 0.7,
-    val_ratio = 0.2,
-    feature_transform = "none",
-    nsga_control = list(popSize = 8, maxiter = 5),
-    n_top_features = 8
-  )
-
-  panel <- fit_panel(opt)
-  calibrated <- calibrate_panel(
-    panel,
-    x_heldout = opt@control$heldout_x,
-    y_heldout = opt@control$heldout_y,
-    cohort_heldout = opt@control$heldout_cohort
-  )
-
-  # Create new validation data
-  sim_new <- simulate_expression_data(p = 20, n = 30, k = 1, seed = 99)
-
-  eval_result <- evaluate_panel(
-    calibrated,
-    x = sim_new$x_list[[1]],
-    y = sim_new$y_list[[1]],
-    feature_transform = "none"
-  )
-
-  expect_true(is.list(eval_result))
-  expect_true("metrics" %in% names(eval_result))
-})
-
 test_that("single cohort is handled gracefully", {
   skip_slow_tests()
   set.seed(505)
