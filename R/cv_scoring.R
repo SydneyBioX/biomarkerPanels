@@ -73,8 +73,7 @@ NULL
 
     # Validate: must have both classes in training fold
     if (length(unique(y_train)) < 2L) {
-      stop("Training fold ", fold, " contains only one class. ",
-           "Consider using more samples or fewer CV folds.", call. = FALSE)
+      stop("Training fold ", fold, " contains only one class. ", call. = FALSE)
     }
 
     # Predicted probabilities for this fold's test set
@@ -97,8 +96,7 @@ NULL
 
   # Final validation: no NAs should remain
   if (any(is.na(predictions))) {
-    stop("Cross-validation scoring produced NA values. This indicates an internal error.",
-         call. = FALSE)
+    stop("Cross-validation scoring produced NA values.", call. = FALSE)
   }
 
   predictions
@@ -229,8 +227,7 @@ NULL
   }
 
   if (length(unique(truth)) < 2L) {
-    stop("Response contains only one class. Cannot fit classification model.",
-         call. = FALSE)
+    stop("Response contains only one class. ", call. = FALSE)
   }
 
   # Check for zero variance features

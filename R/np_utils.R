@@ -96,7 +96,10 @@ NULL
     stop("`delta` must be a single numeric value in (0, 1).", call. = FALSE)
   }
 
-  valid_methods <- c("penlog", "logistic", "svm", "lda", "nb", "ada", "tree", "rf")
+  # Must match nproc::npc's accepted method names exactly (nproc uses
+  # "randomforest", not "rf").
+  valid_methods <- c("penlog", "logistic", "svm", "lda", "slda",
+                     "nb", "nnb", "ada", "tree", "randomforest")
   if (!is.character(method) || length(method) != 1L ||
       !method %in% valid_methods) {
     stop(
