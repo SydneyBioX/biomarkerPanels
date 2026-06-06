@@ -81,6 +81,7 @@ Collate:
     'np_fit.R'
     'np_utils.R'
     'nsga_config.R'
+    'nsga_history_utils.R'
     'objectives.R'
     'optimize_panel.R'
     'optimize_panel_transferable.R'

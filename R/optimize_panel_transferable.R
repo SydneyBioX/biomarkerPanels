@@ -318,27 +318,11 @@ optimize_panel_transferable <- function(
   }
 
   # Optional per-generation history capture (see optimize_panel() for rationale).
-  history_buffer <- new.env(parent = emptyenv())
-  history_buffer$gens <- list()
-  history_monitor <- function(object, ...) {
-    iter <- object@iter
-    fit <- object@fitness
-    pop <- object@population
-    if (is.null(dim(fit))) fit <- matrix(fit, nrow = 1L)
-    if (is.null(dim(pop))) pop <- matrix(pop, nrow = 1L)
-    fr <- as.integer(object@front)
-    for (j in seq_along(objective_directions)) {
-      if (objective_directions[j] == "maximize") fit[, j] <- -fit[, j]
-    }
-    colnames(fit) <- names(objectives)
-    history_buffer$gens[[length(history_buffer$gens) + 1L]] <- list(
-      iter = as.integer(iter),
-      fit = fit,
-      front = fr,
-      pop = pop
-    )
-    invisible(NULL)
-  }
+  # Shared machinery lives in nsga_history_utils.R.
+  history_buffer <- .make_history_buffer()
+  history_monitor <- .make_history_monitor(
+    history_buffer, objective_directions, names(objectives)
+  )
 
   monitor_arg <- if (isTRUE(record_history)) history_monitor else FALSE
 
@@ -471,24 +455,8 @@ optimize_panel_transferable <- function(
   )
 
   # Materialize per-generation history if it was captured.
-  history_out <- if (isTRUE(record_history) && length(history_buffer$gens)) {
-    gen_dfs <- lapply(history_buffer$gens, function(g) {
-      n_ind <- nrow(g$pop)
-      bf <- lapply(seq_len(n_ind), function(i) select_base_features(g$pop[i, ]))
-      df <- data.frame(
-        generation = g$iter,
-        individual = seq_len(n_ind),
-        rank = g$front,
-        is_pareto = g$front == 1L,
-        g$fit,
-        n_features = lengths(bf),
-        check.names = FALSE,
-        stringsAsFactors = FALSE
-      )
-      df$base_features <- bf
-      df
-    })
-    do.call(rbind, gen_dfs)
+  history_out <- if (isTRUE(record_history)) {
+    .materialize_history(history_buffer, select_base_features)
   } else {
     list()
   }
