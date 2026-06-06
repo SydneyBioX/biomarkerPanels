@@ -105,11 +105,13 @@ construct_dual_stream_ratios <- function(x,
   n_missing_num <- length(numerators) - length(numerators_present)
   n_missing_denom <- length(denominators) - length(denominators_present)
   if (n_missing_num > 0L || n_missing_denom > 0L) {
-    message(
+    warning(
       sprintf(
-        "Filtered genes not in matrix: %d numerators, %d denominators",
+        paste0("Filtered genes not in matrix: %d numerators, %d denominators. ",
+               "Ratios are built from the remaining genes only."),
         n_missing_num, n_missing_denom
-      )
+      ),
+      call. = FALSE
     )
   }
 

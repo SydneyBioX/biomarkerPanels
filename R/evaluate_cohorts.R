@@ -153,7 +153,12 @@ evaluate_panel_by_cohort <- function(panel,
                      cohort_names[i], conditionMessage(e)), call. = FALSE)
       })
     } else {
-      scores <- .default_scoring_fn(x_selected, features, yi)
+      stop(
+        "Cohort '", cohort_names[i], "': panel has no fitted model. ",
+        "Use fit_panel() to fit a model before evaluate_panel_by_cohort() ",
+        "(refitting on the evaluation data would report leaky in-sample metrics).",
+        call. = FALSE
+      )
     }
 
     n_pos <- sum(yi == positive)

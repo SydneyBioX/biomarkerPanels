@@ -129,6 +129,13 @@ select_transferable_features <- function(x_list,
   )
 
   if (!nrow(combined_scores)) {
+    warning(
+      "No transferable features passed the sign-consistency and minimum-",
+      "coefficient filters; returning an empty feature set. Consider relaxing ",
+      "`min_coefficient`, `sign_consistency_threshold`, or setting ",
+      "`require_sign_consistency = FALSE`.",
+      call. = FALSE
+    )
     return(list(
       features = character(),
       scores = combined_scores,

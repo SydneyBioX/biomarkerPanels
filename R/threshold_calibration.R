@@ -19,7 +19,6 @@ NULL
 #' @return List with threshold value and metadata.
 #' @keywords internal
 .select_np_threshold <- function(scores, truth, alpha = 0.15, delta = 0.05) {
-  # Check if nproc is available
   if (!requireNamespace("nproc", quietly = TRUE)) {
     stop(
       "Package 'nproc' is required for NP threshold selection. ",
@@ -28,53 +27,79 @@ NULL
     )
   }
 
-  tryCatch(
-    {
-      # nproc expects 0/1 labels
-      y_binary <- as.integer(truth) - 1L
+  scores <- as.numeric(scores)
+  y_binary <- as.integer(truth) - 1L # nproc expects 0/1 labels
+  neg_scores <- scores[y_binary == 0L]
 
-      # npc() returns a classifier; we extract the threshold
-      np_fit <- nproc::npc(
-        x = as.matrix(scores),
-        y = y_binary,
-        method = "lda", # Simple method since scores are 1D
-        alpha = alpha,
-        delta = delta
-      )
-
-      # Extract threshold from fitted classifier
-      # For 1D scores with LDA, threshold is related to cutoff
-      # We need to find the threshold that achieves the target alpha
-
-      # Alternative: use nproc's internal threshold calculation
-      # The npc object stores the threshold implicitly
-      # We can compute it by evaluating at different cutoffs
-
-      # Simple approach: find threshold that achieves target specificity
-      neg_scores <- scores[y_binary == 0]
-      target_spec <- 1 - alpha
-
-      if (length(neg_scores) > 0) {
-        threshold <- stats::quantile(neg_scores, probs = target_spec, na.rm = TRUE)
-      } else {
-        threshold <- 0.5
-      }
-
-      list(
-        threshold = as.numeric(threshold),
-        method = "nproc",
-        alpha = alpha,
-        delta = delta
-      )
-    },
-    error = function(e) {
-      stop(
-        "NP threshold selection failed: ", conditionMessage(e),
-        "\nEnsure scores and truth vectors are valid for NP classification.",
-        call. = FALSE
-      )
+  empirical_fallback <- function(reason) {
+    warning(
+      reason,
+      " Falling back to an empirical training-data quantile threshold, which ",
+      "does NOT carry the (alpha, delta) Neyman-Pearson guarantee.",
+      call. = FALSE
+    )
+    thr <- if (length(neg_scores) > 0L) {
+      as.numeric(stats::quantile(neg_scores, probs = 1 - alpha, na.rm = TRUE))
+    } else {
+      0.5
     }
-  )
+    list(threshold = thr, method = "empirical_quantile_fallback",
+         alpha = alpha, delta = delta)
+  }
+
+  if (length(unique(y_binary)) < 2L) {
+    return(empirical_fallback("NP threshold selection needs both classes present."))
+  }
+
+  # Genuine Neyman-Pearson threshold via nproc::npc, which controls the type-I
+  # error (1 - specificity) at <= alpha with probability >= 1 - delta. We fit on
+  # the 1-D score with method = "lda" (penlog/glmnet rejects a single predictor)
+  # and then recover the threshold ON THE SCORE SCALE from npc's own
+  # NP-controlled predictions. npc's fits[[1]]$cutoff lives on lda's internal
+  # projection scale and is NOT comparable to the probability scores we threshold
+  # against, so it cannot be used directly. Recovering min(score | predicted Yes)
+  # reproduces npc's NP decision when applied as `score >= threshold`.
+  np_err <- NULL
+  np_threshold <- tryCatch({
+    np_model <- nproc::npc(
+      x = as.matrix(scores),
+      y = y_binary,
+      method = "lda",
+      alpha = alpha,
+      delta = delta,
+      split = 1L
+    )
+    pred <- predict(np_model, as.matrix(scores))
+    pos_scores <- scores[pred$pred.label == 1]
+    if (length(pos_scores)) min(pos_scores) else NA_real_
+  }, error = function(e) {
+    np_err <<- conditionMessage(e)
+    NA_real_
+  })
+
+  # Verify the recovered threshold actually controls the type-I error on the
+  # negatives. This single check catches sign flips, boundary ties, npc errors
+  # and degeneracy (no predicted positives); only if it passes is the threshold a
+  # genuine NP threshold.
+  realized_fpr <- if (is.finite(np_threshold) && length(neg_scores) > 0L) {
+    mean(neg_scores >= np_threshold)
+  } else {
+    NA_real_
+  }
+
+  if (is.finite(np_threshold) && !is.na(realized_fpr) &&
+      realized_fpr <= alpha + 1e-8) {
+    list(threshold = as.numeric(np_threshold), method = "nproc",
+         alpha = alpha, delta = delta)
+  } else {
+    reason <- if (!is.null(np_err)) {
+      paste0("nproc::npc failed (", np_err, ").")
+    } else {
+      paste0("nproc did not yield a threshold controlling the type-I error at ",
+             "alpha = ", alpha, " on this data.")
+    }
+    empirical_fallback(reason)
+  }
 }
 
 #' Compute Per-Cohort Performance Metrics

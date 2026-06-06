@@ -73,6 +73,9 @@ metric_cohort_leakage <- function(truth, scores = NULL, selected = NULL,
     c_sub <- droplevels(cohort[idx])
     s_sub <- scores[idx]
     if (nlevels(c_sub) < 2L || length(s_sub) < 10L) return(0)
+    # Constant scores carry no cohort signal; lm() would otherwise return a
+    # spurious (non-NA) adj.r.squared with an "essentially perfect fit" warning.
+    if (stats::var(s_sub) == 0) return(0)
     adj_r2 <- summary(lm(s_sub ~ c_sub))$adj.r.squared
     max(0, adj_r2)
   }

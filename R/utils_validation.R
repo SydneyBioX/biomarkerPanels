@@ -48,7 +48,7 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
   yes_tokens <- c("yes", "y", "1", "true", "positive", "pos", "case",
                   "fgr", "disease", "affected", "present")
   no_tokens <- c("no", "n", "0", "false", "negative", "neg", "control",
-                 "cohort", "healthy", "unaffected", "absent")
+                 "healthy", "unaffected", "absent")
 
   if (!is.null(positive)) {
     positive <- tolower(trimws(as.character(positive)))

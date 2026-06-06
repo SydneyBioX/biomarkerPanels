@@ -156,7 +156,7 @@ evaluate_panel <- function(panel, x, y,
       x_selected <- x_selected[, expected_features, drop = FALSE]
       selected <- expected_features
     } else {
-      warning(
+      stop(
         "Transformed feature names differ from model training. ",
         "Expected: ", paste(expected_features, collapse = ", "), ". ",
         "Got: ", paste(selected, collapse = ", "), ".",

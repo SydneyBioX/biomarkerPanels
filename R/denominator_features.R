@@ -231,6 +231,13 @@ select_denominator_features <- function(
     gene_batch_scores <- as.vector(batch_loadings %*% weights)
     names(gene_batch_scores) <- colnames(x)
   } else {
+    warning(
+      "No batch-associated principal components were found after all fallbacks; ",
+      "batch scores are all zero, so denominator selection carries no batch ",
+      "information and the resulting ratios will not cancel batch effects. ",
+      "Inspect the data or relax the batch-PC criteria.",
+      call. = FALSE
+    )
     gene_batch_scores <- rep(0, ncol(x))
     names(gene_batch_scores) <- colnames(x)
   }
