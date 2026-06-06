@@ -83,6 +83,7 @@ Collate:
     'objectives.R'
     'optimize_panel.R'
     'optimize_panel_transferable.R'
+    'panel_diversity.R'
     'panel_summarization.R'
     'ruv_features.R'
     'threshold_calibration.R'
