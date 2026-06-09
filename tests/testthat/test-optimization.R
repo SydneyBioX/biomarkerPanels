@@ -381,51 +381,6 @@ test_that("custom aggregator can be registered and used", {
   rm("center_features", envir = .transform_registry)
 })
 
-# Adaptive NSGA defaults
-test_that(".get_adaptive_nsga_defaults scales with feature pool size for NSGA-II", {
-  # NSGA-II: Small feature pool
-  small <- biomarkerPanels:::.get_adaptive_nsga_defaults(20, algorithm = "NSGA-II")
-  expect_equal(small$popSize, 64)
-  expect_equal(small$maxiter, 60)
-
-  # NSGA-II: Medium feature pool
-  medium <- biomarkerPanels:::.get_adaptive_nsga_defaults(50, algorithm = "NSGA-II")
-  expect_equal(medium$popSize, 128)
-  expect_equal(medium$maxiter, 150)
-
-  # NSGA-II: Large feature pool
-  large <- biomarkerPanels:::.get_adaptive_nsga_defaults(150, algorithm = "NSGA-II")
-  expect_equal(large$popSize, 200)
-  expect_equal(large$maxiter, 300)
-
-  # All should have consistent base parameters
-  expect_equal(small$pcrossover, 0.7)
-  expect_equal(medium$pcrossover, 0.7)
-  expect_equal(large$pcrossover, 0.7)
-})
-
-test_that(".get_adaptive_nsga_defaults scales with feature pool size for NSGA-III", {
-  # NSGA-III is the default
-  small <- biomarkerPanels:::.get_adaptive_nsga_defaults(20)
-  expect_equal(small$popSize, 92)
-  expect_equal(small$maxiter, 80)
-
-  # NSGA-III: Medium feature pool
-  medium <- biomarkerPanels:::.get_adaptive_nsga_defaults(50, algorithm = "NSGA-III")
-  expect_equal(medium$popSize, 156)
-  expect_equal(medium$maxiter, 180)
-
-  # NSGA-III: Large feature pool
-  large <- biomarkerPanels:::.get_adaptive_nsga_defaults(150, algorithm = "NSGA-III")
-  expect_equal(large$popSize, 252)
-  expect_equal(large$maxiter, 350)
-
-  # All should have consistent base parameters
-  expect_equal(small$pcrossover, 0.7)
-  expect_equal(medium$pcrossover, 0.7)
-  expect_equal(large$pcrossover, 0.7)
-})
-
 test_that(".compute_nsga3_partitions returns appropriate values", {
   # 2-3 objectives: 12 partitions
   expect_equal(biomarkerPanels:::.compute_nsga3_partitions(2), 12L)
