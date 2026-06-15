@@ -5,7 +5,6 @@
 ^data-raw$
 ^NEWS\.md$
 ^README\.md$
-^tests/data$
 ^\.git$
 ^\.Rproj.user$
 ^src/.*\\.(o|so|dll)$
@@ -14,3 +13,7 @@
 ^\.Rproj\.user$
 ^\.github$
 ^\.agents$
+^check\.sh$
+^check_output\.txt$
+^doc$
+^docs$

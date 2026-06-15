@@ -126,7 +126,8 @@ setMethod(
 #' Stores a fitted biomarker panel including selected biomarkers,
 #' performance summaries, and the trained model. This class is
 #' returned by [fit_panel()] and serves as input to [evaluate_panel()].
-#' @name BiomarkerPanelResult
+#' @aliases BiomarkerPanelResult-class BiomarkerPanelResult
+#' @name BiomarkerPanelResult-class
 #' @slot base_features Character vector of original (untransformed) biomarker names.
 #'   These are the features selected by the optimization algorithm before any
 #'   transformation is applied.

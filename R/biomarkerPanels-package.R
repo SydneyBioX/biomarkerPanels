@@ -13,4 +13,8 @@
 #' * Evaluation utilities (`evaluate_panel`, `plot_pareto_front`).
 #'
 #' @keywords internal
+#' @importFrom methods new
+#' @importFrom rlang .data
+#' @importFrom stats median runif setNames
+#' @importFrom utils head
 "_PACKAGE"

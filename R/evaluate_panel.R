@@ -303,12 +303,12 @@ evaluate_panel <- function(panel, x, y,
 
   roc_plot <- NULL
   if (requireNamespace("ggplot2", quietly = TRUE)) {
-    roc_plot <- ggplot2::ggplot(roc_curve, ggplot2::aes(x = fpr, y = tpr)) +
+    roc_plot <- ggplot2::ggplot(roc_curve, ggplot2::aes(x = .data$fpr, y = .data$tpr)) +
       ggplot2::geom_path(color = "#377EB8", linewidth = 0.8) +
       ggplot2::geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey60") +
       ggplot2::geom_point(
         data = highlight_point,
-        ggplot2::aes(x = fpr, y = tpr),
+        ggplot2::aes(x = .data$fpr, y = .data$tpr),
         color = "#E41A1C",
         size = 2.5
       ) +
