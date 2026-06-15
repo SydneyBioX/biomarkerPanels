@@ -13,3 +13,4 @@
 ^dev$
 ^\.Rproj\.user$
 ^\.github$
+^\.agents$

@@ -1,4 +1,4 @@
-# biomarkerPanels <img src="src/moo_hexsticker.png" alt="biomarkerPanels hex sticker" align="right" width="150"/>
+# biomarkerPanels <img src="man/figures/moo_hexsticker.png" alt="biomarkerPanels hex sticker" align="right" width="150"/>
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/SydneyBioX/biomarkerPanels/actions/workflows/R-CMD-check.yaml/badge.svg?branch=main)](https://github.com/SydneyBioX/biomarkerPanels/actions/workflows/R-CMD-check.yaml)
