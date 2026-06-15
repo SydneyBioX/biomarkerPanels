@@ -67,18 +67,18 @@ test_that(".compute_roc_curve_cpp matches pROC", {
 
   # Compare key operating points
   # pROC sensitivities should be present (or very close) in our curve
-  for (sens in roc_proc$sensitivities) {
-    closest <- min(abs(roc_ours$sensitivity - sens), na.rm = TRUE)
-    expect_true(closest < 1e-6,
-                info = sprintf("Sensitivity %.4f not found in our curve", sens))
-  }
+  sens_distances <- sapply(roc_proc$sensitivities, function(sens) {
+    min(abs(roc_ours$sensitivity - sens), na.rm = TRUE)
+  })
+  expect_true(all(sens_distances < 1e-6), 
+              info = "Some pROC sensitivities were not found in our curve")
 
   # Same for specificities
-  for (spec in roc_proc$specificities) {
-    closest <- min(abs(roc_ours$specificity - spec), na.rm = TRUE)
-    expect_true(closest < 1e-6,
-                info = sprintf("Specificity %.4f not found in our curve", spec))
-  }
+  spec_distances <- sapply(roc_proc$specificities, function(spec) {
+    min(abs(roc_ours$specificity - spec), na.rm = TRUE)
+  })
+  expect_true(all(spec_distances < 1e-6),
+              info = "Some pROC specificities were not found in our curve")
 })
 
 test_that(".compute_roc_curve_cpp is faster than pure R", {

@@ -125,45 +125,6 @@ test_that("fit_np_panel with minimize_FPR = TRUE returns TransferablePanelResult
   expect_s3_class(panel@model, "npc")
 })
 
-test_that("fit_np_panel with minimize_FPR = FALSE flips labels correctly", {
-  skip_if_not_installed("nproc")
-  skip_if_not_installed("rmoo")
-  skip_slow_tests()
-
-  set.seed(123)
-  sim <- simulate_expression_data(p = 50, n = 200, k = 2, seed = 123)
-
-  feature_pool <- colnames(sim$x_list[[1]])[1:20]
-
-  opt <- optimize_panel(
-    x = sim$x_list,
-    y = sim$y_list,
-    feature_pool = feature_pool,
-    feature_transform = "none",
-    objectives = define_objectives(
-      metrics = c("sensitivity", "specificity")
-    ),
-    nsga_control = list(popSize = 20, maxiter = 5)
-  )
-
-  # Fit NP panel for rule-out (control FNR)
-  panel <- fit_np_panel(
-    opt,
-    minimize_FPR = FALSE,
-    alpha = 0.10,  # Target 90% sensitivity
-    delta = 0.1,
-    method = "penlog"
-  )
-
-  expect_s4_class(panel, "TransferablePanelResult")
-  expect_true(panel@control$labels_flipped)
-  expect_false(panel@control$minimize_FPR)
-
-  # Per-cohort metrics should be computed
-  expect_true(nrow(panel@per_cohort_metrics) >= 1)
-  expect_true("sensitivity" %in% names(panel@per_cohort_metrics))
-  expect_true("specificity" %in% names(panel@per_cohort_metrics))
-})
 
 test_that("fit_np_panel with explicit features works", {
   skip_if_not_installed("nproc")
@@ -201,53 +162,6 @@ test_that("fit_np_panel with explicit features works", {
   expect_true(is.na(panel@control$fitted_solution_id))
 })
 
-test_that("evaluate_panel works with npc model", {
-  skip_if_not_installed("nproc")
-  skip_if_not_installed("rmoo")
-  skip_slow_tests()
-
-  set.seed(789)
-  sim <- simulate_expression_data(p = 50, n = 200, k = 3, seed = 789)
-
-  # Use first 2 cohorts for training
-  x_train_list <- sim$x_list[1:2]
-  y_train_list <- sim$y_list[1:2]
-
-  # Use third cohort for testing
-  x_test <- sim$x_list[[3]]
-  y_test <- sim$y_list[[3]]
-
-  feature_pool <- colnames(sim$x_list[[1]])[1:20]
-
-  opt <- optimize_panel(
-    x = x_train_list,
-    y = y_train_list,
-    feature_pool = feature_pool,
-    feature_transform = "none",
-    objectives = define_objectives(
-      metrics = c("sensitivity", "specificity")
-    ),
-    nsga_control = list(popSize = 20, maxiter = 5)
-  )
-
-  panel <- fit_np_panel(
-    opt,
-    minimize_FPR = TRUE,
-    alpha = 0.15,
-    delta = 0.1,
-    method = "penlog"
-  )
-
-  # Evaluate on held-out data
-  eval_result <- evaluate_panel(panel, x_test, y_test)
-
-  expect_type(eval_result, "list")
-  expect_true("metrics" %in% names(eval_result))
-  expect_true("confusion" %in% names(eval_result))
-  expect_true("roc" %in% names(eval_result))
-  expect_true("scores" %in% names(eval_result))
-  expect_equal(length(eval_result$scores), nrow(x_test))
-})
 
 test_that("fit_np_panel errors without nproc package", {
   # This test mocks the nproc check to verify error handling

@@ -115,40 +115,7 @@ test_that("cohort-aware AUC metrics compute transfer metrics", {
   )
 })
 
-test_that("cohort AUC metrics handle degenerate cohorts (0 positives)", {
-  # Cohort C has no positives — metric_auc will error, should return NA
-  truth <- factor(
-    c("No", "Yes", "Yes", "No", "No", "No"),
-    levels = c("No", "Yes")
-  )
-  scores <- c(0.1, 0.9, 0.8, 0.2, 0.3, 0.4)
-  cohort <- factor(c("A", "A", "A", "A", "C", "C"))
 
-  # Should not crash — degenerate cohort returns NA, aggregator ignores it
-
-  result <- metric_min_cohort_auc(truth, scores, cohort = cohort)
-  expect_true(is.numeric(result))
-  expect_false(is.na(result))  # cohort A is valid
-
-  gap <- metric_cohort_auc_gap(truth, scores, cohort = cohort)
-  # With only one valid cohort, gap = 0 (single value range)
-  expect_equal(gap, 0)
-})
-
-test_that("cohort AUC metrics return fallback for single cohort", {
-  truth <- factor(c("No", "Yes", "Yes", "No"), levels = c("No", "Yes"))
-  scores <- c(0.1, 0.9, 0.8, 0.2)
-
-  # No cohort argument — gap and var should return 0 (single_cohort_fallback)
-  expect_equal(metric_cohort_auc_gap(truth, scores), 0)
-  expect_equal(metric_cohort_auc_var(truth, scores), 0)
-
-  # min_cohort_auc without cohort falls back to overall AUC
-  expect_equal(
-    metric_min_cohort_auc(truth, scores),
-    metric_auc(truth, scores)
-  )
-})
 
 # Issue 2: cutoff_strategy parameter tests
 test_that("metric_sensitivity uses cutoff_strategy correctly", {

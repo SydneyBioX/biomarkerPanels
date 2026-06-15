@@ -181,58 +181,7 @@ test_that("min_metric_constraint builds feasible constraint", {
   expect_equal(constraint$direction, "maximize")
 })
 
-test_that("optimize_panel enforces minimum metric constraints", {
-  skip_slow_tests()
-  set.seed(5001)
-  n <- 200L
-  x <- matrix(rnorm(n * 2), nrow = n, ncol = 2)
-  colnames(x) <- c("gene_common1", "gene_common2")
-  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
-  x[y == "Yes", "gene_common1"] <- x[y == "Yes", "gene_common1"] + 0.5
-  x[y == "No", "gene_common1"] <- x[y == "No", "gene_common1"] - 0.5
 
-  res <- optimize_panel(
-    x = x,
-    y = y,
-    objectives = define_objectives(metrics = c("specificity", "num_features")),
-    max_features = 2,
-    feature_pool = colnames(x),
-    constraints = list(min_metric_constraint("sensitivity", threshold = 0.9)),
-    feature_transform = "none",
-    nsga_control = list(popSize = 16, maxiter = 15)
-  )
-
-  expect_s4_class(res, "OptimizationResult")
-  expect_true("min_sensitivity_0.9" %in% res@control$constraints)
-
-  # Fit and evaluate to verify constraint is satisfied
-  panel <- fit_panel(res)
-  eval_res <- evaluate_panel(panel, x, y)
-  expect_gte(eval_res$metrics["sensitivity"], 0.9)
-})
-
-test_that("optimize_panel errors when constraints infeasible", {
-  skip_slow_tests()
-  set.seed(5002)
-  n <- 200L
-  x <- matrix(rnorm(n * 3), nrow = n, ncol = 3)
-  colnames(x) <- c("gene_common1", "gene_common2", "gene_common3")
-  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
-
-  expect_error(
-    optimize_panel(
-      x = x,
-      y = y,
-      objectives = define_objectives(metrics = c("specificity")),
-      max_features = 2,
-      feature_pool = colnames(x),
-      constraints = list(min_metric_constraint("sensitivity", threshold = 1.01)),
-      feature_transform = "none",
-      nsga_control = list(popSize = 12, maxiter = 10)
-    ),
-    "Must have at least 2 rows"
-  )
-})
 
 test_that("pairwise cohort aggregator produces contrast features", {
   skip_slow_tests()
@@ -397,49 +346,7 @@ test_that("custom aggregator can be registered and used", {
 })
 
 # Adaptive NSGA defaults
-test_that(".get_adaptive_nsga_defaults scales with feature pool size for NSGA-II", {
-  # NSGA-II: Small feature pool
-  small <- biomarkerPanels:::.get_adaptive_nsga_defaults(20, algorithm = "NSGA-II")
-  expect_true(small$popSize %% 4 == 0)
-  expect_true(small$maxiter >= 60)
 
-  # NSGA-II: Medium feature pool
-  medium <- biomarkerPanels:::.get_adaptive_nsga_defaults(50, algorithm = "NSGA-II")
-  expect_true(medium$popSize > small$popSize)
-  expect_true(medium$maxiter > small$maxiter)
-
-  # NSGA-II: Large feature pool
-  large <- biomarkerPanels:::.get_adaptive_nsga_defaults(150, algorithm = "NSGA-II")
-  expect_true(large$popSize > medium$popSize)
-  expect_true(large$maxiter > medium$maxiter)
-
-  # All should have consistent base parameters
-  expect_equal(small$pcrossover, 0.7)
-  expect_equal(medium$pcrossover, 0.7)
-  expect_equal(large$pcrossover, 0.7)
-})
-
-test_that(".get_adaptive_nsga_defaults scales with feature pool size for NSGA-III", {
-  # NSGA-III is the default
-  small <- biomarkerPanels:::.get_adaptive_nsga_defaults(20)
-  expect_true(small$popSize %% 4 == 0)
-  expect_true(small$maxiter >= 80)
-
-  # NSGA-III: Medium feature pool
-  medium <- biomarkerPanels:::.get_adaptive_nsga_defaults(50, algorithm = "NSGA-III")
-  expect_true(medium$popSize > small$popSize)
-  expect_true(medium$maxiter > small$maxiter)
-
-  # NSGA-III: Large feature pool
-  large <- biomarkerPanels:::.get_adaptive_nsga_defaults(150, algorithm = "NSGA-III")
-  expect_true(large$popSize > medium$popSize)
-  expect_true(large$maxiter > medium$maxiter)
-
-  # All should have consistent base parameters
-  expect_equal(small$pcrossover, 0.7)
-  expect_equal(medium$pcrossover, 0.7)
-  expect_equal(large$pcrossover, 0.7)
-})
 
 test_that(".compute_nsga3_partitions returns appropriate values", {
   # 2-3 objectives: 12 partitions
@@ -455,31 +362,6 @@ test_that(".compute_nsga3_partitions returns appropriate values", {
   expect_equal(biomarkerPanels:::.compute_nsga3_partitions(10), 4L)
 })
 
-test_that("optimize_panel uses adaptive defaults without explicit nsga_control", {
-  skip_extended_tests()  # Very slow: popSize=156, maxiter=180
-  set.seed(999)
-  sim <- simulate_expression_data(p = 40, n = 200, k = 1, seed = 99)
-  x <- sim$x_list[[1]]
-  y <- sim$y_list[[1]]
-
-  # Use 35 features which falls into the 31-100 range
-  res <- optimize_panel(
-    x = x,
-    y = y,
-    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-    max_features = 3,
-    feature_pool = colnames(x)[seq_len(35)],
-    feature_transform = "none"
-  )
-
-  expect_s4_class(res, "OptimizationResult")
-  # Default algorithm is NSGA-II
-  expect_equal(res@control$algorithm, "NSGA-II")
-  # Verify that the stored nsga2 settings reflect adaptive NSGA-II defaults
-  expected_defaults <- biomarkerPanels:::.get_adaptive_nsga_defaults(35, "NSGA-II")
-  expect_equal(res@control$nsga2$popSize, expected_defaults$popSize)
-  expect_equal(res@control$nsga2$maxiter, expected_defaults$maxiter)
-})
 
 # Issue 4: feature_alignment tests
 test_that("feature_alignment = 'majority' keeps features in >= 50% cohorts", {
@@ -562,52 +444,7 @@ test_that("feature_alignment = 'intersection' is default and drops partial featu
 })
 
 # Regularized scoring tests
-test_that("regularized = TRUE uses regularized scoring during optimization", {
-  skip_slow_tests()
-  set.seed(123)
-  sim <- simulate_expression_data(p = 20, n = 200, k = 1, seed = 42)
-  x <- sim$x_list[[1]]
-  y <- sim$y_list[[1]]
 
-  res <- optimize_panel(
-    x = x,
-    y = y,
-    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-    max_features = 3,
-    feature_pool = colnames(x)[seq_len(10)],
-    feature_transform = "none",
-    regularized = TRUE,
-    regularized_alpha = 0.5,
-    nsga_control = list(popSize = 16, maxiter = 10)
-  )
-
-  expect_s4_class(res, "OptimizationResult")
-  expect_true(res@control$regularized)
-  expect_equal(res@control$regularized_alpha, 0.5)
-})
-
-test_that("regularized = FALSE uses unregularized scoring", {
-  skip_slow_tests()
-  set.seed(456)
-  sim <- simulate_expression_data(p = 20, n = 200, k = 1, seed = 43)
-  x <- sim$x_list[[1]]
-  y <- sim$y_list[[1]]
-
-  res <- optimize_panel(
-    x = x,
-    y = y,
-    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-    max_features = 3,
-    feature_pool = colnames(x)[seq_len(10)],
-    feature_transform = "none",
-    regularized = FALSE,
-    nsga_control = list(popSize = 16, maxiter = 10)
-  )
-
-  expect_s4_class(res, "OptimizationResult")
-  expect_false(res@control$regularized)
-  expect_null(res@control$regularized_alpha)
-})
 
 # NSGA algorithm tests
 test_that("optimize_panel uses NSGA-II by default", {

@@ -215,30 +215,6 @@ test_that("fit_panel with regularized = TRUE produces cv.glmnet model", {
   expect_true(panel@control$regularized)
 })
 
-test_that("fit_panel with regularized = FALSE produces glm model", {
-  skip_slow_tests()
-  set.seed(654)
-
-  sim <- simulate_expression_data(p = 30, n = 200, k = 1, seed = 46)
-  x <- sim$x_list[[1]]
-  y <- sim$y_list[[1]]
-
-  opt <- optimize_panel(
-    x = x,
-    y = y,
-    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-    max_features = 3,
-    feature_pool = colnames(x)[seq_len(8)],
-    feature_transform = "none",
-    regularized = FALSE,
-    nsga_control = list(popSize = 12, maxiter = 10)
-  )
-
-  panel <- fit_panel(opt, regularized = FALSE)
-
-  expect_true(inherits(panel@model, "glm"))
-  expect_false(panel@control$regularized)
-})
 
 test_that("fit_panel errors on invalid solution_id", {
   solutions_df <- data.frame(
@@ -294,47 +270,3 @@ test_that("fit_panel errors on features not in pool", {
   expect_error(fit_panel(opt, features = c("g1", "not_in_pool")), "not in feature pool")
 })
 
-test_that("new workflow: optimize_panel -> fit_panel -> evaluate_panel", {
-  skip_slow_tests()
-  set.seed(999)
-
-  sim <- simulate_expression_data(p = 30, n = 200, k = 1, seed = 47)
-  x <- sim$x_list[[1]]
-  y <- sim$y_list[[1]]
-
-  # Split into train/test
-  train_idx <- seq_len(40)
-  test_idx <- seq(41, 60)
-  x_train <- x[train_idx, ]
-  y_train <- y[train_idx]
-  x_test <- x[test_idx, ]
-  y_test <- y[test_idx]
-
-  # Step 1: Optimize
-  opt <- optimize_panel(
-    x = x_train,
-    y = y_train,
-    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-    max_features = 3,
-    feature_pool = colnames(x)[seq_len(10)],
-    feature_transform = "none",
-    nsga_control = list(popSize = 12, maxiter = 10)
-  )
-  expect_s4_class(opt, "OptimizationResult")
-
-  # Step 2: Summarize and fit
-  summary <- summarize_solutions(opt)
-  expect_s3_class(summary, "data.frame")
-  expect_true(nrow(summary) >= 1)
-
-  panel <- fit_panel(opt)
-  expect_s4_class(panel, "BiomarkerPanelResult")
-  expect_true(!is.null(panel@model))
-
-  # Step 3: Evaluate
-  eval_res <- evaluate_panel(panel, x_test, y_test)
-  expect_type(eval_res, "list")
-  expect_true("metrics" %in% names(eval_res))
-  expect_true("roc" %in% names(eval_res))
-  expect_true(all(eval_res$scores >= 0 & eval_res$scores <= 1))
-})

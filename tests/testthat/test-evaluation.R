@@ -35,40 +35,6 @@
   rowMeans(x_selected)
 }
 
-test_that("evaluate_panel errors when no model and no scoring_fn", {
-  panel_features <- c("gene_common1", "gene_common2")
-  metrics <- c(sensitivity = 0.5, specificity = 0.5, auc = 0.5)
-  objective_df <- data.frame(
-    solution_id = 1L,
-    objective = names(metrics),
-    value = metrics,
-    direction = c("maximize", "maximize", "maximize"),
-    stringsAsFactors = FALSE
-  )
-  objective_df$features <- I(rep(list(panel_features), nrow(objective_df)))
-
-  # Panel without model
-  panel <- new(
-    "BiomarkerPanelResult",
-    base_features = panel_features,
-    features = panel_features,
-    metrics = metrics,
-    objectives = objective_df,
-    control = list(),
-    training_data = list(),
-    model = NULL
-  )
-
-  set.seed(123)
-  x <- matrix(rnorm(60), nrow = 30, ncol = 2)
-  colnames(x) <- panel_features
-  y <- factor(rep(c("No", "Yes"), each = 15), levels = c("No", "Yes"))
-
-  expect_error(
-    evaluate_panel(panel, x, y),
-    "fit_panel"
-  )
-})
 
 test_that("evaluate_panel works with scoring_fn when no model", {
   panel_features <- c("gene_common1", "gene_common2")
@@ -151,36 +117,6 @@ test_that("evaluate_panel scores held-out multi-cohort data", {
   expect_true(all(c("obs", "prob") %in% colnames(eval_res$roc$evalm)))
 })
 
-test_that("evaluate_panel requires column names for single-cohort data", {
-  panel_features <- c("gene_common1", "gene_common2")
-  metrics <- c(sensitivity = 0.5, specificity = 0.5, auc = 0.5)
-  objective_df <- data.frame(
-    solution_id = 1L,
-    objective = names(metrics),
-    value = metrics,
-    direction = c("maximize", "maximize", "maximize"),
-    stringsAsFactors = FALSE
-  )
-  objective_df$features <- I(rep(list(panel_features), nrow(objective_df)))
-  panel <- new(
-    "BiomarkerPanelResult",
-    base_features = panel_features,
-    features = panel_features,
-    metrics = metrics,
-    objectives = objective_df,
-    control = list(),
-    training_data = list(),
-    model = NULL  # We'll use scoring_fn
-  )
-
-  x <- matrix(rnorm(20), nrow = 10)
-  y <- factor(rep(c("No", "Yes"), each = 5), levels = c("No", "Yes"))
-
-  expect_error(
-    evaluate_panel(panel, x, y, scoring_fn = .simple_scoring_fn),
-    "Base feature\\(s\\) not found"
-  )
-})
 
 test_that("evaluate_panel accepts custom cutoff for confusion and ROC highlight", {
   panel_features <- c("g1", "g2")

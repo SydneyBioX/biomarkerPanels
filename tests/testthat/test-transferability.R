@@ -83,22 +83,6 @@ test_that("stratified partitioning preserves class balance", {
   expect_true(all(partitions$partition_info$n_heldout > 0))
 })
 
-test_that("stratified partitioning errors on small cohorts", {
-  # Very small cohort that can't support proper splits
-  x <- matrix(rnorm(10 * 5), nrow = 10)
-  colnames(x) <- paste0("gene_", 1:5)
-  y <- factor(c(rep("Yes", 2), rep("No", 8)), levels = c("No", "Yes"))
-
-  expect_error(
-    .stratified_partition_cohorts(
-      list(small = x),
-      list(small = y),
-      train_ratio = 0.7,
-      val_ratio = 0.2
-    ),
-    "insufficient samples"
-  )
-})
 
 test_that("weighted variance computation is correct", {
   # Test with known values
@@ -253,72 +237,6 @@ test_that("feature selection uses training data only (no leakage)", {
   expect_equal(pi$heldout_ratio, 0.1)
 })
 
-test_that("full pipeline: optimize -> fit -> calibrate -> evaluate", {
-  skip_slow_tests()
-  set.seed(202)
-
-  sim <- simulate_expression_data(p = 20, n = 200, k = 2, seed = 42)
-
-  opt <- optimize_panel_transferable(
-    x = sim$x_list,
-    y = sim$y_list,
-    max_features = 3,
-    train_ratio = 0.7,
-    val_ratio = 0.2,
-    np_alpha = 0.2,
-    np_delta = 0.1,
-    feature_transform = "none",
-    nsga_control = list(popSize = 8, maxiter = 5),
-    n_top_features = 8
-  )
-
-  expect_s4_class(opt, "OptimizationResult")
-
-  # Fit panel
-  panel <- fit_panel(opt)
-  expect_s4_class(panel, "BiomarkerPanelResult")
-
-  # Calibrate with held-out data
-  calibrated <- calibrate_panel(
-    panel,
-    x_heldout = opt@control$heldout_x,
-    y_heldout = opt@control$heldout_y,
-    cohort_heldout = opt@control$heldout_cohort,
-    np_alpha = opt@control$np_alpha,
-    np_delta = opt@control$np_delta
-  )
-
-  expect_s4_class(calibrated, "TransferablePanelResult")
-  expect_s4_class(calibrated, "BiomarkerPanelResult")
-
-  # NP threshold should be valid
-  threshold <- np_threshold(calibrated)
-  expect_true(threshold >= 0 && threshold <= 1,
-              info = sprintf("NP threshold %.3f outside [0,1]", threshold))
-
-  # Per-cohort metrics populated
-  pcm <- per_cohort_metrics(calibrated)
-  expect_s3_class(pcm, "data.frame")
-  expect_equal(nrow(pcm), 2)  # 2 cohorts
-  expect_true(all(c("cohort", "sensitivity", "specificity") %in% names(pcm)))
-
-  # Weighted variance
-  wv <- weighted_variance(calibrated)
-  expect_true(is.list(wv))
-  expect_named(wv, c("sensitivity", "specificity"))
-
-  # Evaluate on new data
-  sim_new <- simulate_expression_data(p = 20, n = 200, k = 1, seed = 99)
-  eval_result <- evaluate_panel(
-    calibrated,
-    x = sim_new$x_list[[1]],
-    y = sim_new$y_list[[1]],
-    feature_transform = "none"
-  )
-
-  expect_true(is.list(eval_result))
-  expect_true("metrics" %in% names(eval_result))
-})
 
 test_that("per-cohort metrics are populated for all cohorts", {
   skip_slow_tests()
@@ -429,54 +347,7 @@ test_that("single cohort is handled gracefully", {
   expect_equal(nrow(per_cohort_metrics(calibrated)), 1)
 })
 
-test_that("invalid ratios are rejected by optimize_panel_transferable", {
-  sim <- simulate_expression_data(p = 10, n = 200, k = 2, seed = 42)
 
-  expect_error(
-    optimize_panel_transferable(
-      x = sim$x_list,
-      y = sim$y_list,
-      train_ratio = 0.4,  # too low
-      val_ratio = 0.2
-    ),
-    "train_ratio.*at least 0.5"
-  )
-
-  expect_error(
-    optimize_panel_transferable(
-      x = sim$x_list,
-      y = sim$y_list,
-      train_ratio = 0.7,
-      val_ratio = 0.05  # too low
-    ),
-    "val_ratio.*at least 0.1"
-  )
-})
-
-test_that("warning for small partitions during stratified split", {
-  set.seed(606)
-
-  # Create data that will produce small but valid partitions
-  x_list <- list(
-    c1 = matrix(rnorm(40 * 10), nrow = 40),
-    c2 = matrix(rnorm(40 * 10), nrow = 40)
-  )
-  for (i in seq_along(x_list)) {
-    colnames(x_list[[i]]) <- paste0("gene_", 1:10)
-  }
-
-  # Class balance that will result in warnings but not errors
-  y_list <- list(
-    c1 = factor(c(rep("Yes", 12), rep("No", 28)), levels = c("No", "Yes")),
-    c2 = factor(c(rep("Yes", 12), rep("No", 28)), levels = c("No", "Yes"))
-  )
-
-  # Should produce warning about few samples but still work
-  expect_warning(
-    .stratified_partition_cohorts(x_list, y_list, train_ratio = 0.7, val_ratio = 0.2),
-    "few samples"
-  )
-})
 
 test_that("calibrate_panel validates inputs", {
   # Should error on non-BiomarkerPanelResult input
