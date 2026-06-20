@@ -270,3 +270,115 @@ test_that("fit_panel errors on features not in pool", {
   expect_error(fit_panel(opt, features = c("g1", "not_in_pool")), "not in feature pool")
 })
 
+test_that("new workflow: optimize_panel -> fit_panel -> evaluate_panel", {
+  skip_slow_tests()
+  set.seed(999)
+
+  sim <- simulate_expression_data(p = 30, n = 60, k = 1, seed = 47)
+  x <- sim$x_list[[1]]
+  y <- sim$y_list[[1]]
+
+  # Split into train/test
+  train_idx <- seq_len(40)
+  test_idx <- seq(41, 60)
+  x_train <- x[train_idx, ]
+  y_train <- y[train_idx]
+  x_test <- x[test_idx, ]
+  y_test <- y[test_idx]
+
+  # Step 1: Optimize
+  opt <- optimize_panel(
+    x = x_train,
+    y = y_train,
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
+    max_features = 3,
+    feature_pool = colnames(x)[seq_len(10)],
+    feature_transform = "none",
+    nsga_control = list(popSize = 12, maxiter = 10)
+  )
+  expect_s4_class(opt, "OptimizationResult")
+
+  # Step 2: Summarize and fit
+  summary <- summarize_solutions(opt)
+  expect_s3_class(summary, "data.frame")
+  expect_true(nrow(summary) >= 1)
+
+  panel <- fit_panel(opt)
+  expect_s4_class(panel, "BiomarkerPanelResult")
+  expect_true(!is.null(panel@model))
+
+  # Step 3: Evaluate
+  eval_res <- evaluate_panel(panel, x_test, y_test)
+  expect_type(eval_res, "list")
+  expect_true("metrics" %in% names(eval_res))
+  expect_true("roc" %in% names(eval_res))
+  expect_true(all(eval_res$scores >= 0 & eval_res$scores <= 1))
+})
+
+# ============================================================================
+# Input validation tests (silent failure audit fixes)
+# ============================================================================
+
+test_that("fit_panel validates regularized_alpha range", {
+  solutions_df <- data.frame(
+    solution_id = 1L,
+    sensitivity = 0.8,
+    specificity = 0.7,
+    stringsAsFactors = FALSE
+  )
+  solutions_df$features <- I(list(c("g1", "g2")))
+  solutions_df$base_features <- I(list(c("g1", "g2")))
+
+  opt <- new(
+    "OptimizationResult",
+    solutions = solutions_df,
+    feature_pool = c("g1", "g2"),
+    control = list(max_features = 3, feature_transform = "none"),
+    training_signature = list(n = 20, p = 2),
+    aggregated_x = matrix(rnorm(40), nrow = 20, ncol = 2,
+                          dimnames = list(NULL, c("g1", "g2"))),
+    aggregated_y = factor(rep(c("No", "Yes"), each = 10), levels = c("No", "Yes")),
+    aggregated_cohort = factor(rep("cohort_01", 20))
+  )
+
+  expect_error(fit_panel(opt, regularized_alpha = -0.1), "regularized_alpha")
+  expect_error(fit_panel(opt, regularized_alpha = 1.5), "regularized_alpha")
+})
+
+test_that("fit_panel validates cv_folds minimum", {
+  solutions_df <- data.frame(
+    solution_id = 1L,
+    sensitivity = 0.8,
+    specificity = 0.7,
+    stringsAsFactors = FALSE
+  )
+  solutions_df$features <- I(list(c("g1", "g2")))
+  solutions_df$base_features <- I(list(c("g1", "g2")))
+
+  opt <- new(
+    "OptimizationResult",
+    solutions = solutions_df,
+    feature_pool = c("g1", "g2"),
+    control = list(max_features = 3, feature_transform = "none"),
+    training_signature = list(n = 20, p = 2),
+    aggregated_x = matrix(rnorm(40), nrow = 20, ncol = 2,
+                          dimnames = list(NULL, c("g1", "g2"))),
+    aggregated_y = factor(rep(c("No", "Yes"), each = 10), levels = c("No", "Yes")),
+    aggregated_cohort = factor(rep("cohort_01", 20))
+  )
+
+  expect_error(fit_panel(opt, cv_folds = 1L), "cv_folds")
+  expect_error(fit_panel(opt, cv_folds = 0L), "cv_folds")
+})
+
+test_that(".fit_final_model_cv warns on insufficient data for CV", {
+  set.seed(42)
+  x_small <- matrix(rnorm(12), nrow = 4, ncol = 3,
+                    dimnames = list(NULL, c("a", "b", "c")))
+  y_small <- factor(c("No", "Yes", "No", "Yes"), levels = c("No", "Yes"))
+
+  expect_warning(
+    .fit_final_model_cv(x_small, y_small, cv_folds = 5L),
+    "Too few samples"
+  )
+})

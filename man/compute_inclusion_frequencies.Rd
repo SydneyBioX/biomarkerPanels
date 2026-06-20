@@ -4,11 +4,21 @@
 \alias{compute_inclusion_frequencies}
 \title{Compute biomarker inclusion frequencies across optimisation runs.}
 \usage{
-compute_inclusion_frequencies(panels)
+compute_inclusion_frequencies(
+  panels,
+  feature_type = c("features", "base_features")
+)
 }
 \arguments{
-\item{panels}{List of \code{\link{BiomarkerPanelResult}} objects, character vectors of
-biomarkers, or a mixture of both.}
+\item{panels}{List of \code{OptimizationResult}, \code{\link{BiomarkerPanelResult}}
+objects, character vectors of biomarkers, or a mixture of these. A single
+(unwrapped) \code{OptimizationResult} is also accepted.}
+
+\item{feature_type}{One of \code{"features"} (default) or \code{"base_features"}.
+Controls whether transformed feature names (e.g. \code{"A--B"} for pairwise
+ratios) or base feature names (genes) are counted. Only relevant for
+\code{OptimizationResult} entries; \code{BiomarkerPanelResult} and character vector
+entries always use their stored feature names.}
 }
 \value{
 Data frame with columns \code{feature}, \code{count}, and \code{proportion}.

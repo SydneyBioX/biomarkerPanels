@@ -2,7 +2,7 @@
 % Please edit documentation in R/optimize_panel.R
 \name{optimize_panel}
 \alias{optimize_panel}
-\title{Optimize Biomarker Panels with NSGA-II}
+\title{Optimize Biomarker Panels with NSGA-III / NSGA-II}
 \usage{
 optimize_panel(
   x,
@@ -15,7 +15,7 @@ optimize_panel(
   feature_alignment = c("intersection", "majority", "impute_median"),
   constraints = list(),
   scoring_fn = NULL,
-  algorithm = c("NSGA-II", "NSGA-III"),
+  algorithm = c("NSGA-III", "NSGA-II"),
   nsga_control = list(),
   assay = NULL,
   seed = NULL,
@@ -23,7 +23,10 @@ optimize_panel(
   fitness_cv_folds = 5L,
   regularized = TRUE,
   regularized_alpha = 0.5,
-  selection_threshold = "adaptive"
+  selection_threshold = "adaptive",
+  cache_fitness = TRUE,
+  cache_max_entries = Inf,
+  record_history = FALSE
 )
 }
 \arguments{
@@ -75,13 +78,14 @@ solution to be considered feasible.}
 features. Signature:
 \verb{function(x_selected, selected_features, truth, cohort = NULL, ...)}.}
 
-\item{algorithm}{Multi-objective optimization algorithm. \code{"NSGA-II"} (default)
-uses crowding distance for diversity preservation. \code{"NSGA-III"} uses
-reference-point-based selection for many-objective problems but has a bug
-in rmoo 0.3.0 (use NSGA-II as workaround).}
+\item{algorithm}{Multi-objective optimization algorithm. \code{"NSGA-III"}
+(default) uses reference-point-based selection and gives better Pareto
+front diversity for many-objective problems (3+ objectives). \code{"NSGA-II"}
+uses crowding distance for diversity preservation and is typically
+adequate for 2 objectives.}
 
-\item{nsga_control}{Named list of arguments passed to \code{\link[rmoo:nsga2]{rmoo::nsga2()}} (or
-\code{\link[rmoo:nsga3]{rmoo::nsga3()}}). For NSGA-III, \code{n_partitions} controls reference point
+\item{nsga_control}{Named list of arguments passed to \code{\link[rmoo:nsga3]{rmoo::nsga3()}} (or
+\code{\link[rmoo:nsga2]{rmoo::nsga2()}}). For NSGA-III, \code{n_partitions} controls reference point
 density (default computed from number of objectives). Defaults to adaptive
 values based on feature pool size. Note: \code{parallel = TRUE} is not recommended
 as it is slower than sequential execution due to overhead.}
@@ -89,12 +93,12 @@ as it is slower than sequential execution due to overhead.}
 \item{assay}{For \code{SummarizedExperiment} inputs, assay name or index to use.}
 
 \item{seed}{Optional integer seed for reproducibility. When provided, sets
-the random seed before running NSGA-II optimization. This ensures
+the random seed before running NSGA optimization. This ensures
 reproducible results across runs. If \code{NULL} (default), no seed is set and
 results may vary between runs.}
 
 \item{fitness_cv}{Logical; if \code{TRUE} (default), use cross-validation when
-evaluating candidate solutions during NSGA-II optimization. This prevents
+evaluating candidate solutions during NSGA optimization. This prevents
 overfitting by computing objective metrics on held-out fold predictions
 rather than in-sample predictions. Recommended for fair comparison with
 regularized methods like Lasso.}
@@ -118,6 +122,21 @@ that allows variable panel sizes in the Pareto front. Fixed thresholds
 improve accuracy. Adaptive selection finds natural breakpoints in the
 weight distribution, enabling the \code{num_features} objective to drive panel
 size diversity.}
+
+\item{cache_fitness}{Logical; if \code{TRUE} (default), cache candidate fitness
+by selected base-feature panel within each evaluation context. Set
+\code{FALSE} for intentionally stochastic custom objectives or scoring
+functions.}
+
+\item{cache_max_entries}{Maximum number of selected-panel entries retained
+per fitness cache. Defaults to \code{Inf}.}
+
+\item{record_history}{Logical; if \code{TRUE}, capture the population, fitness,
+and NSGA rank at every generation and attach the result to the returned
+\code{OptimizationResult}. Retrieve via \code{\link[=nsga_history]{nsga_history()}}. Default \code{FALSE}.
+Adds modest overhead (one matrix copy per generation) and is intended for
+diagnostic / visualization use, e.g. plotting how the Pareto front
+evolves over \code{maxiter}.}
 }
 \value{
 An \code{OptimizationResult} containing the Pareto-optimal solutions.
@@ -125,7 +144,7 @@ Use \code{\link[=summarize_solutions]{summarize_solutions()}} to inspect solutio
 fit a model on a selected solution.
 }
 \description{
-Wrapper around \code{\link[rmoo:nsga2]{rmoo::nsga2()}} (or \code{\link[rmoo:nsga3]{rmoo::nsga3()}}) that composes registered
+Wrapper around \code{\link[rmoo:nsga3]{rmoo::nsga3()}} (or \code{\link[rmoo:nsga2]{rmoo::nsga2()}}) that composes registered
 metric functions into a multi-objective search for compact biomarker panels.
 Candidate solutions are represented as weights over a feature pool; features
 with weight > 0.5 are included in the panel (up to \code{max_features}). This

@@ -31,5 +31,10 @@ features. The feature transform is applied on-the-fly during \code{\link[=fit_pa
 \item{\code{aggregated_y}}{Training response vector (factor).}
 
 \item{\code{aggregated_cohort}}{Cohort membership factor for training samples.}
+
+\item{\code{history}}{Optional per-generation NSGA history. Empty list when
+\code{record_history = FALSE} (default); otherwise a data frame with columns
+\code{generation}, \code{individual}, \code{rank}, \code{is_pareto}, and one column per
+objective (in user-facing direction). See \code{\link[=nsga_history]{nsga_history()}}.}
 }}
 

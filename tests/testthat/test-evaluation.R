@@ -442,3 +442,42 @@ test_that("evaluate_panel_at_sensitivity uses correct threshold vs default", {
   # (discrete ROC points may prevent exact match)
   expect_gte(eval_target$metrics["sensitivity"], 0.85)
 })
+
+# ============================================================================
+# Input validation tests (silent failure audit fixes)
+# ============================================================================
+
+test_that("evaluate_panel stops on feature name mismatch (no positional fallback)", {
+  panel_features <- c("g1", "g2")
+
+  set.seed(42)
+  x <- matrix(rnorm(40), nrow = 20, ncol = 2)
+  colnames(x) <- c("g1", "g2")
+  y <- factor(rep(c("No", "Yes"), each = 10), levels = c("No", "Yes"))
+
+  panel <- .create_test_panel_with_model(panel_features, x, y)
+
+  # Same column count but different names should stop(), not warn()
+  x_misnamed <- x
+  colnames(x_misnamed) <- c("a1", "a2")
+  expect_error(
+    evaluate_panel(panel, x_misnamed, y),
+    "not found in validation data|Feature name mismatch"
+  )
+})
+
+test_that("evaluate_panel validates cutoff_prob range", {
+  panel_features <- c("g1", "g2")
+
+  set.seed(42)
+  x <- matrix(rnorm(40), nrow = 20, ncol = 2)
+  colnames(x) <- c("g1", "g2")
+  y <- factor(rep(c("No", "Yes"), each = 10), levels = c("No", "Yes"))
+
+  panel <- .create_test_panel_with_model(panel_features, x, y)
+
+  expect_error(evaluate_panel(panel, x, y, cutoff_prob = 0), "cutoff_prob")
+  expect_error(evaluate_panel(panel, x, y, cutoff_prob = 1), "cutoff_prob")
+  expect_error(evaluate_panel(panel, x, y, cutoff_prob = -0.5), "cutoff_prob")
+  expect_error(evaluate_panel(panel, x, y, cutoff_prob = "abc"), "cutoff_prob")
+})

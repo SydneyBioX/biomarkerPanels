@@ -19,75 +19,87 @@ NULL
 #' @return List with threshold value and metadata.
 #' @keywords internal
 .select_np_threshold <- function(scores, truth, alpha = 0.15, delta = 0.05) {
-  # Check if nproc is available
   if (!requireNamespace("nproc", quietly = TRUE)) {
-    warning(
-      "Package 'nproc' not available. Using fallback threshold of 0.5. ",
-      "Install nproc via install.packages('nproc') for NP threshold selection.",
+    stop(
+      "Package 'nproc' is required for NP threshold selection. ",
+      "Install it via install.packages('nproc').",
       call. = FALSE
     )
-    return(list(
-      threshold = 0.5,
-      method = "fallback",
-      alpha = alpha,
-      delta = delta
-    ))
   }
 
-  tryCatch(
-    {
-      # nproc expects 0/1 labels
-      y_binary <- as.integer(truth) - 1L
+  scores <- as.numeric(scores)
+  y_binary <- as.integer(truth) - 1L # nproc expects 0/1 labels
+  neg_scores <- scores[y_binary == 0L]
 
-      # npc() returns a classifier; we extract the threshold
-      np_fit <- nproc::npc(
-        x = as.matrix(scores),
-        y = y_binary,
-        method = "lda", # Simple method since scores are 1D
-        alpha = alpha,
-        delta = delta
-      )
-
-      # Extract threshold from fitted classifier
-      # For 1D scores with LDA, threshold is related to cutoff
-      # We need to find the threshold that achieves the target alpha
-
-      # Alternative: use nproc's internal threshold calculation
-      # The npc object stores the threshold implicitly
-      # We can compute it by evaluating at different cutoffs
-
-      # Simple approach: find threshold that achieves target specificity
-      neg_scores <- scores[y_binary == 0]
-      target_spec <- 1 - alpha
-
-      if (length(neg_scores) > 0) {
-        threshold <- stats::quantile(neg_scores, probs = target_spec, na.rm = TRUE)
-      } else {
-        threshold <- 0.5
-      }
-
-      list(
-        threshold = as.numeric(threshold),
-        method = "nproc",
-        alpha = alpha,
-        delta = delta
-      )
-    },
-    error = function(e) {
-      warning(
-        "NP threshold selection failed: ", conditionMessage(e),
-        ". Using fallback threshold of 0.5.",
-        call. = FALSE
-      )
-      list(
-        threshold = 0.5,
-        method = "fallback",
-        alpha = alpha,
-        delta = delta,
-        error = conditionMessage(e)
-      )
+  empirical_fallback <- function(reason) {
+    warning(
+      reason,
+      " Falling back to an empirical training-data quantile threshold, which ",
+      "does NOT carry the (alpha, delta) Neyman-Pearson guarantee.",
+      call. = FALSE
+    )
+    thr <- if (length(neg_scores) > 0L) {
+      as.numeric(stats::quantile(neg_scores, probs = 1 - alpha, na.rm = TRUE))
+    } else {
+      0.5
     }
-  )
+    list(threshold = thr, method = "empirical_quantile_fallback",
+         alpha = alpha, delta = delta)
+  }
+
+  if (length(unique(y_binary)) < 2L) {
+    return(empirical_fallback("NP threshold selection needs both classes present."))
+  }
+
+  # Genuine Neyman-Pearson threshold via nproc::npc, which controls the type-I
+  # error (1 - specificity) at <= alpha with probability >= 1 - delta. We fit on
+  # the 1-D score with method = "lda" (penlog/glmnet rejects a single predictor)
+  # and then recover the threshold ON THE SCORE SCALE from npc's own
+  # NP-controlled predictions. npc's fits[[1]]$cutoff lives on lda's internal
+  # projection scale and is NOT comparable to the probability scores we threshold
+  # against, so it cannot be used directly. Recovering min(score | predicted Yes)
+  # reproduces npc's NP decision when applied as `score >= threshold`.
+  np_err <- NULL
+  np_threshold <- tryCatch({
+    np_model <- nproc::npc(
+      x = as.matrix(scores),
+      y = y_binary,
+      method = "lda",
+      alpha = alpha,
+      delta = delta,
+      split = 1L
+    )
+    pred <- predict(np_model, as.matrix(scores))
+    pos_scores <- scores[pred$pred.label == 1]
+    if (length(pos_scores)) min(pos_scores) else NA_real_
+  }, error = function(e) {
+    np_err <<- conditionMessage(e)
+    NA_real_
+  })
+
+  # Verify the recovered threshold actually controls the type-I error on the
+  # negatives. This single check catches sign flips, boundary ties, npc errors
+  # and degeneracy (no predicted positives); only if it passes is the threshold a
+  # genuine NP threshold.
+  realized_fpr <- if (is.finite(np_threshold) && length(neg_scores) > 0L) {
+    mean(neg_scores >= np_threshold)
+  } else {
+    NA_real_
+  }
+
+  if (is.finite(np_threshold) && !is.na(realized_fpr) &&
+      realized_fpr <= alpha + 1e-8) {
+    list(threshold = as.numeric(np_threshold), method = "nproc",
+         alpha = alpha, delta = delta)
+  } else {
+    reason <- if (!is.null(np_err)) {
+      paste0("nproc::npc failed (", np_err, ").")
+    } else {
+      paste0("nproc did not yield a threshold controlling the type-I error at ",
+             "alpha = ", alpha, " on this data.")
+    }
+    empirical_fallback(reason)
+  }
 }
 
 #' Compute Per-Cohort Performance Metrics
@@ -200,6 +212,14 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
   if (!inherits(panel, "BiomarkerPanelResult")) {
     stop("`panel` must be a BiomarkerPanelResult from fit_panel().", call. = FALSE)
   }
+  if (!is.numeric(np_alpha) || length(np_alpha) != 1L ||
+      is.na(np_alpha) || np_alpha <= 0 || np_alpha >= 1) {
+    stop("`np_alpha` must be a single numeric value in (0, 1).", call. = FALSE)
+  }
+  if (!is.numeric(np_delta) || length(np_delta) != 1L ||
+      is.na(np_delta) || np_delta <= 0 || np_delta >= 1) {
+    stop("`np_delta` must be a single numeric value in (0, 1).", call. = FALSE)
+  }
 
   # Get base features and feature transform from panel
   base_features <- panel@base_features
@@ -279,57 +299,4 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
       list()
     }
   )
-}
-
-#' Predict from Fitted Model
-#'
-#' Internal helper to get predictions from either glmnet or glm model.
-#'
-#' @param model Fitted model (cv.glmnet or glm).
-#' @param newx New feature matrix for prediction.
-#' @return Numeric vector of predicted probabilities.
-#' @keywords internal
-.predict_from_model <- function(model, newx, cohort = NULL) {
-  if (inherits(model, "cv.glmnet")) {
-    # glmnet model
-    x_mat <- as.matrix(newx)
-
-    # Add cohort dummies if the model was trained with them
-    meta <- model$biomarkerPanels_meta
-    if (!is.null(meta$cohort_info)) {
-      # For prediction, we assume no cohort effect (set dummies to 0)
-      n_dummies <- meta$cohort_info$n_dummies
-      dummy_cols <- matrix(0, nrow = nrow(x_mat), ncol = n_dummies)
-      colnames(dummy_cols) <- paste0(".cohort_", seq_len(n_dummies))
-      x_mat <- cbind(x_mat, dummy_cols)
-    }
-
-    preds <- stats::predict(model,
-      newx = x_mat, s = "lambda.min",
-      type = "response"
-    )[, 1]
-  } else if (inherits(model, "glm")) {
-    # Standard GLM
-    # Note: as.data.frame.matrix() ignores check.names, so we must sanitize
-    # names explicitly to match the names used during training in
-    # .fit_final_model(), which wraps in data.frame(check.names = TRUE).
-    newdata <- as.data.frame(newx)
-    names(newdata) <- make.names(names(newdata), unique = TRUE)
-
-    # If model was trained with cohort covariate, always use reference level
-    # so predictions are cohort-agnostic (matching the glmnet path which zeros
-    # out cohort dummies). Cohort-aware metrics split by cohort downstream.
-    model_terms <- attr(stats::terms(model), "term.labels")
-    if (".cohort" %in% model_terms) {
-      ref_level <- model$xlevels[[".cohort"]][1]
-      newdata$.cohort <- factor(rep(ref_level, nrow(newdata)),
-                                levels = model$xlevels[[".cohort"]])
-    }
-
-    preds <- stats::predict(model, newdata = newdata, type = "response")
-  } else {
-    stop("Unknown model type: ", class(model)[1], call. = FALSE)
-  }
-
-  as.numeric(preds)
 }

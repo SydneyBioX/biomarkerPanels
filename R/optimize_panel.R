@@ -1,6 +1,6 @@
-#' Optimize Biomarker Panels with NSGA-II
+#' Optimize Biomarker Panels with NSGA-III / NSGA-II
 #'
-#' Wrapper around [rmoo::nsga2()] (or [rmoo::nsga3()]) that composes registered
+#' Wrapper around [rmoo::nsga3()] (or [rmoo::nsga2()]) that composes registered
 #' metric functions into a multi-objective search for compact biomarker panels.
 #' Candidate solutions are represented as weights over a feature pool; features
 #' with weight > 0.5 are included in the panel (up to `max_features`). This
@@ -49,22 +49,23 @@
 #' @param scoring_fn Function producing per-sample scores from the selected
 #'   features. Signature:
 #'   `function(x_selected, selected_features, truth, cohort = NULL, ...)`.
-#' @param algorithm Multi-objective optimization algorithm. `"NSGA-II"` (default)
-#'   uses crowding distance for diversity preservation. `"NSGA-III"` uses
-#'   reference-point-based selection for many-objective problems but has a bug
-#'   in rmoo 0.3.0 (use NSGA-II as workaround).
-#' @param nsga_control Named list of arguments passed to [rmoo::nsga2()] (or
-#'   [rmoo::nsga3()]). For NSGA-III, `n_partitions` controls reference point
+#' @param algorithm Multi-objective optimization algorithm. `"NSGA-III"`
+#'   (default) uses reference-point-based selection and gives better Pareto
+#'   front diversity for many-objective problems (3+ objectives). `"NSGA-II"`
+#'   uses crowding distance for diversity preservation and is typically
+#'   adequate for 2 objectives.
+#' @param nsga_control Named list of arguments passed to [rmoo::nsga3()] (or
+#'   [rmoo::nsga2()]). For NSGA-III, `n_partitions` controls reference point
 #'   density (default computed from number of objectives). Defaults to adaptive
 #'   values based on feature pool size. Note: `parallel = TRUE` is not recommended
 #'   as it is slower than sequential execution due to overhead.
 #' @param assay For `SummarizedExperiment` inputs, assay name or index to use.
 #' @param seed Optional integer seed for reproducibility. When provided, sets
-#'   the random seed before running NSGA-II optimization. This ensures
+#'   the random seed before running NSGA optimization. This ensures
 #'   reproducible results across runs. If `NULL` (default), no seed is set and
 #'   results may vary between runs.
 #' @param fitness_cv Logical; if `TRUE` (default), use cross-validation when
-#'   evaluating candidate solutions during NSGA-II optimization. This prevents
+#'   evaluating candidate solutions during NSGA optimization. This prevents
 #'   overfitting by computing objective metrics on held-out fold predictions
 #'   rather than in-sample predictions. Recommended for fair comparison with
 #'   regularized methods like Lasso.
@@ -77,6 +78,12 @@
 #' @param regularized_alpha Elastic net mixing parameter when `regularized = TRUE`.
 #'   `alpha = 1` is lasso, `alpha = 0` is ridge, and values in between give
 #'   elastic net. Default is 0.5 (elastic net).
+#' @param record_history Logical; if `TRUE`, capture the population, fitness,
+#'   and NSGA rank at every generation and attach the result to the returned
+#'   `OptimizationResult`. Retrieve via [nsga_history()]. Default `FALSE`.
+#'   Adds modest overhead (one matrix copy per generation) and is intended for
+#'   diagnostic / visualization use, e.g. plotting how the Pareto front
+#'   evolves over `maxiter`.
 #' @param selection_threshold Either a fixed numeric threshold in (0,1) for
 #'   feature selection, or `"adaptive"` (default) to use gap-based selection
 #'   that allows variable panel sizes in the Pareto front. Fixed thresholds
@@ -85,6 +92,12 @@
 #'   improve accuracy. Adaptive selection finds natural breakpoints in the
 #'   weight distribution, enabling the `num_features` objective to drive panel
 #'   size diversity.
+#' @param cache_fitness Logical; if `TRUE` (default), cache candidate fitness
+#'   by selected base-feature panel within each evaluation context. Set
+#'   `FALSE` for intentionally stochastic custom objectives or scoring
+#'   functions.
+#' @param cache_max_entries Maximum number of selected-panel entries retained
+#'   per fitness cache. Defaults to `Inf`.
 #' @return An `OptimizationResult` containing the Pareto-optimal solutions.
 #'   Use [summarize_solutions()] to inspect solutions and [fit_panel()] to
 #'   fit a model on a selected solution.
@@ -100,7 +113,7 @@ optimize_panel <- function(x, y,
                            feature_alignment = c("intersection", "majority", "impute_median"),
                            constraints = list(),
                            scoring_fn = NULL,
-                           algorithm = c("NSGA-II", "NSGA-III"),
+                           algorithm = c("NSGA-III", "NSGA-II"),
                            nsga_control = list(),
                            assay = NULL,
                            seed = NULL,
@@ -108,7 +121,10 @@ optimize_panel <- function(x, y,
                            fitness_cv_folds = 5L,
                            regularized = TRUE,
                            regularized_alpha = 0.5,
-                           selection_threshold = "adaptive") {
+                           selection_threshold = "adaptive",
+                           cache_fitness = TRUE,
+                           cache_max_entries = Inf,
+                           record_history = FALSE) {
   algorithm <- match.arg(algorithm)
   feature_alignment <- match.arg(feature_alignment)
   if (!requireNamespace("rmoo", quietly = TRUE)) {
@@ -129,6 +145,24 @@ optimize_panel <- function(x, y,
       call. = FALSE
     )
   }
+  if (!is.numeric(fitness_cv_folds) || length(fitness_cv_folds) != 1L ||
+      is.na(fitness_cv_folds) || fitness_cv_folds < 2L) {
+    stop("`fitness_cv_folds` must be an integer >= 2.", call. = FALSE)
+  }
+  if (!is.numeric(regularized_alpha) || length(regularized_alpha) != 1L ||
+      is.na(regularized_alpha) || regularized_alpha < 0 || regularized_alpha > 1) {
+    stop("`regularized_alpha` must be a single numeric value in [0, 1].", call. = FALSE)
+  }
+  if (!identical(selection_threshold, "adaptive")) {
+    st <- suppressWarnings(as.numeric(selection_threshold))
+    if (is.na(st) || st <= 0 || st >= 1) {
+      stop(
+        "`selection_threshold` must be \"adaptive\" or a numeric value in (0, 1).",
+        call. = FALSE
+      )
+    }
+  }
+  .validate_cache_controls(cache_fitness, cache_max_entries)
 
   inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, transform = "none",
                                        feature_alignment = feature_alignment)
@@ -270,6 +304,11 @@ optimize_panel <- function(x, y,
 
   # Create CV folds for fitness evaluation (if enabled)
   cv_fold_ids <- NULL
+  if (!fitness_cv) {
+    warning("fitness_cv = FALSE: NSGA will use in-sample scoring, which risks ",
+            "overfitting during optimization. Consider fitness_cv = TRUE for ",
+            "more reliable panel selection.", call. = FALSE)
+  }
   if (fitness_cv) {
     n_samples <- nrow(x_pool)
     if (n_samples < fitness_cv_folds * 2L) {
@@ -285,88 +324,46 @@ optimize_panel <- function(x, y,
   # min_features_for_regularized is already computed above
   min_features_required <- min_features_for_regularized
 
-  evaluate_candidate <- function(decision_vec) {
-    # feature_names_pool contains BASE feature names
-    feature_names_pool <- colnames(x_pool)
-    n_pool <- length(feature_names_pool)
+  # Shared selector and transform cache used by fitness evaluation and
+  # history materialization.
+  panel_selector <- .make_panel_selector(
+    feature_pool = colnames(x_pool),
+    max_features = max_features,
+    min_features_required = min_features_required,
+    selection_threshold = selection_threshold
+  )
+  select_base_features <- function(decision_vec) {
+    panel_selector(decision_vec)$base_features
+  }
+  transform_panel <- .make_panel_transformer(
+    matrices = list(x = x_pool),
+    feature_transform = feature_transform,
+    cache_max_entries = cache_max_entries
+  )
+  objective_cache <- .new_fitness_cache(cache_max_entries)
 
-    # Step 1: Select BASE features using decision weights
-    if (identical(selection_threshold, "adaptive")) {
-      # Adaptive: select based on largest gap in sorted weights
-      # This allows the GA to "encode" panel size in the weight distribution
-      ord <- order(decision_vec, feature_names_pool,
-                   decreasing = c(TRUE, FALSE), method = "radix")
-      sorted_weights <- decision_vec[ord]
+  cv_glm_design_terms <- NULL
+  if (fitness_cv && !is.null(cv_fold_ids) && !regularized) {
+    cv_glm_design_terms <- .prepare_cv_glm_design_terms(cohort, cv_fold_ids)
+  }
+  in_sample_glm_design_terms <- NULL
+  if (!fitness_cv && !regularized) {
+    in_sample_glm_design_terms <- .prepare_glm_design_terms(
+      cohort_train = cohort,
+      cohort_new = cohort,
+      predict_cohort = "observed"
+    )
+  }
 
-      if (n_pool > max_features) {
-        top_n <- min(max_features + 5L, n_pool)
-        weight_diffs <- -diff(sorted_weights[seq_len(top_n)])
-
-        # Find largest gap after min_features_required
-        search_range <- seq(min_features_required, top_n - 1L)
-        if (length(search_range) > 0L) {
-          gap_idx <- which.max(weight_diffs[search_range])
-          natural_cutoff <- min_features_required + gap_idx
-        } else {
-          natural_cutoff <- min_features_required
-        }
-        n_selected <- min(natural_cutoff, max_features)
-        n_selected <- max(n_selected, min_features_required)
-      } else {
-        above_median <- sum(decision_vec > 0.5)
-        n_selected <- max(min_features_required, min(above_median, max_features))
-      }
-      selected_idx <- ord[seq_len(n_selected)]
-
-    } else {
-      # Fixed threshold (backward compatible)
-      threshold <- as.numeric(selection_threshold)
-      above_threshold <- which(decision_vec > threshold)
-
-      if (length(above_threshold) < min_features_required) {
-        # Fallback: take top min_features_required by weight
-        ord <- order(decision_vec, feature_names_pool,
-                     decreasing = c(TRUE, FALSE), method = "radix")
-        selected_idx <- ord[seq_len(min(min_features_required, length(ord)))]
-      } else if (length(above_threshold) > max_features) {
-        # Cap at max_features, using feature names for reproducible tie-breaking
-        weights_above <- decision_vec[above_threshold]
-        names_above <- feature_names_pool[above_threshold]
-        ord <- order(weights_above, names_above,
-                     decreasing = c(TRUE, FALSE), method = "radix")
-        selected_idx <- above_threshold[ord[seq_len(max_features)]]
-      } else {
-        selected_idx <- above_threshold
-      }
+  evaluate_candidate <- function(decision_vec = NULL, selection = NULL) {
+    if (is.null(selection)) {
+      selection <- panel_selector(decision_vec)
     }
+    selected_base_features <- selection$base_features
 
-    # Sort by descending weight for consistent output ordering
-    selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
-    selected_base_features <- feature_names_pool[selected_idx]
-    
-    # Ensure reference feature is always passed down to the transform
-    ref_col <- attr(x_raw, "reference_feature")
-    if (!is.null(ref_col) && !(ref_col %in% selected_base_features)) {
-      selected_base_features <- c(ref_col, selected_base_features)
-    }
-    
-    x_base_selected <- x_pool[, selected_base_features, drop = FALSE]
-
-    # Restore reference_feature attribute if present on raw data
-    if (!is.null(ref_col)) {
-      attr(x_base_selected, "reference_feature") <- ref_col
-    }
-
-    # Step 2: Apply feature transform ON-THE-FLY to selected base features
-    if (feature_transform != "none" && ncol(x_base_selected) >= 2L) {
-      x_transformed <- .apply_feature_transform_single(x_base_selected, feature_transform)
-      selected_features <- colnames(x_transformed)  # e.g., "A--B" for pairwise
-      x_selected <- x_transformed
-    } else {
-      # No transform or single feature - use base features directly
-      x_selected <- x_base_selected
-      selected_features <- selected_base_features
-    }
+    transformed <- transform_panel(selected_base_features)
+    x_selected <- transformed$matrices$x
+    selected_features <- transformed$features
 
     # Step 3: Compute scores using CV (out-of-fold predictions) or in-sample
     if (fitness_cv && !is.null(cv_fold_ids)) {
@@ -377,19 +374,32 @@ optimize_panel <- function(x, y,
         fold_ids = cv_fold_ids,
         cohort = cohort,
         regularized = regularized,
-        alpha = regularized_alpha
+        alpha = regularized_alpha,
+        glm_design_terms = cv_glm_design_terms
       )
     } else {
       # In-sample scoring (for backward compatibility or small datasets)
       if (regularized || identical(scoring_fn, .default_scoring_fn)) {
-        scores <- .default_scoring_fn(
-          x_selected = x_selected,
-          selected_features = selected_features,
-          truth = truth,
-          cohort = cohort,
-          regularized = regularized,
-          alpha = regularized_alpha
-        )
+        scores <- if (!regularized) {
+          .fit_predict_binomial_glm(
+            x_train = x_selected,
+            truth = truth,
+            x_new = x_selected,
+            cohort_train = cohort,
+            cohort_new = cohort,
+            predict_cohort = "observed",
+            design_terms = in_sample_glm_design_terms
+          )
+        } else {
+          .default_scoring_fn(
+            x_selected = x_selected,
+            selected_features = selected_features,
+            truth = truth,
+            cohort = cohort,
+            regularized = regularized,
+            alpha = regularized_alpha
+          )
+        }
       } else {
         # Custom scoring function provided by user (only used when regularized = FALSE)
         score_args <- list(
@@ -409,13 +419,13 @@ optimize_panel <- function(x, y,
            call. = FALSE)
     }
 
-    # Step 4: Evaluate constraints on TRANSFORMED features
+    # Step 4: Evaluate constraints
     constraint_results <- if (length(constraint_specs)) {
       setNames(vapply(seq_along(constraint_specs), function(j) {
         res <- constraint_specs[[j]]$fun(
           truth = truth,
           scores = scores,
-          selected = selected_features,
+          selected = selected_base_features,
           cohort = cohort,
           x = x_selected
         )
@@ -427,11 +437,13 @@ optimize_panel <- function(x, y,
     feasible <- if (length(constraint_results)) all(constraint_results) else TRUE
 
     # Step 5: Evaluate objectives on TRANSFORMED features
+    # Pass base features as `selected` so metric_num_features counts genes,
+    # not pairwise ratios. Other metrics ignore `selected`.
     metrics <- vapply(objectives, function(obj) {
       obj$fun(
         truth,
         scores,
-        selected = selected_features,
+        selected = selected_base_features,
         cohort = cohort,
         x = x_selected
       )
@@ -453,39 +465,44 @@ optimize_panel <- function(x, y,
   .PENALTY <- 1e6
 
   # Evaluate a single decision vector and return converted objective values
-  evaluate_single <- function(decision_vec) {
-    evaluated <- evaluate_candidate(decision_vec)
+  evaluate_single <- function(decision_vec = NULL, selection = NULL) {
+    evaluated <- evaluate_candidate(decision_vec = decision_vec,
+                                    selection = selection)
     if (length(constraint_specs) && !evaluated$feasible) {
       return(rep(.PENALTY, length(objectives)))
     }
-    metrics <- evaluated$metrics
-    converted <- mapply(function(val, dir) {
-      # Handle NA, Inf, and -Inf explicitly
-      if (is.na(val)) {
-        return(.PENALTY)  # Treat NA as infeasible
-      }
-      if (is.infinite(val)) {
-        return(.PENALTY)
-      }
-      if (dir == "maximize") {
-        return(-val)
-      }
-      val
-    }, val = metrics, dir = objective_directions, SIMPLIFY = TRUE, USE.NAMES = FALSE)
-    as.numeric(converted)
+    .convert_metrics_to_objectives(evaluated$metrics, objective_directions,
+                                   penalty = .PENALTY)
   }
 
   # rmoo fitness function: can receive matrix (rows=individuals) or vector (single individual)
   # Must return matrix when receiving matrix input
   # Note: Accept ... to handle rmoo bug that passes reference_dirs to fitness
   objective_wrapper <- function(x, ...) {
-    if (is.null(dim(x))) {
-      # Single individual as vector
-      return(evaluate_single(x))
-    }
-    # Matrix input: evaluate each row and return matrix of objectives
-    t(apply(x, 1, evaluate_single))
+    .evaluate_fitness_population(
+      x = x,
+      selector = panel_selector,
+      evaluate_selection = function(selection) {
+        evaluate_single(selection = selection)
+      },
+      n_objectives = length(objectives),
+      cache = objective_cache,
+      cache_fitness = cache_fitness
+    )
   }
+
+  # Optional per-generation history capture. We build a closure that pushes
+  # each generation's population, fitness, and front into a parent-scope env.
+  # The decision-weight matrix is needed to reconstruct base_features post-run
+  # (we don't compute features inside the monitor to keep per-iter overhead low).
+  # The capture machinery is shared with optimize_panel_transferable() via
+  # nsga_history_utils.R.
+  history_buffer <- .make_history_buffer()
+  history_monitor <- .make_history_monitor(
+    history_buffer, objective_directions, names(objectives)
+  )
+
+  monitor_arg <- if (isTRUE(record_history)) history_monitor else FALSE
 
   nsga_params <- c(
     list(
@@ -494,7 +511,7 @@ optimize_panel <- function(x, y,
       nObj = length(objectives),
       lower = rep(0, decision_dim),
       upper = rep(1, decision_dim),
-      monitor = FALSE,
+      monitor = monitor_arg,
       summary = FALSE
     ),
     nsga_args
@@ -558,6 +575,14 @@ optimize_panel <- function(x, y,
   metric_matrix <- do.call(rbind, lapply(solutions, `[[`, "metrics"))
   colnames(metric_matrix) <- names(objectives)
 
+  # Post-filter dominated solutions: re-evaluation may shift metrics (e.g. due
+
+  # to non-deterministic inner CV in glmnet), introducing dominated solutions
+  # into what was originally a rank-1 front.
+  nondom_idx <- .filter_dominated(metric_matrix, objective_directions)
+  solutions <- solutions[nondom_idx]
+  metric_matrix <- metric_matrix[nondom_idx, , drop = FALSE]
+
   # Build solutions data frame in wide format (one row per solution)
   solutions_df <- data.frame(
     solution_id = seq_along(solutions),
@@ -595,6 +620,8 @@ optimize_panel <- function(x, y,
     # Store seed for reproducibility documentation
     seed = seed,
     selection_threshold = selection_threshold,
+    cache_fitness = cache_fitness,
+    cache_max_entries = cache_max_entries,
     regularized = regularized,
     regularized_alpha = if (regularized) regularized_alpha else NULL,
     objective_directions = objective_directions
@@ -612,6 +639,15 @@ optimize_panel <- function(x, y,
     cohort_counts = inputs$cohort_counts
   )
 
+  # Materialize per-generation history if it was captured. For each individual
+  # we run the same selection logic the optimizer used to derive base_features,
+  # so the recorded panels exactly match what NSGA was scoring.
+  history_out <- if (isTRUE(record_history)) {
+    .materialize_history(history_buffer, select_base_features)
+  } else {
+    list()
+  }
+
   # Return OptimizationResult (no model fitting)
   # Note: aggregated_x now stores RAW (untransformed) base features
   # Transform is applied on-the-fly during fit_panel() and evaluate_panel()
@@ -623,6 +659,7 @@ optimize_panel <- function(x, y,
     training_signature = training_signature,
     aggregated_x = x_pool,  # Raw base features (transform applied later)
     aggregated_y = truth,
-    aggregated_cohort = cohort
+    aggregated_cohort = cohort,
+    history = history_out
   )
 }

@@ -117,6 +117,11 @@ evaluate_panel_by_cohort <- function(panel,
     x_base <- xi[, base_features, drop = FALSE]
     if (feature_transform != "none" && length(base_features) >= 2L) {
       x_selected <- .apply_feature_transform_single(x_base, feature_transform)
+      # CPOP-style panels store a subset of all possible pair features; subset
+      # the transformed matrix to match the model's expected columns.
+      if (length(features) && all(features %in% colnames(x_selected))) {
+        x_selected <- x_selected[, features, drop = FALSE]
+      }
     } else {
       x_selected <- x_base
     }
@@ -148,7 +153,12 @@ evaluate_panel_by_cohort <- function(panel,
                      cohort_names[i], conditionMessage(e)), call. = FALSE)
       })
     } else {
-      scores <- .default_scoring_fn(x_selected, features, yi)
+      stop(
+        "Cohort '", cohort_names[i], "': panel has no fitted model. ",
+        "Use fit_panel() to fit a model before evaluate_panel_by_cohort() ",
+        "(refitting on the evaluation data would report leaky in-sample metrics).",
+        call. = FALSE
+      )
     }
 
     n_pos <- sum(yi == positive)

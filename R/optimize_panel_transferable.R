@@ -36,8 +36,42 @@
 #' @param seed Optional integer seed for reproducibility.
 #' @param regularized Logical; if `TRUE` (default), use regularized regression.
 #' @param regularized_alpha Elastic net mixing parameter (default 0.5).
+#' @param selection_threshold Either a fixed numeric threshold in (0,1) for
+#'   feature selection, or `"adaptive"` (default) to use gap-based selection
+#'   that allows variable panel sizes in the Pareto front. See
+#'   [optimize_panel()] for details.
 #' @param n_top_features Number of top features to select via
 #'   `select_transferable_features()` when `feature_pool` is NULL (default 50).
+#' @param fitness_mode Fitness-evaluation strategy:
+#'   `"within_cohort_val"` (default) trains on the combined train partition and
+#'   evaluates on the combined validation partition — both partitions contain
+#'   samples from every cohort, so a candidate can win by fitting
+#'   within-cohort structure. `"within_cohort_rotating"` pools train and
+#'   validation samples, pre-computes `n_val_splits` stratified train/val
+#'   splits, and rotates to the next split every NSGA generation. This is
+#'   the MOO analogue of mini-batch SGD: no single split can be overfit to,
+#'   and final Pareto-solution metrics are averaged across all K splits for
+#'   an honest cross-split number. Feature selection still runs on the
+#'   original training partition only, so held-out labels never influence
+#'   the feature pool. `"loco"` (leave-one-cohort-out) ignores the
+#'   validation partition and pools train+val per cohort; each candidate is
+#'   scored by iteratively training on all-but-one cohort and predicting on the
+#'   held-out cohort. Metrics are computed on the concatenated out-of-cohort
+#'   predictions, making cross-cohort transferability the objective NSGA
+#'   actually optimizes for. Requires `>=2` cohorts.
+#' @param n_val_splits Number of rotating train/val splits to pre-compute
+#'   when `fitness_mode = "within_cohort_rotating"` (default 10).
+#' @param cache_fitness Logical; if `TRUE` (default), cache candidate fitness
+#'   by selected base-feature panel within each validation context. Set
+#'   `FALSE` for intentionally stochastic custom objectives.
+#' @param cache_max_entries Maximum number of selected-panel entries retained
+#'   per fitness cache. Defaults to `Inf`.
+#' @param record_history Logical; if `TRUE`, capture the population, fitness,
+#'   and NSGA rank at every generation and attach the result to the returned
+#'   `OptimizationResult`. Retrieve via [nsga_history()]. Default `FALSE`.
+#'   Adds modest overhead (one matrix copy per generation) and is intended for
+#'   diagnostic / visualization use, e.g. plotting how the Pareto front
+#'   evolves over `maxiter`.
 #' @return An `OptimizationResult` containing Pareto-optimal solutions and
 #'   held-out data for downstream calibration. Use [summarize_solutions()] to
 #'   inspect solutions, [fit_panel()] to fit a model, [calibrate_panel()] for
@@ -65,9 +99,24 @@ optimize_panel_transferable <- function(
   seed = NULL,
   regularized = TRUE,
   regularized_alpha = 0.5,
-  n_top_features = 50L
+  selection_threshold = "adaptive",
+  n_top_features = 50L,
+  fitness_mode = c("within_cohort_val", "within_cohort_rotating", "loco"),
+  n_val_splits = 10L,
+  cache_fitness = TRUE,
+  cache_max_entries = Inf,
+  record_history = FALSE
 ) {
   algorithm <- match.arg(algorithm)
+  fitness_mode <- match.arg(fitness_mode)
+
+  if (fitness_mode == "within_cohort_rotating") {
+    if (!is.numeric(n_val_splits) || length(n_val_splits) != 1L ||
+        is.na(n_val_splits) || n_val_splits < 2L) {
+      stop("`n_val_splits` must be an integer >= 2.", call. = FALSE)
+    }
+    n_val_splits <- as.integer(n_val_splits)
+  }
 
   # Validate inputs
   if (!is.list(x) || length(x) < 1L) {
@@ -76,6 +125,22 @@ optimize_panel_transferable <- function(
   if (!is.list(y) || length(y) != length(x)) {
     stop("`y` must be a list of response vectors matching `x`.", call. = FALSE)
   }
+
+  # Validate numeric parameters
+  if (!is.numeric(regularized_alpha) || length(regularized_alpha) != 1L ||
+      is.na(regularized_alpha) || regularized_alpha < 0 || regularized_alpha > 1) {
+    stop("`regularized_alpha` must be a single numeric value in [0, 1].", call. = FALSE)
+  }
+  if (!identical(selection_threshold, "adaptive")) {
+    st <- suppressWarnings(as.numeric(selection_threshold))
+    if (is.na(st) || st <= 0 || st >= 1) {
+      stop(
+        "`selection_threshold` must be \"adaptive\" or a numeric value in (0, 1).",
+        call. = FALSE
+      )
+    }
+  }
+  .validate_cache_controls(cache_fitness, cache_max_entries)
 
   # 1. Validate partition ratios
   .validate_partition_ratios(train_ratio, val_ratio)
@@ -133,28 +198,133 @@ optimize_panel_transferable <- function(
     min_features_required <- 1L
   }
 
-  # 5. Create validation-based fitness function (base-feature-first)
-  fitness_fn <- .make_validation_fitness(
-    train_x = train_inputs$x,
-    train_y = train_inputs$truth,
-    train_cohort = train_inputs$cohort,
-    val_x = val_inputs$x,
-    val_y = val_inputs$truth,
-    val_cohort = val_inputs$cohort,
-    feature_pool = base_feature_pool,
-    max_features = max_features,
-    objectives = objectives,
-    constraints = constraints,
-    regularized = regularized,
-    alpha = regularized_alpha,
-    feature_transform = feature_transform,
-    min_features_required = min_features_required
-  )
+  # 5. Create fitness function (base-feature-first)
+  if (fitness_mode == "within_cohort_rotating") {
+    # Pool train + val; pre-compute K stratified splits and rotate per
+    # generation so no single split can be overfit to. Feature pool was
+    # already selected on the ORIGINAL train partition only, so held-out
+    # labels never reach feature selection.
+    pool_x <- rbind(train_inputs$x, val_inputs$x)
+    pool_y <- factor(
+      c(as.character(train_inputs$truth), as.character(val_inputs$truth)),
+      levels = levels(train_inputs$truth)
+    )
+    pool_cohort <- factor(
+      c(as.character(train_inputs$cohort), as.character(val_inputs$cohort)),
+      levels = unique(c(levels(train_inputs$cohort), levels(val_inputs$cohort)))
+    )
+    split_val_ratio <- val_ratio / (train_ratio + val_ratio)
+    rotating_splits <- .generate_stratified_splits(
+      y = pool_y,
+      cohort = pool_cohort,
+      n_splits = n_val_splits,
+      val_ratio = split_val_ratio,
+      seed = seed
+    )
+    fitness_fn <- .make_rotating_validation_fitness(
+      pool_x = pool_x,
+      pool_y = pool_y,
+      pool_cohort = pool_cohort,
+      splits = rotating_splits,
+      feature_pool = base_feature_pool,
+      max_features = max_features,
+      objectives = objectives,
+      constraints = constraints,
+      regularized = regularized,
+      alpha = regularized_alpha,
+      feature_transform = feature_transform,
+      min_features_required = min_features_required,
+      selection_threshold = selection_threshold,
+      cache_fitness = cache_fitness,
+      cache_max_entries = cache_max_entries
+    )
+  } else if (fitness_mode == "loco") {
+    # Pool train+val per cohort; LOCO loop provides the held-out evaluation.
+    loco_x <- rbind(train_inputs$x, val_inputs$x)
+    loco_y <- factor(
+      c(as.character(train_inputs$truth), as.character(val_inputs$truth)),
+      levels = levels(train_inputs$truth)
+    )
+    loco_cohort <- factor(
+      c(as.character(train_inputs$cohort), as.character(val_inputs$cohort)),
+      levels = unique(c(levels(train_inputs$cohort), levels(val_inputs$cohort)))
+    )
+    if (nlevels(droplevels(loco_cohort)) < 2L) {
+      stop(
+        "fitness_mode = 'loco' requires >=2 cohorts but only ",
+        nlevels(droplevels(loco_cohort)),
+        " was available after partitioning.",
+        call. = FALSE
+      )
+    }
+    fitness_fn <- .make_loco_fitness(
+      x = loco_x,
+      y = loco_y,
+      cohort = loco_cohort,
+      feature_pool = base_feature_pool,
+      max_features = max_features,
+      objectives = objectives,
+      constraints = constraints,
+      regularized = regularized,
+      alpha = regularized_alpha,
+      feature_transform = feature_transform,
+      min_features_required = min_features_required,
+      selection_threshold = selection_threshold,
+      cache_fitness = cache_fitness,
+      cache_max_entries = cache_max_entries
+    )
+  } else {
+    fitness_fn <- .make_validation_fitness(
+      train_x = train_inputs$x,
+      train_y = train_inputs$truth,
+      train_cohort = train_inputs$cohort,
+      val_x = val_inputs$x,
+      val_y = val_inputs$truth,
+      val_cohort = val_inputs$cohort,
+      feature_pool = base_feature_pool,
+      max_features = max_features,
+      objectives = objectives,
+      constraints = constraints,
+      regularized = regularized,
+      alpha = regularized_alpha,
+      feature_transform = feature_transform,
+      min_features_required = min_features_required,
+      selection_threshold = selection_threshold,
+      cache_fitness = cache_fitness,
+      cache_max_entries = cache_max_entries
+    )
+  }
 
   # 6. Get NSGA defaults and run optimization
   decision_dim <- length(base_feature_pool)
   nsga_defaults <- .get_adaptive_nsga_defaults(decision_dim, algorithm)
   nsga_args <- utils::modifyList(nsga_defaults, nsga_control)
+
+  # Hoisted: needed both by the per-generation history monitor (to convert
+  # minimised fitness back to user-facing direction) and by the post-run
+  # dominance filter further down.
+  objective_directions <- vapply(objectives, `[[`, character(1), "direction")
+
+  # Same shared selector used by the fitness factories, materialized here for
+  # per-generation history.
+  panel_selector <- .make_panel_selector(
+    feature_pool = base_feature_pool,
+    max_features = max_features,
+    min_features_required = min_features_required,
+    selection_threshold = selection_threshold
+  )
+  select_base_features <- function(decision_vec) {
+    panel_selector(decision_vec)$base_features
+  }
+
+  # Optional per-generation history capture (see optimize_panel() for rationale).
+  # Shared machinery lives in nsga_history_utils.R.
+  history_buffer <- .make_history_buffer()
+  history_monitor <- .make_history_monitor(
+    history_buffer, objective_directions, names(objectives)
+  )
+
+  monitor_arg <- if (isTRUE(record_history)) history_monitor else FALSE
 
   nsga_params <- c(
     list(
@@ -163,7 +333,7 @@ optimize_panel_transferable <- function(
       nObj = length(objectives),
       lower = rep(0, decision_dim),
       upper = rep(1, decision_dim),
-      monitor = FALSE,
+      monitor = monitor_arg,
       summary = FALSE
     ),
     nsga_args
@@ -171,6 +341,19 @@ optimize_panel_transferable <- function(
 
   if (algorithm == "NSGA-III" && is.null(nsga_args$n_partitions)) {
     nsga_params$n_partitions <- .compute_nsga3_partitions(length(objectives))
+  }
+
+  # Seed initial population with diverse panel sizes
+  n_suggestions <- min(20L, nsga_args$popSize %/% 4L)
+  if (n_suggestions >= 2L) {
+    sparse_suggestions <- .generate_sparse_suggestions(
+      n_features = decision_dim,
+      n_suggestions = n_suggestions,
+      min_features = min_features_required,
+      max_features = max_features,
+      seed = seed
+    )
+    nsga_params$suggestions <- sparse_suggestions
   }
 
   message("Running ", algorithm, " optimization...")
@@ -198,9 +381,13 @@ optimize_panel_transferable <- function(
   }
   solutions <- solutions[feasible_vec]
 
-  objective_directions <- vapply(objectives, `[[`, character(1), "direction")
   metric_matrix <- do.call(rbind, lapply(solutions, `[[`, "metrics"))
   colnames(metric_matrix) <- names(objectives)
+
+  # Post-filter dominated solutions (see .filter_dominated docs)
+  nondom_idx <- .filter_dominated(metric_matrix, objective_directions)
+  solutions <- solutions[nondom_idx]
+  metric_matrix <- metric_matrix[nondom_idx, , drop = FALSE]
 
   # Build solutions data frame (all Pareto solutions)
   solutions_df <- data.frame(
@@ -235,9 +422,13 @@ optimize_panel_transferable <- function(
     positive_class = "Yes",
     response_levels = levels(train_inputs$truth),
     seed = seed,
-    selection_threshold = 0.5,
+    selection_threshold = selection_threshold,
+    cache_fitness = cache_fitness,
+    cache_max_entries = cache_max_entries,
     regularized = regularized,
     regularized_alpha = if (regularized) regularized_alpha else NULL,
+    fitness_mode = fitness_mode,
+    n_val_splits = if (fitness_mode == "within_cohort_rotating") n_val_splits else NULL,
     objective_directions = objective_directions,
     # Transferable-specific: held-out data for calibrate_panel()
     heldout_x = heldout_inputs$x,
@@ -263,6 +454,13 @@ optimize_panel_transferable <- function(
     cohort_labels = partitions$cohort_names
   )
 
+  # Materialize per-generation history if it was captured.
+  history_out <- if (isTRUE(record_history)) {
+    .materialize_history(history_buffer, select_base_features)
+  } else {
+    list()
+  }
+
   new("OptimizationResult",
       solutions = solutions_df,
       feature_pool = base_feature_pool,
@@ -270,186 +468,6 @@ optimize_panel_transferable <- function(
       training_signature = training_signature,
       aggregated_x = combined_x,
       aggregated_y = combined_y,
-      aggregated_cohort = combined_cohort)
-}
-
-
-# -----------------------------------------------------------------------------
-# Helper Functions
-# -----------------------------------------------------------------------------
-
-#' Create Validation-Based Fitness Function (Base-Feature-First)
-#'
-#' Factory that returns a fitness function for rmoo that selects base features,
-#' applies feature transforms on-the-fly, trains on training data, and
-#' evaluates objectives on validation data.
-#'
-#' @param train_x Training feature matrix (base features).
-#' @param train_y Training response factor.
-#' @param train_cohort Training cohort factor.
-#' @param val_x Validation feature matrix (base features).
-#' @param val_y Validation response factor.
-#' @param val_cohort Validation cohort factor.
-#' @param feature_pool Character vector of base feature names.
-#' @param max_features Maximum base features to include.
-#' @param objectives Objective list from define_objectives().
-#' @param constraints Constraint list.
-#' @param regularized Whether to use regularized regression.
-#' @param alpha Elastic net mixing parameter.
-#' @param feature_transform Name of the feature transform to apply.
-#' @param min_features_required Minimum number of base features.
-#' @return List with `wrapper` (fitness for rmoo) and `evaluate` (full eval).
-#' @keywords internal
-.make_validation_fitness <- function(
-  train_x, train_y, train_cohort,
-  val_x, val_y, val_cohort,
-  feature_pool, max_features, objectives, constraints,
-  regularized, alpha,
-  feature_transform = "none",
-  min_features_required = NULL
-) {
-  objective_directions <- vapply(objectives, `[[`, character(1), "direction")
-  constraint_specs <- .normalize_constraints(constraints)
-
-  if (is.null(min_features_required)) {
-    min_features_required <- if (regularized) 2L else 1L
-  }
-
-  evaluate_candidate <- function(decision_vec) {
-    feature_names_pool <- feature_pool
-    above_threshold <- which(decision_vec > 0.5)
-
-    if (length(above_threshold) < min_features_required) {
-      ord <- order(decision_vec, feature_names_pool,
-        decreasing = c(TRUE, FALSE),
-        method = "radix"
-      )
-      selected_idx <- ord[seq_len(min(min_features_required, length(ord)))]
-    } else if (length(above_threshold) > max_features) {
-      weights_above <- decision_vec[above_threshold]
-      names_above <- feature_names_pool[above_threshold]
-      ord <- order(weights_above, names_above,
-        decreasing = c(TRUE, FALSE),
-        method = "radix"
-      )
-      selected_idx <- above_threshold[ord[seq_len(max_features)]]
-    } else {
-      selected_idx <- above_threshold
-    }
-
-    selected_idx <- selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
-    selected_base_features <- feature_names_pool[selected_idx]
-
-    # Extract base features from both sets
-    x_train_base <- train_x[, selected_base_features, drop = FALSE]
-    x_val_base <- val_x[, selected_base_features, drop = FALSE]
-
-    # Apply transform on-the-fly (mirrors optimize_panel.R)
-    if (feature_transform != "none" && ncol(x_train_base) >= 2L) {
-      x_train_sel <- .apply_feature_transform_single(x_train_base, feature_transform)
-      x_val_sel <- .apply_feature_transform_single(x_val_base, feature_transform)
-      selected_features <- colnames(x_train_sel)
-    } else {
-      x_train_sel <- x_train_base
-      x_val_sel <- x_val_base
-      selected_features <- selected_base_features
-    }
-
-    tryCatch(
-      {
-        if (regularized) {
-          fit <- .fit_final_model_regularized(
-            x_train_sel, train_y, train_cohort,
-            alpha = alpha
-          )
-        } else {
-          fit <- .fit_final_model(x_train_sel, train_y, train_cohort)
-        }
-
-        # Predict on validation data
-        val_scores <- .predict_from_model(fit, x_val_sel, cohort = val_cohort)
-
-        # Compute constraints on validation data
-        constraint_results <- if (length(constraint_specs)) {
-          setNames(vapply(seq_along(constraint_specs), function(j) {
-            res <- constraint_specs[[j]]$fun(
-              truth = val_y,
-              scores = val_scores,
-              selected = selected_features,
-              cohort = val_cohort,
-              x = x_val_sel
-            )
-            isTRUE(res)
-          }, logical(1)), vapply(constraint_specs, `[[`, character(1), "label"))
-        } else {
-          logical(0)
-        }
-
-        feasible <- if (length(constraint_results)) all(constraint_results) else TRUE
-
-        metrics <- vapply(objectives, function(obj) {
-          obj$fun(
-            val_y,
-            val_scores,
-            selected = selected_features,
-            cohort = val_cohort,
-            x = x_val_sel
-          )
-        }, numeric(1))
-
-        list(
-          base_features = selected_base_features,
-          features = selected_features,
-          scores = val_scores,
-          metrics = metrics,
-          constraint_results = constraint_results,
-          feasible = feasible
-        )
-      },
-      error = function(e) {
-        list(
-          base_features = selected_base_features,
-          features = selected_features,
-          scores = rep(0.5, nrow(val_x)),
-          metrics = setNames(rep(Inf, length(objectives)), names(objectives)),
-          constraint_results = logical(0),
-          feasible = length(constraint_specs) == 0L
-        )
-      }
-    )
-  }
-
-  # Large finite penalty instead of Inf -- NSGA-III normalization produces NaN
-  # from Inf values, causing "missing value where TRUE/FALSE needed" errors
-  .PENALTY <- 1e6
-
-  evaluate_single <- function(decision_vec) {
-    evaluated <- evaluate_candidate(decision_vec)
-    if (length(constraint_specs) && !evaluated$feasible) {
-      return(rep(.PENALTY, length(objectives)))
-    }
-    metrics <- evaluated$metrics
-    converted <- mapply(function(val, dir) {
-      if (is.na(val) || is.infinite(val)) {
-        return(.PENALTY)
-      }
-      if (dir == "maximize") {
-        return(-val)
-      }
-      val
-    }, val = metrics, dir = objective_directions, SIMPLIFY = TRUE, USE.NAMES = FALSE)
-    as.numeric(converted)
-  }
-
-  objective_wrapper <- function(x, ...) {
-    if (is.null(dim(x))) {
-      return(evaluate_single(x))
-    }
-    t(apply(x, 1, evaluate_single))
-  }
-
-  list(
-    wrapper = objective_wrapper,
-    evaluate = evaluate_candidate
-  )
+      aggregated_cohort = combined_cohort,
+      history = history_out)
 }

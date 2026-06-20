@@ -24,7 +24,13 @@ optimize_panel_transferable(
   seed = NULL,
   regularized = TRUE,
   regularized_alpha = 0.5,
-  n_top_features = 50L
+  selection_threshold = "adaptive",
+  n_top_features = 50L,
+  fitness_mode = c("within_cohort_val", "within_cohort_rotating", "loco"),
+  n_val_splits = 10L,
+  cache_fitness = TRUE,
+  cache_max_entries = Inf,
+  record_history = FALSE
 )
 }
 \arguments{
@@ -72,8 +78,48 @@ on-the-fly during optimization (default \code{"pairwise_ratios"}). See
 
 \item{regularized_alpha}{Elastic net mixing parameter (default 0.5).}
 
+\item{selection_threshold}{Either a fixed numeric threshold in (0,1) for
+feature selection, or \code{"adaptive"} (default) to use gap-based selection
+that allows variable panel sizes in the Pareto front. See
+\code{\link[=optimize_panel]{optimize_panel()}} for details.}
+
 \item{n_top_features}{Number of top features to select via
 \code{select_transferable_features()} when \code{feature_pool} is NULL (default 50).}
+
+\item{fitness_mode}{Fitness-evaluation strategy:
+\code{"within_cohort_val"} (default) trains on the combined train partition and
+evaluates on the combined validation partition — both partitions contain
+samples from every cohort, so a candidate can win by fitting
+within-cohort structure. \code{"within_cohort_rotating"} pools train and
+validation samples, pre-computes \code{n_val_splits} stratified train/val
+splits, and rotates to the next split every NSGA generation. This is
+the MOO analogue of mini-batch SGD: no single split can be overfit to,
+and final Pareto-solution metrics are averaged across all K splits for
+an honest cross-split number. Feature selection still runs on the
+original training partition only, so held-out labels never influence
+the feature pool. \code{"loco"} (leave-one-cohort-out) ignores the
+validation partition and pools train+val per cohort; each candidate is
+scored by iteratively training on all-but-one cohort and predicting on the
+held-out cohort. Metrics are computed on the concatenated out-of-cohort
+predictions, making cross-cohort transferability the objective NSGA
+actually optimizes for. Requires \verb{>=2} cohorts.}
+
+\item{n_val_splits}{Number of rotating train/val splits to pre-compute
+when \code{fitness_mode = "within_cohort_rotating"} (default 10).}
+
+\item{cache_fitness}{Logical; if \code{TRUE} (default), cache candidate fitness
+by selected base-feature panel within each validation context. Set
+\code{FALSE} for intentionally stochastic custom objectives.}
+
+\item{cache_max_entries}{Maximum number of selected-panel entries retained
+per fitness cache. Defaults to \code{Inf}.}
+
+\item{record_history}{Logical; if \code{TRUE}, capture the population, fitness,
+and NSGA rank at every generation and attach the result to the returned
+\code{OptimizationResult}. Retrieve via \code{\link[=nsga_history]{nsga_history()}}. Default \code{FALSE}.
+Adds modest overhead (one matrix copy per generation) and is intended for
+diagnostic / visualization use, e.g. plotting how the Pareto front
+evolves over \code{maxiter}.}
 }
 \value{
 An \code{OptimizationResult} containing Pareto-optimal solutions and

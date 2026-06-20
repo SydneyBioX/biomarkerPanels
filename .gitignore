@@ -12,10 +12,6 @@ src/*.dll
 # analysis
 analysis/
 
-# claude related files
-CLAUDE.md
-.claude
-
 # R documentation
 helper-docs/
 refs/

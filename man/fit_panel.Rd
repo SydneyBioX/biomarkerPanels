@@ -14,8 +14,7 @@ fit_panel(
   regularized = TRUE,
   regularized_alpha = 0.5,
   cv = FALSE,
-  cv_folds = 5L,
-  validate_fitness = TRUE
+  cv_folds = 5L
 )
 }
 \arguments{
@@ -48,10 +47,6 @@ model (only applies when \code{regularized = FALSE}). Default is \code{FALSE}.}
 
 \item{cv_folds}{Number of cross-validation folds when \code{cv = TRUE}.
 Default is 5.}
-
-\item{validate_fitness}{Logical; if \code{TRUE} (default), recomputes metrics on
-the training data after model fitting to verify consistency with the
-optimization results. Issues a warning if metrics differ substantially.}
 }
 \value{
 A \code{BiomarkerPanelResult} with the fitted model.

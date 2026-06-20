@@ -4,7 +4,7 @@
 \alias{cv_scoring}
 \title{Cross-Validation Scoring Functions}
 \description{
-Internal functions for computing cross-validated scores during NSGA-II
+Internal functions for computing cross-validated scores during NSGA
 optimization. These functions prevent overfitting by using out-of-fold
 predictions for fitness evaluation.
 }

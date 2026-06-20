@@ -13,7 +13,7 @@ summarize_solutions(optimization_result)
 A data frame with columns:
 \describe{
 \item{solution_id}{Integer ID of the solution.}
-\item{n_features}{Number of features in the solution.}
+\item{n_features}{Number of base features (individual genes) in the solution, not ratio pairs.}
 \item{...}{One column per objective with numeric values.}
 }
 }

@@ -1,6 +1,6 @@
 #' Final Model Fitting Functions
 #'
-#' Internal functions for fitting the final model after NSGA-II optimization
+#' Internal functions for fitting the final model after NSGA optimization
 #' has selected the best features. These models are stored in the
 #' BiomarkerPanelResult object for use in evaluation.
 #'
@@ -63,7 +63,11 @@ NULL
 
   n <- nrow(x_selected)
   if (n < cv_folds * 2L) {
-    # Not enough data for CV, fall back to standard fitting
+    warning(
+      "Too few samples (n=", n, ") for ", cv_folds, "-fold CV. ",
+      "Falling back to standard (non-CV) model fitting.",
+      call. = FALSE
+    )
     return(.fit_final_model(x_selected, truth, cohort))
   }
 
@@ -88,7 +92,13 @@ NULL
 
       fold_fit <- tryCatch(
         stats::glm(.response ~ ., data = train_df, family = stats::binomial()),
-        error = function(e) NULL
+        error = function(e) {
+          warning(
+            sprintf("CV fold %d/%d failed: %s", fold, cv_folds, conditionMessage(e)),
+            call. = FALSE
+          )
+          NULL
+        }
       )
 
       if (!is.null(fold_fit)) {
@@ -120,6 +130,16 @@ NULL
       }, numeric(1))
       mean(vals, na.rm = TRUE)
     }, numeric(1))
+
+    non_finite <- names(avg_coefs)[!is.finite(avg_coefs)]
+    if (length(non_finite) > 0L) {
+      stop(
+        "CV averaging produced non-finite coefficients for: ",
+        paste(non_finite, collapse = ", "),
+        ". This typically means all CV folds failed for these terms.",
+        call. = FALSE
+      )
+    }
 
     # Fit final model on all data to get the model object, then replace coefficients
     full_fit <- stats::glm(.response ~ ., data = df, family = stats::binomial())
@@ -229,9 +249,6 @@ NULL
 #'   model (only applies when `regularized = FALSE`). Default is `FALSE`.
 #' @param cv_folds Number of cross-validation folds when `cv = TRUE`.
 #'   Default is 5.
-#' @param validate_fitness Logical; if `TRUE` (default), recomputes metrics on
-#'   the training data after model fitting to verify consistency with the
-#'   optimization results. Issues a warning if metrics differ substantially.
 #' @return A `BiomarkerPanelResult` with the fitted model.
 #' @export
 #' @seealso [optimize_panel()], [evaluate_panel()]
@@ -261,8 +278,7 @@ fit_panel <- function(optimization_result,
                       regularized = TRUE,
                       regularized_alpha = 0.5,
                       cv = FALSE,
-                      cv_folds = 5L,
-                      validate_fitness = TRUE) {
+                      cv_folds = 5L) {
 
   if (!inherits(optimization_result, "OptimizationResult")) {
     stop("`optimization_result` must be an OptimizationResult from optimize_panel().",
@@ -272,6 +288,14 @@ fit_panel <- function(optimization_result,
   solutions_df <- optimization_result@solutions
   if (nrow(solutions_df) == 0L) {
     stop("OptimizationResult contains no solutions.", call. = FALSE)
+  }
+  if (!is.numeric(regularized_alpha) || length(regularized_alpha) != 1L ||
+      is.na(regularized_alpha) || regularized_alpha < 0 || regularized_alpha > 1) {
+    stop("`regularized_alpha` must be a single numeric value in [0, 1].", call. = FALSE)
+  }
+  if (!is.numeric(cv_folds) || length(cv_folds) != 1L ||
+      is.na(cv_folds) || cv_folds < 2L) {
+    stop("`cv_folds` must be an integer >= 2.", call. = FALSE)
   }
 
   # Determine which features to use
@@ -445,4 +469,57 @@ fit_panel <- function(optimization_result,
   )
 
   panel
+}
+
+#' Predict from Fitted Model
+#'
+#' Internal helper to get predictions from either glmnet or glm model.
+#'
+#' @param model Fitted model (cv.glmnet or glm).
+#' @param newx New feature matrix for prediction.
+#' @return Numeric vector of predicted probabilities.
+#' @keywords internal
+.predict_from_model <- function(model, newx, cohort = NULL) {
+  if (inherits(model, "cv.glmnet")) {
+    # glmnet model
+    x_mat <- as.matrix(newx)
+
+    # Add cohort dummies if the model was trained with them
+    meta <- model$biomarkerPanels_meta
+    if (!is.null(meta$cohort_info)) {
+      # For prediction, we assume no cohort effect (set dummies to 0)
+      n_dummies <- meta$cohort_info$n_dummies
+      dummy_cols <- matrix(0, nrow = nrow(x_mat), ncol = n_dummies)
+      colnames(dummy_cols) <- paste0(".cohort_", seq_len(n_dummies))
+      x_mat <- cbind(x_mat, dummy_cols)
+    }
+
+    preds <- stats::predict(model,
+      newx = x_mat, s = "lambda.min",
+      type = "response"
+    )[, 1]
+  } else if (inherits(model, "glm")) {
+    # Standard GLM
+    # Note: as.data.frame.matrix() ignores check.names, so we must sanitize
+    # names explicitly to match the names used during training in
+    # .fit_final_model(), which wraps in data.frame(check.names = TRUE).
+    newdata <- as.data.frame(newx)
+    names(newdata) <- make.names(names(newdata), unique = TRUE)
+
+    # If model was trained with cohort covariate, always use reference level
+    # so predictions are cohort-agnostic (matching the glmnet path which zeros
+    # out cohort dummies). Cohort-aware metrics split by cohort downstream.
+    model_terms <- attr(stats::terms(model), "term.labels")
+    if (".cohort" %in% model_terms) {
+      ref_level <- model$xlevels[[".cohort"]][1]
+      newdata$.cohort <- factor(rep(ref_level, nrow(newdata)),
+                                levels = model$xlevels[[".cohort"]])
+    }
+
+    preds <- stats::predict(model, newdata = newdata, type = "response")
+  } else {
+    stop("Unknown model type: ", class(model)[1], call. = FALSE)
+  }
+
+  as.numeric(preds)
 }

@@ -11,7 +11,7 @@ NULL
 #' Prepare Cohort Inputs for Optimization
 #'
 #' Main internal function that processes input data (single or multi-cohort)
-#' and prepares it for NSGA-II optimization. Handles feature extraction,
+#' and prepares it for NSGA optimization. Handles feature extraction,
 #' alignment, transformation, and response standardization.
 #'
 #' @param x Matrix-like object, SummarizedExperiment, or list of such objects.
@@ -252,7 +252,7 @@ NULL
     if (is.null(assay)) {
       assay <- assays[1]
     }
-    return(SummarizedExperiment::assay(x, assay))
+    return(t(SummarizedExperiment::assay(x, assay)))
   }
   if (is.data.frame(x)) {
     x <- as.matrix(x)
@@ -260,6 +260,87 @@ NULL
   if (!is.matrix(x)) {
     stop("`x` must be a matrix-like object.", call. = FALSE)
   }
+  na_before <- sum(is.na(x))
   mode(x) <- "numeric"
+  na_after <- sum(is.na(x))
+  if (na_after > na_before) {
+    warning(
+      "Coercing matrix to numeric introduced ",
+      na_after - na_before, " NA value(s). ",
+      "Check that input data contains only numeric values.",
+      call. = FALSE
+    )
+  }
   x
+}
+
+#' Prepare Inputs for Ridge Regression
+#'
+#' Extracts feature matrices and responses from cohort lists, aligns features
+#' across cohorts via intersection, and converts responses to binary integers.
+#'
+#' @param x_list A matrix, `SummarizedExperiment`, or list of such objects.
+#' @param y_list A binary response aligned with `x_list`.
+#' @param assay For `SummarizedExperiment` inputs, the assay name or index.
+#' @return A list with `matrices`, `responses`, `cohort_names`, and
+#'   `feature_names`.
+#' @keywords internal
+.prepare_ridge_inputs <- function(x_list, y_list, assay = NULL) {
+  x_list <- .as_cohort_list(x_list)
+  y_list <- .as_cohort_list(y_list)
+
+  if (length(x_list) != length(y_list)) {
+    stop("`x_list` and `y_list` must have the same length.", call. = FALSE)
+  }
+
+  cohort_names <- names(x_list)
+  if (is.null(cohort_names) || any(!nzchar(cohort_names))) {
+    cohort_names <- sprintf("cohort_%02d", seq_along(x_list))
+  }
+
+  matrices <- vector("list", length(x_list))
+  responses <- vector("list", length(x_list))
+
+  for (i in seq_along(x_list)) {
+    x_mat <- .extract_feature_matrix(x_list[[i]], assay = assay)
+    y_vec <- ensure_binary_response(y_list[[i]])
+
+    if (nrow(x_mat) != length(y_vec)) {
+      stop("Number of rows in `x_list[[", i, "]]` must match the length of ",
+        "`y_list[[", i, "]]`.",
+        call. = FALSE
+      )
+    }
+
+    if (is.null(colnames(x_mat))) {
+      colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
+    }
+
+    matrices[[i]] <- x_mat
+    responses[[i]] <- as.integer(y_vec) - 1L
+  }
+
+  feature_sets <- lapply(matrices, colnames)
+  # Uses intersection alignment for consistency with ridge models across cohorts
+  # For more flexible alignment, use .align_features() from cohort_preparation.R
+  common_features <- Reduce(intersect, feature_sets)
+  if (is.null(common_features) || !length(common_features)) {
+    stop(
+      "No shared features were found across cohorts. Provide data with ",
+      "overlapping feature identifiers (future releases will support more ",
+      "flexible alignment).",
+      call. = FALSE
+    )
+  }
+  ordered_features <- feature_sets[[1]][feature_sets[[1]] %in% common_features]
+  matrices <- lapply(matrices, function(mat) {
+    mat[, ordered_features, drop = FALSE]
+  })
+
+  list(
+    matrices = matrices,
+    responses = responses,
+    cohort_names = cohort_names,
+    feature_names = ordered_features
+  )
 }

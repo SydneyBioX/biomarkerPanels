@@ -15,6 +15,11 @@ plot_pareto_front(
   point_alpha = 0.7,
   viridis_option = "plasma",
   title = NULL,
+  xlab = NULL,
+  ylab = NULL,
+  color_label = NULL,
+  connect = FALSE,
+  on_error = c("warn", "stop"),
   regularized = TRUE,
   verbose = interactive()
 )
@@ -49,6 +54,20 @@ stored by \code{\link[=optimize_panel_transferable]{optimize_panel_transferable(
 
 \item{title}{Character or \code{NULL}; plot title. Auto-generated when \code{NULL}.}
 
+\item{xlab}{Character or \code{NULL}; x-axis label. Defaults to \code{x_metric}.}
+
+\item{ylab}{Character or \code{NULL}; y-axis label. Defaults to \code{y_metric}.}
+
+\item{color_label}{Character or \code{NULL}; color legend label. Defaults to
+\code{color_by}.}
+
+\item{connect}{Logical; if \code{TRUE}, connect points with a line sorted by the
+x-axis metric. Default \code{FALSE}.}
+
+\item{on_error}{One of \code{"warn"} or \code{"stop"}. Controls behaviour when a
+solution fails evaluation. \code{"warn"} (default) skips the solution with a
+warning; \code{"stop"} raises an error immediately.}
+
 \item{regularized}{Logical; passed to \code{\link[=fit_panel]{fit_panel()}}. Default \code{TRUE}.}
 
 \item{verbose}{Logical; print progress messages. Default \code{interactive()}.}
@@ -72,5 +91,6 @@ p$data     # access metrics data.frame
 }
 }
 \seealso{
-\code{\link[=optimize_panel]{optimize_panel()}}, \code{\link[=fit_panel]{fit_panel()}}, \code{\link[=evaluate_panel]{evaluate_panel()}}
+\code{\link[=evaluate_pareto_solutions]{evaluate_pareto_solutions()}}, \code{\link[=optimize_panel]{optimize_panel()}}, \code{\link[=fit_panel]{fit_panel()}},
+\code{\link[=evaluate_panel]{evaluate_panel()}}
 }

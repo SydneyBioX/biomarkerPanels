@@ -48,7 +48,7 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
   yes_tokens <- c("yes", "y", "1", "true", "positive", "pos", "case",
                   "fgr", "disease", "affected", "present")
   no_tokens <- c("no", "n", "0", "false", "negative", "neg", "control",
-                 "cohort", "healthy", "unaffected", "absent")
+                 "healthy", "unaffected", "absent")
 
   if (!is.null(positive)) {
     positive <- tolower(trimws(as.character(positive)))
@@ -114,4 +114,37 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
   }
 
   factor(mapped, levels = c("No", "Yes"))
+}
+
+#' Ensure Input is a List of Cohorts
+#'
+#' Wraps single objects in a list for consistent multi-cohort handling.
+#'
+#' @param x An object or list of objects.
+#' @return A list.
+#' @keywords internal
+.as_cohort_list <- function(x) { # nocov start
+  if (is.null(x)) {
+    stop("Input cannot be NULL.", call. = FALSE)
+  }
+
+  if (is.list(x)) {
+    return(x)
+  }
+  list(x)
+} # nocov end
+
+#' Validate Positive Integer Parameter
+#'
+#' Checks that a parameter is a positive integer and coerces it.
+#'
+#' @param x The value to validate.
+#' @param name Parameter name for error messages.
+#' @return An integer value.
+#' @keywords internal
+.validate_positive_integer <- function(x, name) {
+  if (!is.numeric(x) || length(x) != 1L || is.na(x) || x < 1L) {
+    stop("`", name, "` must be a positive integer.", call. = FALSE)
+  }
+  as.integer(x)
 }

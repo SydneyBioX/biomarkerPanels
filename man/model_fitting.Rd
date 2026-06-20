@@ -4,7 +4,7 @@
 \alias{model_fitting}
 \title{Final Model Fitting Functions}
 \description{
-Internal functions for fitting the final model after NSGA-II optimization
+Internal functions for fitting the final model after NSGA optimization
 has selected the best features. These models are stored in the
 BiomarkerPanelResult object for use in evaluation.
 }

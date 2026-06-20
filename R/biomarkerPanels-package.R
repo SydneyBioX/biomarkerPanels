@@ -10,7 +10,8 @@
 #' @section Modules:
 #' * Objective construction helpers (`define_objectives`).
 #' * Optimization engines (`optimize_panel`).
-#' * Evaluation utilities (`evaluate_panel`, `plot_pareto_front`).
+#' * Evaluation utilities (`evaluate_panel`, `evaluate_pareto_solutions`,
+#'   `plot_pareto_front`).
 #'
 #' @keywords internal
 #' @importFrom methods new

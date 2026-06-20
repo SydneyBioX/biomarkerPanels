@@ -37,8 +37,9 @@ NULL
 #'   (i.e., minimum sensitivity = 1 - alpha).
 #' @param delta Tolerance for violating the alpha constraint (default 0.05).
 #'   The error rate is guaranteed to be at most alpha with probability 1-delta.
-#' @param method NP classification method. One of: "penlog" (penalized logistic,
-#'   default), "logistic", "svm", "lda", "nb", "ada", "tree", "rf".
+#' @param method NP classification method passed to [nproc::npc()]. One of:
+#'   "penlog" (penalized logistic, default), "logistic", "svm", "lda", "slda",
+#'   "nb", "nnb", "ada", "tree", "randomforest".
 #' @param split Number of random train/test splits for threshold estimation (default 1).
 #' @param split.ratio Proportion of data used for training in each split (default 0.5).
 #' @param n.cores Number of cores for parallel processing (default 1).
@@ -239,13 +240,52 @@ fit_np_panel <- function(optimization_result,
   # Invert predictions if labels were flipped
   scores <- .invert_np_predictions(raw_scores, labels_flipped)
 
-  # Extract or compute threshold
-  # npc stores cutoff in the model; adjust for label flipping
-  if (!is.null(np_model$cutoff)) {
+  # Extract or compute threshold.
+  # An npc object has NO top-level $cutoff; the NP-calibrated cutoff lives in
+  # fits[[i]]$cutoff (one per split). The cutoff applies to the *signed*
+  # pred.score returned by predict.npc. For the default penlog/logistic case
+  # sign == TRUE and pred.score is P(class 1) in [0, 1], so:
+  #   - minimize_FPR (no flip): predict Yes iff score >= cutoff  -> threshold = cutoff
+  #   - flipped:                scores = 1 - P(No); predict Yes iff scores >= 1 - cutoff
+  # When sign == FALSE the score is negated (not in [0, 1]); the flip arithmetic
+  # below would be invalid, so we fall back. With split > 1 predict.npc averages
+  # scores across splits and there is no single scalar cutoff matching the
+  # averaged score, so a scalar NP threshold is not well defined either.
+  np_fit1 <- if (length(np_model$fits) >= 1L) np_model$fits[[1L]] else NULL
+  np_cutoff <- np_fit1$cutoff
+  np_sign <- np_fit1$sign
+
+  # nproc returns a length-1 cutoff per (alpha) request, or NA when the sample
+  # is too small to meet the (alpha, delta) guarantee.
+  np_cutoff_usable <- !is.null(np_cutoff) && length(np_cutoff) == 1L &&
+    is.finite(np_cutoff)
+
+  if (np_cutoff_usable && split > 1L) {
+    warning(
+      "split > 1: npc averages prediction scores across splits, so there is ",
+      "no single NP-calibrated cutoff. Falling back to an empirical ",
+      "training-data threshold, which does NOT carry the (alpha, delta) ",
+      "guarantee. Use split = 1 to retain the NP threshold.",
+      call. = FALSE
+    )
+  } else if (!is.null(np_cutoff) && !np_cutoff_usable) {
+    warning(
+      "nproc could not calibrate an NP cutoff for alpha = ", alpha,
+      ", delta = ", delta, " (sample likely too small). Falling back to an ",
+      "empirical training-data threshold, which does NOT carry the ",
+      "(alpha, delta) guarantee.",
+      call. = FALSE
+    )
+  }
+
+  use_np_cutoff <- np_cutoff_usable && split == 1L &&
+    (!labels_flipped || isTRUE(np_sign))
+
+  if (use_np_cutoff) {
     threshold <- if (labels_flipped) {
-      1 - np_model$cutoff
+      1 - np_cutoff
     } else {
-      np_model$cutoff
+      np_cutoff
     }
   } else {
     # Fallback: compute threshold from target specificity (for minimize_FPR=TRUE)

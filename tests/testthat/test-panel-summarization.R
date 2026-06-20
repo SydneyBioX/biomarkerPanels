@@ -369,3 +369,115 @@ test_that("plot_feature_stability validates inputs", {
     "between 0 and 1"
   )
 })
+
+# ============================================================================
+# OptimizationResult support and feature_type tests
+# ============================================================================
+
+.make_mock_optimization_result <- function() {
+  solutions <- data.frame(
+    solution_id = 1:3,
+    sensitivity = c(0.8, 0.75, 0.82),
+    specificity = c(0.7, 0.72, 0.68),
+    stringsAsFactors = FALSE
+  )
+  solutions$features <- I(list(
+    c("A--B", "A--C"),
+    c("B--C", "A--C", "B--D"),
+    c("A--B", "C--D")
+  ))
+  solutions$base_features <- I(list(
+    c("A", "B", "C"),
+    c("A", "B", "C", "D"),
+    c("A", "B", "C", "D")
+  ))
+
+  new(
+    "OptimizationResult",
+    solutions = solutions,
+    feature_pool = c("A", "B", "C", "D"),
+    control = list(feature_transform = "pairwise_ratios"),
+    training_signature = list(),
+    aggregated_x = matrix(0, nrow = 1, ncol = 1),
+    aggregated_y = factor("No"),
+    aggregated_cohort = factor("c1")
+  )
+}
+
+test_that("compute_inclusion_frequencies accepts OptimizationResult", {
+  opt <- .make_mock_optimization_result()
+  freq <- compute_inclusion_frequencies(list(opt))
+
+  expect_true(is.data.frame(freq))
+  expect_equal(colnames(freq), c("feature", "count", "proportion"))
+  # "A--C" appears in solutions 1 and 2, "A--B" in 1 and 3
+  expect_true("A--C" %in% freq$feature)
+  expect_true("A--B" %in% freq$feature)
+  expect_equal(freq$proportion[freq$feature == "A--C"], 2/3)
+})
+
+test_that("compute_inclusion_frequencies accepts unwrapped OptimizationResult", {
+  opt <- .make_mock_optimization_result()
+  freq <- compute_inclusion_frequencies(opt)
+
+  expect_true(is.data.frame(freq))
+  expect_true(nrow(freq) > 0L)
+})
+
+test_that("compute_inclusion_frequencies feature_type = base_features works", {
+  opt <- .make_mock_optimization_result()
+  freq <- compute_inclusion_frequencies(list(opt), feature_type = "base_features")
+
+  expect_true(is.data.frame(freq))
+  # Base features are A, B, C, D
+  expect_true(all(freq$feature %in% c("A", "B", "C", "D")))
+  # A, B, C appear in all 3 solutions
+  expect_equal(freq$proportion[freq$feature == "A"], 1.0)
+  # D appears in solutions 2 and 3
+  expect_equal(freq$proportion[freq$feature == "D"], 2/3)
+})
+
+test_that("analyze_feature_stability accepts OptimizationResult", {
+  opt <- .make_mock_optimization_result()
+  stability <- analyze_feature_stability(opt)
+
+  expect_s3_class(stability, "FeatureStabilityResult")
+  expect_equal(stability$n_solutions, 3L)
+  expect_equal(dim(stability$jaccard_matrix), c(3L, 3L))
+  expect_true(stability$mean_jaccard >= 0 && stability$mean_jaccard <= 1)
+})
+
+test_that("analyze_feature_stability with base_features on OptimizationResult", {
+  opt <- .make_mock_optimization_result()
+  stability <- analyze_feature_stability(opt, feature_type = "base_features")
+
+  expect_s3_class(stability, "FeatureStabilityResult")
+  expect_true(all(stability$frequencies$feature %in% c("A", "B", "C", "D")))
+  # Jaccard for base features: sol1={A,B,C}, sol2={A,B,C,D}, sol3={A,B,C,D}
+  # J(1,2) = 3/4 = 0.75, J(1,3) = 3/4 = 0.75, J(2,3) = 4/4 = 1.0
+  expect_equal(stability$jaccard_matrix[1, 2], 3/4, tolerance = 1e-10)
+  expect_equal(stability$jaccard_matrix[2, 3], 1.0, tolerance = 1e-10)
+})
+
+test_that("analyze_feature_stability rejects base_features for BiomarkerPanelResult", {
+  panel <- new(
+    "BiomarkerPanelResult",
+    features = c("A", "B"),
+    metrics = c(sensitivity = 0.8),
+    objectives = data.frame(),
+    control = list(),
+    training_data = list()
+  )
+
+  expect_error(
+    analyze_feature_stability(panel, feature_type = "base_features"),
+    "base_features.*only supported for OptimizationResult"
+  )
+})
+
+test_that("analyze_feature_stability rejects invalid input", {
+  expect_error(
+    analyze_feature_stability(data.frame(a = 1)),
+    "OptimizationResult or BiomarkerPanelResult"
+  )
+})

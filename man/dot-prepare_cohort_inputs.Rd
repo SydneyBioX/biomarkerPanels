@@ -32,7 +32,7 @@ cohort_names, and cohort_counts.
 }
 \description{
 Main internal function that processes input data (single or multi-cohort)
-and prepares it for NSGA-II optimization. Handles feature extraction,
+and prepares it for NSGA optimization. Handles feature extraction,
 alignment, transformation, and response standardization.
 }
 \keyword{internal}

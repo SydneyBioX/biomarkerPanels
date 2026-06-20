@@ -58,6 +58,11 @@ evaluate_panel <- function(panel, x, y,
                            positive = NULL) {
   stopifnot(inherits(panel, "BiomarkerPanelResult"))
 
+  if (!is.numeric(cutoff_prob) || length(cutoff_prob) != 1L ||
+      is.na(cutoff_prob) || cutoff_prob <= 0 || cutoff_prob >= 1) {
+    stop("`cutoff_prob` must be a single numeric value in (0, 1).", call. = FALSE)
+  }
+
   # Use stored positive class from training if not explicitly specified
   if (is.null(positive)) {
     stored_positive <- panel@control$positive_class
@@ -142,15 +147,22 @@ evaluate_panel <- function(panel, x, y,
     stop("Panel has no selected features.", call. = FALSE)
   }
 
-  # Verify feature names match model expectations
+  # Verify feature names match model expectations. CPOP-style panels store a
+  # subset of all possible pair features; in that case subset the transformed
+  # matrix down to the expected columns rather than warning.
   expected_features <- panel@features
   if (!setequal(selected, expected_features)) {
-    warning(
-      "Transformed feature names differ from model training. ",
-      "Expected: ", paste(expected_features, collapse = ", "), ". ",
-      "Got: ", paste(selected, collapse = ", "), ".",
-      call. = FALSE
-    )
+    if (all(expected_features %in% selected)) {
+      x_selected <- x_selected[, expected_features, drop = FALSE]
+      selected <- expected_features
+    } else {
+      stop(
+        "Transformed feature names differ from model training. ",
+        "Expected: ", paste(expected_features, collapse = ", "), ". ",
+        "Got: ", paste(selected, collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
   }
 
   # Determine how to compute scores
@@ -198,24 +210,18 @@ evaluate_panel <- function(panel, x, y,
 
         # Verify the mapping matches what the model expects
         if (!setequal(expected_names, feature_cols)) {
-          # Names don't match - this could happen if features were renamed
-          # differently during training. Try position-based mapping as fallback.
-          if (length(feature_cols) == ncol(x_selected)) {
-            warning(
-              "Feature name mismatch between training and validation. ",
-              "Using positional mapping (verify features are aligned).",
-              call. = FALSE
-            )
-            names(newdata) <- feature_cols
-          } else {
-            stop("Cannot match validation features to model features.")
-          }
-        } else {
-          # Names match - ensure same order as model expects
-          names(newdata) <- expected_names
-          # Reorder to match model's feature order
-          newdata <- newdata[, feature_cols, drop = FALSE]
+          stop(
+            "Feature name mismatch between training and validation. ",
+            "Expected: ", paste(head(feature_cols, 10), collapse = ", "),
+            if (length(feature_cols) > 10) "..." else "", ". ",
+            "Got: ", paste(head(expected_names, 10), collapse = ", "),
+            if (length(expected_names) > 10) "..." else "",
+            call. = FALSE
+          )
         }
+        # Names match -- ensure same order as model expects
+        names(newdata) <- expected_names
+        newdata <- newdata[, feature_cols, drop = FALSE]
 
         # If model was trained with cohort, always use reference level so
         # predictions are cohort-agnostic. Cohort-aware metrics split downstream.
@@ -346,152 +352,4 @@ evaluate_panel <- function(panel, x, y,
     cutoff = cutoff_prob,
     scores = scores
   )
-}
-
-#' Compute Confusion Matrix
-#'
-#' @param truth Binary response factor.
-#' @param scores Numeric prediction scores.
-#' @param cutoff_prob Classification cutoff.
-#' @param positive Label for positive class.
-#' @return A 2x2 confusion matrix with cutoff, positive, and negative attributes.
-#' @keywords internal
-.compute_confusion_matrix <- function(truth, scores, cutoff_prob, positive) {
-  truth <- ensure_binary_response(truth, positive = positive)
-  levels_truth <- levels(truth)
-  if (!positive %in% levels_truth) {
-    positive <- levels_truth[length(levels_truth)]
-  }
-  negative <- setdiff(levels_truth, positive)
-  if (!length(negative)) {
-    stop("Unable to determine negative class for confusion matrix.", call. = FALSE)
-  }
-  negative <- negative[1]
-  predicted_positive <- scores >= cutoff_prob
-  predicted <- ifelse(predicted_positive, positive, negative)
-  predicted <- factor(predicted, levels = levels_truth)
-  table_res <- table(
-    truth = truth,
-    predicted = predicted
-  )
-  structure(
-    as.matrix(table_res),
-    cutoff = cutoff_prob,
-    positive = positive,
-    negative = negative
-  )
-}
-
-#' Compute ROC Curve
-#'
-#' Computes the ROC curve for a set of predictions. Uses C++ for performance.
-#'
-#' @param truth A binary response vector or factor.
-#' @param scores Numeric vector of predicted scores or probabilities.
-#' @param positive The label for the positive class.
-#' @return A data.frame with columns `threshold`, `tpr`, `fpr`, `sensitivity`,
-#'   and `specificity`.
-#' @keywords internal
-.compute_roc_curve <- function(truth, scores, positive) {
-  truth <- ensure_binary_response(truth, positive = positive)
-  levels_truth <- levels(truth)
-  if (!positive %in% levels_truth) {
-    positive <- levels_truth[length(levels_truth)]
-  }
-
-  # Convert truth to logical vector for C++
-  is_positive <- truth == positive
-
-  # Call C++ implementation
-  df <- .compute_roc_curve_cpp(as.numeric(scores), is_positive)
-
-  # Sort by fpr, tpr for consistency with pure R version
-  df[order(df$fpr, df$tpr), , drop = FALSE]
-}
-
-#' Predict Using Stored glmnet Model
-#'
-#' Helper function to make predictions from a cv.glmnet model stored in a
-#' BiomarkerPanelResult. Handles cohort dummy variables using the metadata
-#' stored during training.
-#'
-#' @param model A cv.glmnet model object with biomarkerPanels_meta attribute.
-#' @param x_selected Matrix of selected features for prediction.
-#' @param cohort_vec Factor of cohort membership for samples.
-#' @return Numeric vector of predicted probabilities.
-#' @keywords internal
-.predict_glmnet_model <- function(model, x_selected, cohort_vec) {
-  x_mat <- as.matrix(x_selected)
-
-  # Get metadata stored during training
-
-  meta <- model$biomarkerPanels_meta
-
-  # Add cohort dummies if the model was trained with them.
-  # Always zero out — predictions should be cohort-agnostic for
-
-  # transferability. Cohort-aware metrics split by cohort downstream.
-  if (!is.null(meta$cohort_info)) {
-    n_dummies <- meta$cohort_info$n_dummies
-    dummy_cols <- matrix(0, nrow = nrow(x_mat), ncol = n_dummies)
-    colnames(dummy_cols) <- paste0(".cohort_", seq_len(n_dummies))
-    x_mat <- cbind(x_mat, dummy_cols)
-  }
-
-  # Predict using lambda.min
-  preds <- stats::predict(model, newx = x_mat, s = "lambda.min", type = "response")[, 1]
-
-  preds
-}
-
-# ==============================================================================
-# PURE R REFERENCE IMPLEMENTATIONS (for testing)
-# TODO: Remove these once Rcpp equivalents are fully debugged and validated.
-# See tests/testthat/test-rcpp-equivalence.R for equivalence tests.
-# ==============================================================================
-
-#' Pure R Reference Implementation of ROC Curve Computation
-#'
-#' Kept for regression testing against the C++ implementation.
-#' TODO: Remove once Rcpp equivalents are fully debugged and validated.
-#'
-#' @inheritParams .compute_roc_curve
-#' @keywords internal
-.compute_roc_curve_pure_r <- function(truth, scores, positive) {
-  truth <- ensure_binary_response(truth, positive = positive)
-  levels_truth <- levels(truth)
-  if (!positive %in% levels_truth) {
-    positive <- levels_truth[length(levels_truth)]
-  }
-  negative <- setdiff(levels_truth, positive)
-  if (!length(negative)) {
-    stop("Unable to determine negative class for ROC.", call. = FALSE)
-  }
-  negative <- negative[1]
-
-  thresholds <- sort(unique(scores), decreasing = TRUE)
-  thresholds <- c(Inf, thresholds, -Inf)
-
-  pos_total <- sum(truth == positive)
-  neg_total <- sum(truth == negative)
-
-  compute_point <- function(thresh) {
-    predicted_positive <- scores >= thresh
-    tp <- sum(predicted_positive & truth == positive)
-    fp <- sum(predicted_positive & truth == negative)
-    tpr <- if (pos_total == 0) NA_real_ else tp / pos_total
-    fpr <- if (neg_total == 0) NA_real_ else fp / neg_total
-    c(tpr = tpr, fpr = fpr)
-  }
-
-  mat <- vapply(thresholds, compute_point, numeric(2))
-  df <- data.frame(
-    threshold = thresholds,
-    tpr = mat["tpr", ],
-    fpr = mat["fpr", ],
-    sensitivity = mat["tpr", ],
-    specificity = 1 - mat["fpr", ],
-    stringsAsFactors = FALSE
-  )
-  df[order(df$fpr, df$tpr), , drop = FALSE]
 }

@@ -52,8 +52,9 @@ this is the maximum FPR. When \code{minimize_FPR = FALSE}, this is the maximum F
 \item{delta}{Tolerance for violating the alpha constraint (default 0.05).
 The error rate is guaranteed to be at most alpha with probability 1-delta.}
 
-\item{method}{NP classification method. One of: "penlog" (penalized logistic,
-default), "logistic", "svm", "lda", "nb", "ada", "tree", "rf".}
+\item{method}{NP classification method passed to \code{\link[nproc:npc]{nproc::npc()}}. One of:
+"penlog" (penalized logistic, default), "logistic", "svm", "lda", "slda",
+"nb", "nnb", "ada", "tree", "randomforest".}
 
 \item{split}{Number of random train/test splits for threshold estimation (default 1).}
 

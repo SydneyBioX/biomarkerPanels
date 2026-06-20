@@ -103,14 +103,14 @@ test_that("all Pareto solutions have consistent feature counts", {
   sols <- solutions(res)
   expect_true(nrow(sols) > 0)
 
-  # Check each solution's num_features matches actual feature count
+  # Check each solution's num_features matches actual base feature count
   for (i in seq_len(nrow(sols))) {
     stored_count <- sols$num_features[i]
-    solution_features <- sols$features[[i]]
+    base_feats <- sols$base_features[[i]]
     expect_equal(
-      stored_count, length(solution_features),
-      info = paste("Solution", i, "feature count mismatch:",
-                   "stored =", stored_count, "actual =", length(solution_features))
+      stored_count, length(base_feats),
+      info = paste("Solution", i, "base feature count mismatch:",
+                   "stored =", stored_count, "actual =", length(base_feats))
     )
   }
 })
@@ -362,6 +362,30 @@ test_that(".compute_nsga3_partitions returns appropriate values", {
   expect_equal(biomarkerPanels:::.compute_nsga3_partitions(10), 4L)
 })
 
+test_that("optimize_panel uses adaptive defaults without explicit nsga_control", {
+  skip_extended_tests()  # Very slow: popSize=156, maxiter=180
+  set.seed(999)
+  sim <- simulate_expression_data(p = 40, n = 30, k = 1, seed = 99)
+  x <- sim$x_list[[1]]
+  y <- sim$y_list[[1]]
+
+  # Use 35 features which falls into the 31-100 range
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
+    max_features = 3,
+    feature_pool = colnames(x)[seq_len(35)],
+    feature_transform = "none"
+  )
+
+  expect_s4_class(res, "OptimizationResult")
+  # Default algorithm is NSGA-III
+  expect_equal(res@control$algorithm, "NSGA-III")
+  # Verify that the stored nsga2 settings reflect adaptive NSGA-III defaults
+  expect_equal(res@control$nsga2$popSize, 156)
+  expect_equal(res@control$nsga2$maxiter, 180)
+})
 
 # Issue 4: feature_alignment tests
 test_that("feature_alignment = 'majority' keeps features in >= 50% cohorts", {
@@ -447,7 +471,7 @@ test_that("feature_alignment = 'intersection' is default and drops partial featu
 
 
 # NSGA algorithm tests
-test_that("optimize_panel uses NSGA-II by default", {
+test_that("optimize_panel uses NSGA-III by default", {
   skip_slow_tests()
   set.seed(123)
   sim <- simulate_expression_data(p = 15, n = 200, k = 1, seed = 42)
@@ -465,12 +489,10 @@ test_that("optimize_panel uses NSGA-II by default", {
   )
 
   expect_s4_class(res, "OptimizationResult")
-  expect_equal(res@control$algorithm, "NSGA-II")
+  expect_equal(res@control$algorithm, "NSGA-III")
 })
 
-test_that("optimize_panel respects explicit NSGA-III algorithm selection", {
-  # Skip: NSGA-III has a bug in rmoo 0.3.0 (associate_to_niches returns list)
-  skip("NSGA-III has known bug in rmoo 0.3.0")
+test_that("optimize_panel respects explicit NSGA-II algorithm selection", {
   skip_slow_tests()
   set.seed(456)
   sim <- simulate_expression_data(p = 15, n = 200, k = 1, seed = 43)
@@ -484,12 +506,12 @@ test_that("optimize_panel respects explicit NSGA-III algorithm selection", {
     max_features = 3,
     feature_pool = colnames(x)[seq_len(8)],
     feature_transform = "none",
-    algorithm = "NSGA-III",
+    algorithm = "NSGA-II",
     nsga_control = list(popSize = 12, maxiter = 10)
   )
 
   expect_s4_class(res, "OptimizationResult")
-  expect_equal(res@control$algorithm, "NSGA-III")
+  expect_equal(res@control$algorithm, "NSGA-II")
 })
 
 # Adaptive threshold tests
@@ -616,4 +638,114 @@ test_that("selection_threshold stored in control slot", {
     nsga_control = list(popSize = 12, maxiter = 5)
   )
   expect_equal(res_fixed@control$selection_threshold, 0.6)
+})
+
+test_that("Pareto front contains no dominated solutions", {
+  skip_slow_tests()
+  set.seed(777)
+  n <- 40L
+  p <- 10L
+  x <- matrix(rnorm(n * p), nrow = n)
+  colnames(x) <- paste0("gene_", seq_len(p))
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+  x[y == "Yes", 1:3] <- x[y == "Yes", 1:3] + 2
+
+  res <- optimize_panel(
+    x = x,
+    y = y,
+    objectives = define_objectives(metrics = c("sensitivity", "specificity", "num_features")),
+    max_features = 6,
+    feature_pool = colnames(x),
+    feature_transform = "none",
+    nsga_control = list(popSize = 20, maxiter = 20)
+  )
+
+  sols <- solutions(res)
+  n_sol <- nrow(sols)
+  if (n_sol < 2) skip("Only one Pareto solution; dominance check trivially passes")
+
+  obj_cols <- setdiff(names(sols), c("solution_id", "base_features", "features"))
+  directions <- res@control$objective_directions[obj_cols]
+
+  # For each pair of solutions, verify neither dominates the other on ALL objectives
+  for (i in seq_len(n_sol - 1)) {
+    for (j in (i + 1):n_sol) {
+      vals_i <- as.numeric(sols[i, obj_cols])
+      vals_j <- as.numeric(sols[j, obj_cols])
+
+      # Compare with direction: "maximize" means higher is better
+      i_better <- mapply(function(vi, vj, dir) {
+        if (dir == "maximize") vi > vj else vi < vj
+      }, vals_i, vals_j, directions)
+
+      i_equal_or_better <- mapply(function(vi, vj, dir) {
+        if (dir == "maximize") vi >= vj else vi <= vj
+      }, vals_i, vals_j, directions)
+
+      j_better <- mapply(function(vi, vj, dir) {
+        if (dir == "maximize") vj > vi else vj < vi
+      }, vals_i, vals_j, directions)
+
+      j_equal_or_better <- mapply(function(vi, vj, dir) {
+        if (dir == "maximize") vj >= vi else vj <= vi
+      }, vals_i, vals_j, directions)
+
+      # i dominates j if i is >= on all and > on at least one
+      i_dominates_j <- all(i_equal_or_better) && any(i_better)
+      j_dominates_i <- all(j_equal_or_better) && any(j_better)
+
+      expect_false(
+        i_dominates_j,
+        info = sprintf("Solution %d dominates solution %d", i, j)
+      )
+      expect_false(
+        j_dominates_i,
+        info = sprintf("Solution %d dominates solution %d", j, i)
+      )
+    }
+  }
+})
+
+# ============================================================================
+# Input validation tests (silent failure audit fixes)
+# ============================================================================
+
+test_that("optimize_panel validates fitness_cv_folds", {
+  sim <- simulate_expression_data(p = 10, n = 20, k = 1, seed = 1)
+  expect_error(
+    optimize_panel(sim$x_list[[1]], sim$y_list[[1]], fitness_cv_folds = 1L),
+    "fitness_cv_folds"
+  )
+  expect_error(
+    optimize_panel(sim$x_list[[1]], sim$y_list[[1]], fitness_cv_folds = "abc"),
+    "fitness_cv_folds"
+  )
+})
+
+test_that("optimize_panel validates regularized_alpha", {
+  sim <- simulate_expression_data(p = 10, n = 20, k = 1, seed = 1)
+  expect_error(
+    optimize_panel(sim$x_list[[1]], sim$y_list[[1]], regularized_alpha = 2),
+    "regularized_alpha"
+  )
+  expect_error(
+    optimize_panel(sim$x_list[[1]], sim$y_list[[1]], regularized_alpha = -0.1),
+    "regularized_alpha"
+  )
+})
+
+test_that("optimize_panel validates selection_threshold", {
+  sim <- simulate_expression_data(p = 10, n = 20, k = 1, seed = 1)
+  expect_error(
+    optimize_panel(sim$x_list[[1]], sim$y_list[[1]], selection_threshold = "bad"),
+    "selection_threshold"
+  )
+  expect_error(
+    optimize_panel(sim$x_list[[1]], sim$y_list[[1]], selection_threshold = 0),
+    "selection_threshold"
+  )
+  expect_error(
+    optimize_panel(sim$x_list[[1]], sim$y_list[[1]], selection_threshold = 1),
+    "selection_threshold"
+  )
 })

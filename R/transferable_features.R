@@ -129,6 +129,13 @@ select_transferable_features <- function(x_list,
   )
 
   if (!nrow(combined_scores)) {
+    warning(
+      "No transferable features passed the sign-consistency and minimum-",
+      "coefficient filters; returning an empty feature set. Consider relaxing ",
+      "`min_coefficient`, `sign_consistency_threshold`, or setting ",
+      "`require_sign_consistency = FALSE`.",
+      call. = FALSE
+    )
     return(list(
       features = character(),
       scores = combined_scores,
@@ -165,77 +172,6 @@ select_transferable_features <- function(x_list,
       sign_consistency_threshold = sign_consistency_threshold,
       standardize = standardize
     )
-  )
-}
-
-#' Prepare Inputs for Ridge Regression
-#'
-#' Extracts feature matrices and responses from cohort lists, aligns features
-#' across cohorts via intersection, and converts responses to binary integers.
-#'
-#' @param x_list A matrix, `SummarizedExperiment`, or list of such objects.
-#' @param y_list A binary response aligned with `x_list`.
-#' @param assay For `SummarizedExperiment` inputs, the assay name or index.
-#' @return A list with `matrices`, `responses`, `cohort_names`, and
-#'   `feature_names`.
-#' @keywords internal
-.prepare_ridge_inputs <- function(x_list, y_list, assay = NULL) {
-  x_list <- .as_cohort_list(x_list)
-  y_list <- .as_cohort_list(y_list)
-
-  if (length(x_list) != length(y_list)) {
-    stop("`x_list` and `y_list` must have the same length.", call. = FALSE)
-  }
-
-  cohort_names <- names(x_list)
-  if (is.null(cohort_names) || any(!nzchar(cohort_names))) {
-    cohort_names <- sprintf("cohort_%02d", seq_along(x_list))
-  }
-
-  matrices <- vector("list", length(x_list))
-  responses <- vector("list", length(x_list))
-
-  for (i in seq_along(x_list)) {
-    x_mat <- .extract_feature_matrix(x_list[[i]], assay = assay)
-    y_vec <- ensure_binary_response(y_list[[i]])
-
-    if (nrow(x_mat) != length(y_vec)) {
-      stop("Number of rows in `x_list[[", i, "]]` must match the length of ",
-        "`y_list[[", i, "]]`.",
-        call. = FALSE
-      )
-    }
-
-    if (is.null(colnames(x_mat))) {
-      colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
-    }
-
-    matrices[[i]] <- x_mat
-    responses[[i]] <- as.integer(y_vec) - 1L
-  }
-
-  feature_sets <- lapply(matrices, colnames)
-  # Uses intersection alignment for consistency with ridge models across cohorts
-  # For more flexible alignment, use .align_features() from cohort_preparation.R
-  common_features <- Reduce(intersect, feature_sets)
-  if (is.null(common_features) || !length(common_features)) {
-    stop(
-      "No shared features were found across cohorts. Provide data with ",
-      "overlapping feature identifiers (future releases will support more ",
-      "flexible alignment).",
-      call. = FALSE
-    )
-  }
-  ordered_features <- feature_sets[[1]][feature_sets[[1]] %in% common_features]
-  matrices <- lapply(matrices, function(mat) {
-    mat[, ordered_features, drop = FALSE]
-  })
-
-  list(
-    matrices = matrices,
-    responses = responses,
-    cohort_names = cohort_names,
-    feature_names = ordered_features
   )
 }
 
@@ -339,97 +275,3 @@ select_transferable_features <- function(x_list,
   score_df
 }
 
-#' Ensure Input is a List of Cohorts
-#'
-#' Wraps single objects in a list for consistent multi-cohort handling.
-#'
-#' @param x An object or list of objects.
-#' @return A list.
-#' @keywords internal
-.as_cohort_list <- function(x) { # nocov start
-  if (is.null(x)) {
-    stop("Input cannot be NULL.", call. = FALSE)
-  }
-
-  if (is.list(x)) {
-    return(x)
-  }
-  list(x)
-} # nocov end
-
-#' Validate Positive Integer Parameter
-#'
-#' Checks that a parameter is a positive integer and coerces it.
-#'
-#' @param x The value to validate.
-#' @param name Parameter name for error messages.
-#' @return An integer value.
-#' @keywords internal
-.validate_positive_integer <- function(x, name) {
-  if (!is.numeric(x) || length(x) != 1L || is.na(x) || x < 1L) {
-    stop("`", name, "` must be a positive integer.", call. = FALSE)
-  }
-  as.integer(x)
-}
-
-# ==============================================================================
-# PURE R REFERENCE IMPLEMENTATIONS (for testing)
-# ==============================================================================
-
-#' Pure R Reference Implementation of Transferable Feature Scoring
-#'
-#' Kept for regression testing against the C++ implementation.
-#' TODO: Remove once Rcpp equivalents are fully debugged and validated.
-#'
-#' @inheritParams .score_transferable_features
-#' @keywords internal
-.score_transferable_features_pure_r <- function(coefficient_matrix,
-                                                min_coefficient,
-                                                require_sign_consistency,
-                                                sign_consistency_threshold = 1.0) {
-  if (!nrow(coefficient_matrix)) {
-    return(data.frame())
-  }
-
-  feature_names <- rownames(coefficient_matrix)
-  row_index <- seq_len(nrow(coefficient_matrix))
-
-  abs_coeff <- abs(coefficient_matrix)
-  mean_abs <- rowMeans(abs_coeff)
-  sd_coeff <- apply(coefficient_matrix, 1, stats::sd)
-  min_abs <- apply(abs_coeff, 1, min)
-
-  sign_agreement <- apply(coefficient_matrix, 1, function(vals) {
-    nz <- vals[abs(vals) > 1e-6]
-    if (!length(nz)) {
-      return(1.0)
-    }
-    median_sign <- sign(stats::median(nz))
-    mean(sign(nz) == median_sign)
-  })
-
-  sign_consistent <- sign_agreement >= sign_consistency_threshold
-  score <- mean_abs / (sd_coeff + 1e-6)
-
-  keep <- is.finite(score) & !is.na(score) & (min_abs >= min_coefficient)
-  if (require_sign_consistency) {
-    keep <- keep & sign_consistent
-  }
-
-  score_df <- data.frame(
-    feature = feature_names,
-    row_index = row_index,
-    mean_abs = mean_abs,
-    sd = sd_coeff,
-    min_abs = min_abs,
-    sign_agreement = sign_agreement,
-    sign_consistent = sign_consistent,
-    score = score,
-    stringsAsFactors = FALSE
-  )
-
-  score_df <- score_df[keep, , drop = FALSE]
-  score_df <- score_df[order(score_df$score, decreasing = TRUE), , drop = FALSE]
-  rownames(score_df) <- NULL
-  score_df
-}

@@ -7,7 +7,7 @@ fixture_path <- function(name) {
 
 #' Skip tests that are too slow for CRAN/Bioconductor builds
 #'
-#' Use for tests that run NSGA-II optimization with small populations
+#' Use for tests that run NSGA optimization with small populations
 #' (typically 5-30 seconds per test)
 skip_slow_tests <- function() {
   testthat::skip_on_cran()
@@ -16,7 +16,7 @@ skip_slow_tests <- function() {
 
 #' Skip very intensive tests unless explicitly enabled
 #'
-#' Use for tests that run NSGA-II with large populations or many generations
+#' Use for tests that run NSGA with large populations or many generations
 #' (typically > 60 seconds per test). Only run when BIOMARKERPANELS_EXTENDED_TESTS=true
 skip_extended_tests <- function() {
   testthat::skip_on_cran()

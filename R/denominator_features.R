@@ -183,7 +183,7 @@ select_denominator_features <- function(
       pure_batch_pcs <- as.integer(gsub("PC", "", top_lda_pcs))
     } else {
       # Last resort: use top variance PCs with any batch association
-      pure_batch_pcs <- which(pc_diagnostics$batch_pvalue < 0.50)[1:min(3L, n_pcs)]
+      pure_batch_pcs <- head(which(pc_diagnostics$batch_pvalue < 0.50), 3L)
     }
   }
 
@@ -231,6 +231,13 @@ select_denominator_features <- function(
     gene_batch_scores <- as.vector(batch_loadings %*% weights)
     names(gene_batch_scores) <- colnames(x)
   } else {
+    warning(
+      "No batch-associated principal components were found after all fallbacks; ",
+      "batch scores are all zero, so denominator selection carries no batch ",
+      "information and the resulting ratios will not cancel batch effects. ",
+      "Inspect the data or relax the batch-PC criteria.",
+      call. = FALSE
+    )
     gene_batch_scores <- rep(0, ncol(x))
     names(gene_batch_scores) <- colnames(x)
   }

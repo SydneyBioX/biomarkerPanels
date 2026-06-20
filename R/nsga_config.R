@@ -88,7 +88,7 @@ NULL
     } else if (n_features <= 250) {
       adaptive_params <- list(popSize = 192, maxiter = 300)
     } else {
-      warning("Feature pool size is very large. NSGA-III may take a long time to run. Consider feature selection to reduce feature pool size.")
+      warning("Feature pool size is very large. NSGA-II may take a long time to run. Consider feature selection to reduce feature pool size.")
       adaptive_params <- list(popSize = 256, maxiter = 500)
     }
   }

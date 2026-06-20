@@ -15,7 +15,7 @@
 #' @return A data frame with columns:
 #'   \describe{
 #'     \item{solution_id}{Integer ID of the solution.}
-#'     \item{n_features}{Number of features in the solution.}
+#'     \item{n_features}{Number of base features (individual genes) in the solution, not ratio pairs.}
 #'     \item{...}{One column per objective with numeric values.}
 #'   }
 #' @export
@@ -40,8 +40,9 @@ summarize_solutions <- function(optimization_result) {
     ))
   }
 
-  # Calculate number of features per solution
-  n_features <- vapply(solutions_df$features, length, integer(1))
+  # Count base features (genes to measure), not transformed features (ratios)
+  feature_col <- if ("base_features" %in% names(solutions_df)) "base_features" else "features"
+  n_features <- vapply(solutions_df[[feature_col]], length, integer(1))
 
   # Get objective columns (everything except solution_id and features)
   objective_cols <- setdiff(names(solutions_df), c("solution_id", "features", "base_features"))
@@ -53,8 +54,8 @@ summarize_solutions <- function(optimization_result) {
     stringsAsFactors = FALSE
   )
 
-  # Add objective columns
- for (col in objective_cols) {
+  # Add objective columns (num_features from the metric also counts base features now)
+  for (col in objective_cols) {
     result[[col]] <- solutions_df[[col]]
   }
 
@@ -144,11 +145,26 @@ select_panel_top_sensitivity <- function(performance,
 
 #' Compute biomarker inclusion frequencies across optimisation runs.
 #'
-#' @param panels List of [`BiomarkerPanelResult`] objects, character vectors of
-#'   biomarkers, or a mixture of both.
+#' @param panels List of `OptimizationResult`, [`BiomarkerPanelResult`]
+#'   objects, character vectors of biomarkers, or a mixture of these. A single
+#'   (unwrapped) `OptimizationResult` is also accepted.
+#' @param feature_type One of `"features"` (default) or `"base_features"`.
+#'   Controls whether transformed feature names (e.g. `"A--B"` for pairwise
+#'   ratios) or base feature names (genes) are counted. Only relevant for
+#'   `OptimizationResult` entries; `BiomarkerPanelResult` and character vector
+#'   entries always use their stored feature names.
 #' @return Data frame with columns `feature`, `count`, and `proportion`.
 #' @export
-compute_inclusion_frequencies <- function(panels) {
+compute_inclusion_frequencies <- function(panels,
+                                          feature_type = c("features",
+                                                           "base_features")) {
+  feature_type <- match.arg(feature_type)
+
+  # Accept a single unwrapped OptimizationResult
+  if (inherits(panels, "OptimizationResult")) {
+    panels <- list(panels)
+  }
+
   if (is.null(panels) || !length(panels)) {
     return(data.frame(
       feature = character(),
@@ -159,7 +175,18 @@ compute_inclusion_frequencies <- function(panels) {
   }
 
   collected <- lapply(panels, function(p) {
-    if (inherits(p, "BiomarkerPanelResult")) {
+    if (inherits(p, "OptimizationResult")) {
+      sol_df <- p@solutions
+      if (!nrow(sol_df)) {
+        return(list(features = character(), solutions = 0L))
+      }
+      feat_list <- sol_df[[feature_type]]
+      feat_list <- lapply(feat_list, unique)
+      list(
+        features = unlist(feat_list, use.names = FALSE),
+        solutions = nrow(sol_df)
+      )
+    } else if (inherits(p, "BiomarkerPanelResult")) {
       sol <- .extract_solution_features(p)
       sol <- lapply(sol, unique)
       list(
@@ -172,8 +199,8 @@ compute_inclusion_frequencies <- function(panels) {
         solutions = 1L
       )
     } else {
-      stop("Unsupported panel entry: must be character vector or BiomarkerPanelResult.",
-           call. = FALSE)
+      stop("Unsupported panel entry: must be OptimizationResult, ",
+           "BiomarkerPanelResult, or character vector.", call. = FALSE)
     }
   })
 
@@ -364,103 +391,5 @@ select_panel_by_pathway <- function(high_sensitivity_panels,
   list(
     features = selection,
     pathway_assignments = assignments_df
-  )
-}
-
-#' Analyze Feature Selection Stability Across Pareto Solutions
-#'
-#' Computes feature inclusion frequencies and pairwise Jaccard similarity
-#' between all Pareto-optimal solutions in a `BiomarkerPanelResult`.
-#'
-#' @param result A [`BiomarkerPanelResult`] object containing optimization results.
-#' @return A list with class `"FeatureStabilityResult"` containing:
-#'   \describe{
-#'     \item{frequencies}{Data frame with columns `feature`, `count`, `proportion`
-#'       ordered by descending count.}
-#'     \item{jaccard_matrix}{Symmetric matrix of pairwise Jaccard similarity
-#'       coefficients between solutions. Row/column names are `solution_id` values.}
-#'     \item{n_solutions}{Integer count of Pareto-optimal solutions analyzed.}
-#'     \item{mean_jaccard}{Mean pairwise Jaccard similarity (excluding diagonal).}
-#'   }
-#' @export
-#' @seealso [compute_inclusion_frequencies()], [plot_feature_stability()]
-#' @examples
-#' # After running optimize_panel():
-#' # stability <- analyze_feature_stability(panel_result)
-#' # stability$frequencies
-#' # stability$jaccard_matrix
-analyze_feature_stability <- function(result) {
-  stopifnot(inherits(result, "BiomarkerPanelResult"))
-
-  solution_features <- .extract_solution_features(result)
-  n_solutions <- length(solution_features)
-
-  # Handle empty result
-
-  if (n_solutions == 0L) {
-    return(structure(
-      list(
-        frequencies = data.frame(
-          feature = character(),
-          count = integer(),
-          proportion = numeric(),
-          stringsAsFactors = FALSE
-        ),
-        jaccard_matrix = matrix(nrow = 0L, ncol = 0L),
-        n_solutions = 0L,
-        mean_jaccard = NA_real_
-      ),
-      class = "FeatureStabilityResult"
-    ))
-  }
-
-  # Compute frequencies by reusing compute_inclusion_frequencies()
-  frequencies <- compute_inclusion_frequencies(list(result))
-
-  # Compute Jaccard similarity matrix
-  solution_ids <- names(solution_features)
-  jaccard_matrix <- matrix(
-    NA_real_,
-    nrow = n_solutions,
-    ncol = n_solutions,
-    dimnames = list(solution_ids, solution_ids)
-  )
-
-  for (i in seq_len(n_solutions)) {
-    for (j in seq_len(i)) {
-      set_i <- solution_features[[i]]
-      set_j <- solution_features[[j]]
-
-      if (length(set_i) == 0L && length(set_j) == 0L) {
-        jaccard <- 1.0
-      } else if (length(set_i) == 0L || length(set_j) == 0L) {
-        jaccard <- 0.0
-      } else {
-        intersection_size <- length(intersect(set_i, set_j))
-        union_size <- length(union(set_i, set_j))
-        jaccard <- intersection_size / union_size
-      }
-
-      jaccard_matrix[i, j] <- jaccard
-      jaccard_matrix[j, i] <- jaccard
-    }
-  }
-
-  # Calculate mean Jaccard (off-diagonal)
-  if (n_solutions > 1L) {
-    off_diag <- jaccard_matrix[lower.tri(jaccard_matrix)]
-    mean_jaccard <- mean(off_diag)
-  } else {
-    mean_jaccard <- NA_real_
-  }
-
-  structure(
-    list(
-      frequencies = frequencies,
-      jaccard_matrix = jaccard_matrix,
-      n_solutions = n_solutions,
-      mean_jaccard = mean_jaccard
-    ),
-    class = "FeatureStabilityResult"
   )
 }
