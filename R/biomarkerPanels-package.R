@@ -16,6 +16,6 @@
 #' @keywords internal
 #' @importFrom methods new
 #' @importFrom rlang .data
-#' @importFrom stats median runif setNames
-#' @importFrom utils head
+#' @importFrom stats median runif setNames lm predict quantile
+#' @importFrom utils head combn
 "_PACKAGE"
