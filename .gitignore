@@ -27,4 +27,5 @@ inst/benchmarks/
 *.tar.gz
 
 *.Rproj
-.agents
+check.sh
+check_output.txt
