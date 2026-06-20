@@ -154,7 +154,21 @@ NULL
   cache <- .new_fitness_cache(cache_max_entries)
   force(feature_transform)
 
+  # Check for reference_feature attribute on any matrix
+  ref_col <- NULL
+  for (mat in matrices) {
+    rc <- attr(mat, "reference_feature")
+    if (!is.null(rc)) {
+      ref_col <- rc
+      break
+    }
+  }
+
   function(selected_base_features) {
+    if (!is.null(ref_col) && !(ref_col %in% selected_base_features)) {
+      selected_base_features <- c(ref_col, selected_base_features)
+    }
+
     key <- .panel_key(selected_base_features)
     cached <- .cache_get(cache, key)
     if (!is.null(cached)) {
@@ -162,7 +176,11 @@ NULL
     }
 
     base_matrices <- lapply(matrices, function(mat) {
-      mat[, selected_base_features, drop = FALSE]
+      sub_mat <- mat[, selected_base_features, drop = FALSE]
+      if (!is.null(ref_col)) {
+        attr(sub_mat, "reference_feature") <- ref_col
+      }
+      sub_mat
     })
 
     if (feature_transform != "none" && length(selected_base_features) >= 2L) {

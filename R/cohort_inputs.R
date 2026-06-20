@@ -135,6 +135,11 @@ NULL
     }
 
     combined_x <- do.call(rbind, matrices)
+    ref_attr <- attr(matrices[[1]], "reference_feature")
+    if (!is.null(ref_attr)) {
+      attr(combined_x, "reference_feature") <- ref_attr
+    }
+
     # Safe concatenation: all responses are now guaranteed to have identical levels
     truth <- factor(
       unlist(lapply(response_list, as.character), use.names = FALSE),
