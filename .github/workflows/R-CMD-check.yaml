@@ -44,10 +44,6 @@ jobs:
           extra-packages: any::rcmdcheck
           needs: check
 
-      - name: Install customized rmoo fork
-        run: pak::pkg_install("Harry25R/rmoo@a984a1b8735dd5fe6beded0d38925a99f9139dcb")
-        shell: Rscript {0}
-
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true

@@ -20,7 +20,7 @@ Imports:
     Rcpp,
     SummarizedExperiment,
     rlang,
-    rmoo,
+    rmoo (>= 0.3.2),
     limma,
     glmnet,
     MASS,
