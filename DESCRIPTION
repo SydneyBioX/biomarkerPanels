@@ -37,6 +37,7 @@ Suggests:
     pkgload,
     ruv,
     emoa,
+    ecr,
     patchwork,
     magick
 LinkingTo:
