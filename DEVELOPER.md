@@ -67,3 +67,23 @@ The package is organized into several distinct modules that handle the data life
 ### 6. Summarization & Visualization
 - **Files:** `panel_summarization.R`, `panel_diversity.R`, `visualization.R`, `hypervolume.R`
 - **Purpose:** Translates complex optimization outputs into actionable insights. `panel_diversity.R` measures feature sharing across the Pareto front, while `visualization.R` provides high-level plotting tools to inspect pareto fronts, feature importance, and performance trade-offs.
+
+## Unit Testing Strategy & Refactoring Plan
+
+The `biomarkerPanels` package maintains a robust unit testing suite. However, to keep tests maintainable, performant, and easy to navigate, we utilize smaller, categorically split scripts paired with centralized helper functions.
+
+### Testing Architecture
+
+1. **Categorical Splitting**: Test files are named using the `test-{module}-{feature}.R` convention.
+   - For example, `test-optimization.R` is split into `test-optimize-core.R`, `test-optimize-aggregators.R`, `test-optimize-cohorts.R`, and `test-optimize-algorithms.R`.
+   - `test-metric-functions.R` is split into `test-metrics-base.R`, `test-metrics-cohort.R`, and `test-metrics-objectives.R`.
+2. **Centralized Helpers (DRY)**: Repeated data setup and mock generation are centralized in `tests/testthat/helper-data.R` (and other `helper-*.R` files). These are automatically loaded by `testthat` for all tests.
+3. **Decoupled Integration Tests**: Tests validating S4 data structures or simple threshold logic use mock objects instead of running the full stochastic optimization loops (e.g., `nsga3`).
+
+### Execution Workflow for Refactoring
+
+When refactoring or breaking up long test scripts, the following workflow must be strictly followed to ensure stability:
+
+1. **One-by-One Execution**: We will work with each test script one by one. We do not attempt to split or rewrite all files simultaneously.
+2. **Immediate Validation**: At the end of editing or splitting a single script, we immediately revise and review that the solution actually works by running the `devtools::test()` function (or `devtools::test(filter='pattern')`).
+3. **Immediate Remediation**: If there are any problems, errors, or test failures with the script that was just edited, we will fix those errors immediately before moving on to the next test script.

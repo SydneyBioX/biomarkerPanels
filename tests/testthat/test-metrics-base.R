@@ -1,3 +1,4 @@
+# Tests for foundational single-cutoff or continuous classification metrics (e.g., sensitivity, specificity, AUC).
 test_that("metric_sensitivity and metric_specificity behave as expected", {
   truth <- factor(c("No", "Yes", "Yes", "No"), levels = c("No", "Yes"))
   scores <- c(0.1, 0.9, 0.8, 0.2)
@@ -43,68 +44,6 @@ test_that("metric_num_features handles edge cases", {
   expect_equal(metric_num_features(selected = named_features), 2)
 })
 
-test_that("build_objectives wraps registered metrics", {
-  objs <- build_objectives(c("sensitivity", "num_features"),
-                           params = list(sensitivity = list(cutoff_prob = 0.7)))
-  truth <- factor(c("No", "Yes", "Yes", "No"), levels = c("No", "Yes"))
-  scores <- c(0.1, 0.9, 0.6, 0.3)
-  selected <- c("a", "b", "c")
-  expect_equal(names(objs), c("sensitivity", "num_features"))
-  expect_equal(objs$sensitivity$direction, "maximize")
-  expect_equal(objs$num_features$direction, "minimize")
-  expect_true(is.numeric(objs$sensitivity$fun(truth, scores, selected)))
-  expect_equal(objs$num_features$fun(truth, scores, selected), 3)
-})
-
-test_that("register_metric adds new entries", {
-  custom <- function(truth, scores = NULL, selected = NULL, ...) 42
-  name <- paste0("custom_", sample(1000, 1))
-  register_metric(name, custom, direction = "maximize", overwrite = TRUE)
-  objs <- build_objectives(name)
-  expect_equal(objs[[name]]$fun(NULL, NULL, NULL), 42)
-})
-
-test_that("cohort-aware AUC metrics compute transfer metrics", {
-  # Need enough samples per cohort for AUC to be meaningful
-  set.seed(123)
-  truth <- factor(
-    c("No", "Yes", "Yes", "No", "Yes", "No", "No", "Yes", "Yes", "No"),
-    levels = c("No", "Yes")
-  )
-  scores <- c(0.1, 0.9, 0.8, 0.2, 0.7, 0.3, 0.15, 0.85, 0.75, 0.25)
-  cohort <- factor(c("A", "A", "A", "A", "A", "B", "B", "B", "B", "B"))
-
-  auc_A <- metric_auc(truth[cohort == "A"], scores[cohort == "A"])
-  auc_B <- metric_auc(truth[cohort == "B"], scores[cohort == "B"])
-
-  # metric_min_cohort_auc equals minimum per-cohort AUC
-  expect_equal(
-    metric_min_cohort_auc(truth, scores, cohort = cohort),
-    min(auc_A, auc_B)
-  )
-
-  # metric_cohort_auc_gap equals max - min per-cohort AUC
-  gap <- metric_cohort_auc_gap(truth, scores, cohort = cohort)
-  expect_gte(gap, 0)
-  expect_equal(gap, max(auc_A, auc_B) - min(auc_A, auc_B))
-
-  # metric_cohort_auc_var equals variance of per-cohort AUC
-  auc_var <- metric_cohort_auc_var(truth, scores, cohort = cohort)
-  expect_gte(auc_var, 0)
-  expect_equal(auc_var, var(c(auc_A, auc_B)))
-
-  brier <- metric_max_cohort_brier(truth, scores, cohort = cohort)
-  expect_gte(brier, 0)
-
-  objs <- build_objectives("min_cohort_auc")
-  expect_equal(
-    objs$min_cohort_auc$fun(truth, scores, cohort = cohort),
-    metric_min_cohort_auc(truth, scores, cohort = cohort)
-  )
-})
-
-
-
 # Issue 2: cutoff_strategy parameter tests
 test_that("metric_sensitivity uses cutoff_strategy correctly", {
   # Create imbalanced data (30% positive)
@@ -140,24 +79,6 @@ test_that("metric_specificity uses cutoff_strategy correctly", {
   spec_prev <- metric_specificity(truth, scores, cutoff_strategy = "prevalence")
   # With cutoff = 0.3, scores < 0.3 are TN. Negatives: 0.1, 0.2 < 0.3 -> TN=2
   expect_equal(spec_prev, 2/7)
-})
-
-test_that("define_objectives passes cutoff_strategy to metrics", {
-  objs <- define_objectives(
-    metrics = c("sensitivity", "specificity"),
-    cutoff_strategy = "prevalence"
-  )
-
-  truth <- factor(c(rep("No", 7), rep("Yes", 3)), levels = c("No", "Yes"))
-  scores <- c(0.1, 0.2, 0.3, 0.35, 0.4, 0.45, 0.55, 0.7, 0.8, 0.9)
-
-  # The objectives should use prevalence-based cutoff
-  sens <- objs$sensitivity$fun(truth, scores)
-  spec <- objs$specificity$fun(truth, scores)
-
-  # Compare with direct call using prevalence
-  expect_equal(sens, metric_sensitivity(truth, scores, cutoff_strategy = "prevalence"))
-  expect_equal(spec, metric_specificity(truth, scores, cutoff_strategy = "prevalence"))
 })
 
 # Tests for metric functions: AUC, F1, precision, NPV
@@ -236,32 +157,6 @@ test_that("metric functions handle edge cases", {
   expect_equal(metric_npv(truth_all_neg, scores2), 1.0)
 })
 
-test_that("metric functions are registered in the metric registry", {
-  registry <- metric_registry()
-  expect_true("auc" %in% names(registry))
-  expect_true("f1" %in% names(registry))
-  expect_true("precision" %in% names(registry))
-  expect_true("npv" %in% names(registry))
-
-  # All should be maximize direction
-  expect_equal(registry$auc$direction, "maximize")
-  expect_equal(registry$f1$direction, "maximize")
-  expect_equal(registry$precision$direction, "maximize")
-  expect_equal(registry$npv$direction, "maximize")
-})
-
-test_that("metric functions work with build_objectives", {
-  objs <- build_objectives(c("auc", "f1", "precision", "npv"))
-
-  truth <- factor(c("No", "Yes", "Yes", "No"), levels = c("No", "Yes"))
-  scores <- c(0.1, 0.9, 0.8, 0.2)
-
-  expect_true(is.numeric(objs$auc$fun(truth, scores)))
-  expect_true(is.numeric(objs$f1$fun(truth, scores)))
-  expect_true(is.numeric(objs$precision$fun(truth, scores)))
-  expect_true(is.numeric(objs$npv$fun(truth, scores)))
-})
-
 # Tests for metric_specificity_at_sensitivity
 test_that("metric_specificity_at_sensitivity computes correctly", {
   set.seed(42)
@@ -316,237 +211,6 @@ test_that("metric_specificity_at_sensitivity handles edge cases", {
     metric_specificity_at_sensitivity(truth),
     "scores.*must be supplied"
   )
-})
-
-test_that("metric_specificity_at_sensitivity is registered correctly", {
-  registry <- metric_registry()
-  expect_true("specificity_at_sensitivity" %in% names(registry))
-  expect_equal(registry$specificity_at_sensitivity$direction, "maximize")
-})
-
-test_that("metric_specificity_at_sensitivity works with build_objectives", {
-  objs <- build_objectives(
-    "specificity_at_sensitivity",
-    params = list(specificity_at_sensitivity = list(target_sensitivity = 0.95))
-  )
-
-  set.seed(42)
-  truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
-  scores <- c(rnorm(50, 0.3, 0.1), rnorm(50, 0.7, 0.1))
-
-  result <- objs$specificity_at_sensitivity$fun(truth, scores)
-  expect_true(is.numeric(result))
-
-  # Should match direct call with same parameter
-  direct <- metric_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.95)
-  expect_equal(result, direct)
-})
-
-# Tests for cutoff_dependent metadata
-test_that("metric registry includes cutoff_dependent field", {
-  registry <- metric_registry()
-
-  # Cutoff-dependent metrics should have cutoff_dependent = TRUE
-  expect_true(registry$sensitivity$cutoff_dependent)
-  expect_true(registry$specificity$cutoff_dependent)
-  expect_true(registry$balanced_accuracy$cutoff_dependent)
-  expect_true(registry$f1$cutoff_dependent)
-  expect_true(registry$precision$cutoff_dependent)
-  expect_true(registry$npv$cutoff_dependent)
-  expect_false(registry$min_cohort_auc$cutoff_dependent)
-  expect_false(registry$cohort_auc_gap$cutoff_dependent)
-  expect_false(registry$cohort_auc_var$cutoff_dependent)
-
-  # Cutoff-free metrics should have cutoff_dependent = FALSE
-  expect_false(registry$auc$cutoff_dependent)
-  expect_false(registry$pauc$cutoff_dependent)
-  expect_false(registry$specificity_at_sensitivity$cutoff_dependent)
-  expect_false(registry$num_features$cutoff_dependent)
-  expect_false(registry$max_cohort_brier$cutoff_dependent)
-
-})
-
-test_that("min_metric_constraint warns for cutoff-dependent metrics", {
-  # Should warn for sensitivity
-
-  expect_warning(
-    min_metric_constraint("sensitivity", threshold = 0.9),
-    "depends on a probability cutoff"
-  )
-
-  # Should warn for specificity
-  expect_warning(
-    min_metric_constraint("specificity", threshold = 0.8),
-    "depends on a probability cutoff"
-  )
-
-  # Should NOT warn for AUC
-  expect_no_warning(
-    min_metric_constraint("auc", threshold = 0.8)
-  )
-
-  # Should NOT warn for specificity_at_sensitivity
-  expect_no_warning(
-    min_metric_constraint("specificity_at_sensitivity", threshold = 0.5)
-  )
-})
-
-test_that("register_metric accepts cutoff_dependent parameter", {
-  custom_cutoff <- function(truth, scores = NULL, selected = NULL, ...) 0.5
-  name <- paste0("custom_cutoff_", sample(1000, 1))
-
-  register_metric(
-    name, custom_cutoff,
-    direction = "maximize",
-    cutoff_dependent = TRUE,
-    overwrite = TRUE
-  )
-
-  registry <- metric_registry()
-  expect_true(registry[[name]]$cutoff_dependent)
-
-  # Should warn when used in constraint
-  expect_warning(
-    min_metric_constraint(name, threshold = 0.4),
-    "depends on a probability cutoff"
-  )
-})
-
-# ---------------------------------------------------------------------------
-# Tests for cohort transferability metrics
-# ---------------------------------------------------------------------------
-
-test_that("metric_cohort_leakage detects cohort-driven score shifts", {
-
-  set.seed(42)
-  n <- 60
-  truth <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
-  cohort <- factor(rep(c("A", "B", "C"), times = n / 3))
-
-  # Scores with strong cohort effect within each class
-  scores_leaky <- ifelse(cohort == "A", 0.2, ifelse(cohort == "B", 0.5, 0.8))
-  scores_leaky <- scores_leaky + rnorm(n, 0, 0.02)
-
-  leak <- metric_cohort_leakage(truth, scores_leaky, cohort = cohort)
-  expect_gt(leak, 0.5)  # strong leakage
-
-  # Scores with no cohort effect
-  scores_clean <- ifelse(truth == "Yes", 0.8, 0.2) + rnorm(n, 0, 0.05)
-
-  leak_clean <- metric_cohort_leakage(truth, scores_clean, cohort = cohort)
-  expect_lt(leak_clean, 0.15)  # minimal leakage
-})
-
-test_that("metric_cohort_leakage returns 0 when cohort is NULL or single level", {
-  truth <- factor(c("No", "Yes", "Yes", "No"), levels = c("No", "Yes"))
-  scores <- c(0.1, 0.9, 0.8, 0.2)
-
-  expect_equal(metric_cohort_leakage(truth, scores, cohort = NULL), 0)
-  expect_equal(
-    metric_cohort_leakage(truth, scores, cohort = rep("A", 4)),
-    0
-  )
-})
-
-test_that("metric_cohort_leakage uses adjusted R-squared", {
-  # With many cohort levels and few samples, unadjusted R-squared inflates.
-  # Adjusted R-squared should be lower.
-  set.seed(99)
-  n <- 40
-  truth <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
-  # 4 cohorts, balanced — random scores should have low leakage
-  cohort <- factor(rep(paste0("C", 1:4), times = n / 4))
-  scores <- runif(n)
-
-  leak <- metric_cohort_leakage(truth, scores, cohort = cohort)
-  # Random scores + adjusted R2 should be near 0 (not inflated)
-  expect_lte(leak, 0.25)
-})
-
-test_that("metric_cohort_leakage errors without scores", {
-  truth <- factor(c("No", "Yes"), levels = c("No", "Yes"))
-  expect_error(metric_cohort_leakage(truth), "scores")
-})
-
-test_that("metric_conditional_score_shift detects distributional shifts", {
-  set.seed(42)
-  n_per <- 30
-
-  truth <- factor(rep(c("No", "Yes"), each = n_per * 2), levels = c("No", "Yes"))
-  cohort <- factor(rep(rep(c("A", "B"), each = n_per), 2))
-
-  # Controls: A ~ N(0.2, 0.05), B ~ N(0.6, 0.05) — large shift
-  # Cases: A ~ N(0.7, 0.05), B ~ N(0.7, 0.05) — no shift
-  scores <- c(
-    rnorm(n_per, 0.2, 0.05), rnorm(n_per, 0.6, 0.05),  # controls
-    rnorm(n_per, 0.7, 0.05), rnorm(n_per, 0.7, 0.05)   # cases
-  )
-
-  shift <- metric_conditional_score_shift(truth, scores, cohort = cohort)
-  expect_gt(shift, 0.3)  # detects the control shift
-
-  # Clean scores: no cohort shift within either class
-  scores_clean <- c(
-    rnorm(n_per, 0.3, 0.05), rnorm(n_per, 0.3, 0.05),  # controls
-    rnorm(n_per, 0.7, 0.05), rnorm(n_per, 0.7, 0.05)   # cases
-  )
-  shift_clean <- metric_conditional_score_shift(truth, scores_clean, cohort = cohort)
-  expect_lt(shift_clean, 0.1)
-})
-
-test_that("metric_conditional_score_shift returns 0 when cohort is NULL", {
-  truth <- factor(c("No", "Yes", "Yes", "No"), levels = c("No", "Yes"))
-  scores <- c(0.1, 0.9, 0.8, 0.2)
-
-  expect_equal(metric_conditional_score_shift(truth, scores, cohort = NULL), 0)
-})
-
-test_that("metric_conditional_score_shift handles small cohorts gracefully", {
-  # Cohorts too small for W1 (< 10 per class per cohort) -> NA
-  truth <- factor(c(rep("No", 6), rep("Yes", 6)), levels = c("No", "Yes"))
-  cohort <- factor(rep(c("A", "B"), 6))
-  scores <- runif(12)
-
-  result <- metric_conditional_score_shift(truth, scores, cohort = cohort)
-  expect_true(is.na(result) || is.numeric(result))
-})
-
-test_that("metric_conditional_score_shift errors without scores", {
-  truth <- factor(c("No", "Yes"), levels = c("No", "Yes"))
-  expect_error(metric_conditional_score_shift(truth), "scores")
-})
-
-test_that("cohort transferability metrics are registered correctly", {
-  registry <- metric_registry()
-
-  expect_true("cohort_leakage" %in% names(registry))
-  expect_equal(registry$cohort_leakage$direction, "minimize")
-  expect_false(registry$cohort_leakage$cutoff_dependent)
-
-  expect_true("conditional_score_shift" %in% names(registry))
-  expect_equal(registry$conditional_score_shift$direction, "minimize")
-  expect_false(registry$conditional_score_shift$cutoff_dependent)
-})
-
-test_that("cohort transferability metrics work through build_objectives", {
-  set.seed(42)
-  n_per <- 30
-  truth <- factor(rep(c("No", "Yes"), each = n_per * 2), levels = c("No", "Yes"))
-  cohort <- factor(rep(rep(c("A", "B"), each = n_per), 2))
-  scores <- c(
-    rnorm(n_per, 0.3, 0.1), rnorm(n_per, 0.5, 0.1),
-    rnorm(n_per, 0.7, 0.1), rnorm(n_per, 0.7, 0.1)
-  )
-
-  objs <- build_objectives(c("cohort_leakage", "conditional_score_shift"))
-
-  leak_obj <- objs$cohort_leakage$fun(truth, scores, cohort = cohort)
-  leak_direct <- metric_cohort_leakage(truth, scores, cohort = cohort)
-  expect_equal(leak_obj, leak_direct)
-
-  shift_obj <- objs$conditional_score_shift$fun(truth, scores, cohort = cohort)
-  shift_direct <- metric_conditional_score_shift(truth, scores, cohort = cohort)
-  expect_equal(shift_obj, shift_direct)
 })
 
 # --- Hand-calculated ground truth tests ---
@@ -666,29 +330,6 @@ test_that("metric_easy_hard_accuracy errors on length mismatch", {
     metric_easy_hard_accuracy(truth, scores, difficulty = c("easy", "hard")),
     "same length"
   )
-})
-
-test_that("metric_easy_hard_accuracy is registered correctly", {
-  registry <- metric_registry()
-  expect_true("easy_hard_accuracy" %in% names(registry))
-  expect_equal(registry$easy_hard_accuracy$direction, "maximize")
-  expect_true(registry$easy_hard_accuracy$cutoff_dependent)
-})
-
-test_that("metric_easy_hard_accuracy works through build_objectives", {
-  truth <- factor(c("No", "No", "Yes", "Yes", "No", "No", "Yes", "Yes"),
-                  levels = c("No", "Yes"))
-  scores <- c(0.1, 0.2, 0.8, 0.9, 0.1, 0.2, 0.3, 0.9)
-  difficulty <- c("easy", "easy", "easy", "easy", "hard", "hard", "hard", "hard")
-
-  objs <- build_objectives(
-    "easy_hard_accuracy",
-    params = list(easy_hard_accuracy = list(difficulty = difficulty))
-  )
-
-  result <- objs$easy_hard_accuracy$fun(truth, scores)
-  direct <- metric_easy_hard_accuracy(truth, scores, difficulty = difficulty)
-  expect_equal(result, direct)
 })
 
 # ============================================================================
