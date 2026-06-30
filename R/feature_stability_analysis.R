@@ -12,10 +12,10 @@ NULL
 #'
 #' Computes feature inclusion frequencies and pairwise Jaccard similarity
 #' between all Pareto-optimal solutions. Accepts either an
-#' [`OptimizationResult`] (preferred — contains all Pareto solutions) or a
+#' `OptimizationResult` (preferred — contains all Pareto solutions) or a
 #' [`BiomarkerPanelResult`] (legacy path).
 #'
-#' @param result An [`OptimizationResult`] or [`BiomarkerPanelResult`].
+#' @param result An `OptimizationResult` or [`BiomarkerPanelResult`].
 #' @param feature_type One of `"features"` (default) or `"base_features"`.
 #'   When `"base_features"`, counts original gene names rather than transformed
 #'   feature names (e.g. pairwise ratios). Only supported for

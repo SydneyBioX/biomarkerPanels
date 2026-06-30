@@ -3,6 +3,7 @@
 \docType{class}
 \name{BiomarkerPanelResult-class}
 \alias{BiomarkerPanelResult-class}
+\alias{BiomarkerPanelResult}
 \title{Biomarker Panel Result Class}
 \description{
 Stores a fitted biomarker panel including selected biomarkers,

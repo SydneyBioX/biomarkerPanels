@@ -20,7 +20,7 @@ hypervolume_history(
 )
 }
 \arguments{
-\item{object}{An \code{\link{OptimizationResult}} with non-empty \code{nsga_history()}.}
+\item{object}{An \code{OptimizationResult} with non-empty \code{nsga_history()}.}
 
 \item{ref}{Optional numeric reference point in user-facing direction. If
 \code{NULL}, derived from the final generation's Pareto set.}

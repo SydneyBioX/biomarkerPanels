@@ -12,7 +12,7 @@ optimize_panel(
   max_features = 5L,
   feature_pool = NULL,
   feature_transform = "pairwise_ratios",
-  feature_alignment = "intersection",
+  feature_alignment = c("intersection", "majority", "impute_median"),
   constraints = list(),
   scoring_fn = NULL,
   algorithm = c("NSGA-III", "NSGA-II"),

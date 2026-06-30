@@ -21,6 +21,6 @@ binary label. Uses the rank-sum formula for speed:
 sum of ranks for the positive class.
 }
 \details{
-AUC is folded to \link{0.5, 1} so direction doesn't matter.
+AUC is folded to \code{[0.5, 1]} so direction doesn't matter.
 }
 \keyword{internal}

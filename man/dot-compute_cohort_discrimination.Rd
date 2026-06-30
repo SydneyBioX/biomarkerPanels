@@ -13,7 +13,7 @@
 }
 \value{
 Numeric vector of cohort discrimination scores per feature, scaled
-to \link{0.5, 1} where 0.5 = no cohort separation.
+to \code{[0.5, 1]} where 0.5 = no cohort separation.
 }
 \description{
 For each feature, measures how well it separates cohorts (ignoring outcome).

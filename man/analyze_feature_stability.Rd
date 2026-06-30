@@ -10,7 +10,7 @@ analyze_feature_stability(
 )
 }
 \arguments{
-\item{result}{An \code{\link{OptimizationResult}} or \code{\link{BiomarkerPanelResult}}.}
+\item{result}{An \code{OptimizationResult} or \code{\link{BiomarkerPanelResult}}.}
 
 \item{feature_type}{One of \code{"features"} (default) or \code{"base_features"}.
 When \code{"base_features"}, counts original gene names rather than transformed
@@ -31,7 +31,7 @@ coefficients between solutions. Row/column names are \code{solution_id} values.}
 \description{
 Computes feature inclusion frequencies and pairwise Jaccard similarity
 between all Pareto-optimal solutions. Accepts either an
-\code{\link{OptimizationResult}} (preferred — contains all Pareto solutions) or a
+\code{OptimizationResult} (preferred — contains all Pareto solutions) or a
 \code{\link{BiomarkerPanelResult}} (legacy path).
 }
 \examples{

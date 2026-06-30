@@ -4,7 +4,7 @@ NULL
 #' Hypervolume of an Optimization Result
 #'
 #' Compute the dominated hypervolume of the Pareto front contained in an
-#' [`OptimizationResult`]. Hypervolume is a standard quality indicator for
+#' `OptimizationResult`. Hypervolume is a standard quality indicator for
 #' multi-objective optimization: larger values indicate a front that
 #' simultaneously improves on more objectives.
 #'
@@ -17,7 +17,7 @@ NULL
 #'
 #' Requires the suggested `emoa` package.
 #'
-#' @param object An [`OptimizationResult`].
+#' @param object An `OptimizationResult`.
 #' @param ref Optional numeric reference point in the **user-facing** direction
 #'   (same scale as the columns in `solutions(object)`). If `NULL`, defaults to
 #'   the front's nadir shifted by `ref_buffer`.
@@ -67,7 +67,7 @@ setMethod(
 #' fixed across generations so HV values are comparable: if not supplied, the
 #' nadir of the *final* generation's Pareto set is used (with `ref_buffer`).
 #'
-#' @param object An [`OptimizationResult`] with non-empty `nsga_history()`.
+#' @param object An `OptimizationResult` with non-empty `nsga_history()`.
 #' @param ref Optional numeric reference point in user-facing direction. If
 #'   `NULL`, derived from the final generation's Pareto set.
 #' @param ref_buffer Fractional outward shift applied per objective when `ref`

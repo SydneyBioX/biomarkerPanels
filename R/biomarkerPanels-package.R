@@ -13,6 +13,9 @@
 #' * Evaluation utilities (`evaluate_panel`, `evaluate_pareto_solutions`,
 #'   `plot_pareto_front`).
 #'
-#' @docType package
-#' @name biomarkerPanels
-NULL
+#' @keywords internal
+#' @importFrom methods new
+#' @importFrom rlang .data
+#' @importFrom stats median runif setNames lm predict quantile
+#' @importFrom utils head combn
+"_PACKAGE"

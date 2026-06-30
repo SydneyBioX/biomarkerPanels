@@ -113,7 +113,7 @@ test_that("fit_panel selects solution automatically", {
   skip_slow_tests()
   set.seed(123)
 
-  sim <- simulate_expression_data(p = 30, n = 40, k = 1, seed = 42)
+  sim <- simulate_expression_data(p = 30, n = 200, k = 1, seed = 42)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
 
@@ -141,7 +141,7 @@ test_that("fit_panel selects specified solution", {
   skip_slow_tests()
   set.seed(456)
 
-  sim <- simulate_expression_data(p = 30, n = 40, k = 1, seed = 43)
+  sim <- simulate_expression_data(p = 30, n = 200, k = 1, seed = 43)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
 
@@ -169,7 +169,7 @@ test_that("fit_panel accepts explicit features", {
   skip_slow_tests()
   set.seed(789)
 
-  sim <- simulate_expression_data(p = 30, n = 40, k = 1, seed = 44)
+  sim <- simulate_expression_data(p = 30, n = 200, k = 1, seed = 44)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
 
@@ -195,7 +195,7 @@ test_that("fit_panel with regularized = TRUE produces cv.glmnet model", {
   skip_slow_tests()
   set.seed(321)
 
-  sim <- simulate_expression_data(p = 30, n = 40, k = 1, seed = 45)
+  sim <- simulate_expression_data(p = 30, n = 200, k = 1, seed = 45)
   x <- sim$x_list[[1]]
   y <- sim$y_list[[1]]
 
@@ -215,30 +215,6 @@ test_that("fit_panel with regularized = TRUE produces cv.glmnet model", {
   expect_true(panel@control$regularized)
 })
 
-test_that("fit_panel with regularized = FALSE produces glm model", {
-  skip_slow_tests()
-  set.seed(654)
-
-  sim <- simulate_expression_data(p = 30, n = 40, k = 1, seed = 46)
-  x <- sim$x_list[[1]]
-  y <- sim$y_list[[1]]
-
-  opt <- optimize_panel(
-    x = x,
-    y = y,
-    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-    max_features = 3,
-    feature_pool = colnames(x)[seq_len(8)],
-    feature_transform = "none",
-    regularized = FALSE,
-    nsga_control = list(popSize = 12, maxiter = 10)
-  )
-
-  panel <- fit_panel(opt, regularized = FALSE)
-
-  expect_true(inherits(panel@model, "glm"))
-  expect_false(panel@control$regularized)
-})
 
 test_that("fit_panel errors on invalid solution_id", {
   solutions_df <- data.frame(

@@ -17,11 +17,10 @@ Imports:
     methods,
     stats,
     utils,
-    Matrix,
     Rcpp,
     SummarizedExperiment,
-    S4Vectors,
-    rmoo,
+    rlang,
+    rmoo (>= 0.3.2),
     limma,
     glmnet,
     MASS,
@@ -34,8 +33,11 @@ Suggests:
     ggplot2,
     BiocStyle,
     nproc,
+    microbenchmark,
+    pkgload,
     ruv,
     emoa,
+    ecr,
     patchwork,
     magick
 LinkingTo:
@@ -47,6 +49,7 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 URL: https://github.com/SydneyBioX/biomarkerPanels
 BugReports: https://github.com/SydneyBioX/biomarkerPanels/issues
+VignetteBuilder: knitr
 Collate: 
     'RcppExports.R'
     'biomarkerPanels-package.R'
@@ -56,6 +59,7 @@ Collate:
     'cpop_step2.R'
     'cpop_utils.R'
     'cv_scoring.R'
+    'data.R'
     'data_partitioning.R'
     'de_analysis_helpers.R'
     'denominator_features.R'
@@ -95,6 +99,7 @@ Collate:
     'panel_summarization.R'
     'ruv_features.R'
     'ruv_features_helpers.R'
+    'simulate_expression_data.R'
     'threshold_calibration.R'
     'transferable_features.R'
     'utils.R'

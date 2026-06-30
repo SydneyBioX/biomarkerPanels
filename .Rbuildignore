@@ -5,9 +5,16 @@
 ^data-raw$
 ^NEWS\.md$
 ^README\.md$
-^tests/data$
 ^\.git$
 ^\.Rproj.user$
 ^src/.*\\.(o|so|dll)$
 ^biomarkerPanels_.*\.tar\.gz$
 ^dev$
+^\.Rproj\.user$
+^\.github$
+^\.agents$
+^check\.sh$
+^check_output\.txt$
+^doc$
+^docs$
+^DEVELOPER\.md$

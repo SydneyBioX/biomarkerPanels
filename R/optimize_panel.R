@@ -110,7 +110,7 @@ optimize_panel <- function(x, y,
                            max_features = 5L,
                            feature_pool = NULL,
                            feature_transform = "pairwise_ratios",
-                           feature_alignment = "intersection",
+                           feature_alignment = c("intersection", "majority", "impute_median"),
                            constraints = list(),
                            scoring_fn = NULL,
                            algorithm = c("NSGA-III", "NSGA-II"),
@@ -277,7 +277,11 @@ optimize_panel <- function(x, y,
   }
 
   # x_pool contains RAW (base) features - transform applied on-the-fly
+  ref_attr <- attr(x_raw, "reference_feature")
   x_pool <- x_raw[, feature_pool, drop = FALSE]
+  if (!is.null(ref_attr)) {
+    attr(x_pool, "reference_feature") <- ref_attr
+  }
   decision_dim <- ncol(x_pool)  # Decision dimension = number of BASE features
 
   if (decision_dim > 200) {

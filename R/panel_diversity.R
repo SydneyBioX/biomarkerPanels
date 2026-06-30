@@ -23,9 +23,9 @@
 #' the pool -- unlike annotation-based pathway diversity on non-symbol features.
 #'
 #' @param solutions A data frame from [summarize_solutions()] (must contain a
-#'   `solution_id` column). As a convenience, an [`OptimizationResult`] may be
+#'   `solution_id` column). As a convenience, an `OptimizationResult` may be
 #'   passed directly, in which case its summary is computed internally.
-#' @param optimization_result The [`OptimizationResult`] the `solutions` summary
+#' @param optimization_result The `OptimizationResult` the `solutions` summary
 #'   came from. Supplies both the training feature matrix (`@aggregated_x`, whose
 #'   columns are the base-feature pool) and the per-solution base features.
 #'   Optional when `solutions` is itself an `OptimizationResult`.

@@ -145,7 +145,7 @@ select_panel_top_sensitivity <- function(performance,
 
 #' Compute biomarker inclusion frequencies across optimisation runs.
 #'
-#' @param panels List of [`OptimizationResult`], [`BiomarkerPanelResult`]
+#' @param panels List of `OptimizationResult`, [`BiomarkerPanelResult`]
 #'   objects, character vectors of biomarkers, or a mixture of these. A single
 #'   (unwrapped) `OptimizationResult` is also accepted.
 #' @param feature_type One of `"features"` (default) or `"base_features"`.

@@ -10,7 +10,7 @@ hypervolume(object, ref = NULL, ref_buffer = 0.05)
 \S4method{hypervolume}{OptimizationResult}(object, ref = NULL, ref_buffer = 0.05)
 }
 \arguments{
-\item{object}{An \code{\link{OptimizationResult}}.}
+\item{object}{An \code{OptimizationResult}.}
 
 \item{ref}{Optional numeric reference point in the \strong{user-facing} direction
 (same scale as the columns in \code{solutions(object)}). If \code{NULL}, defaults to
@@ -26,7 +26,7 @@ user-facing direction).
 }
 \description{
 Compute the dominated hypervolume of the Pareto front contained in an
-\code{\link{OptimizationResult}}. Hypervolume is a standard quality indicator for
+\code{OptimizationResult}. Hypervolume is a standard quality indicator for
 multi-objective optimization: larger values indicate a front that
 simultaneously improves on more objectives.
 }

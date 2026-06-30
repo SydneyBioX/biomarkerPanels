@@ -10,7 +10,7 @@ compute_inclusion_frequencies(
 )
 }
 \arguments{
-\item{panels}{List of \code{\link{OptimizationResult}}, \code{\link{BiomarkerPanelResult}}
+\item{panels}{List of \code{OptimizationResult}, \code{\link{BiomarkerPanelResult}}
 objects, character vectors of biomarkers, or a mixture of these. A single
 (unwrapped) \code{OptimizationResult} is also accepted.}
 

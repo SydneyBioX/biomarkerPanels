@@ -16,10 +16,10 @@ compute_diversity(
 }
 \arguments{
 \item{solutions}{A data frame from \code{\link[=summarize_solutions]{summarize_solutions()}} (must contain a
-\code{solution_id} column). As a convenience, an \code{\link{OptimizationResult}} may be
+\code{solution_id} column). As a convenience, an \code{OptimizationResult} may be
 passed directly, in which case its summary is computed internally.}
 
-\item{optimization_result}{The \code{\link{OptimizationResult}} the \code{solutions} summary
+\item{optimization_result}{The \code{OptimizationResult} the \code{solutions} summary
 came from. Supplies both the training feature matrix (\verb{@aggregated_x}, whose
 columns are the base-feature pool) and the per-solution base features.
 Optional when \code{solutions} is itself an \code{OptimizationResult}.}

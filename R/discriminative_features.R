@@ -135,7 +135,7 @@ select_discriminative_features <- function(x_list,
 #' \eqn{AUC = (R_1 - n_1(n_1+1)/2) / (n_1 \cdot n_0)} where \eqn{R_1} is the
 #' sum of ranks for the positive class.
 #'
-#' AUC is folded to [0.5, 1] so direction doesn't matter.
+#' AUC is folded to \code{[0.5, 1]} so direction doesn't matter.
 #'
 #' @param x Numeric matrix (samples x features).
 #' @param y Integer vector of 0/1 labels.
@@ -169,7 +169,7 @@ select_discriminative_features <- function(x_list,
 #' @param x_pooled Numeric matrix of pooled samples (samples x features).
 #' @param cohort_labels Integer vector of cohort assignments.
 #' @return Numeric vector of cohort discrimination scores per feature, scaled
-#'   to [0.5, 1] where 0.5 = no cohort separation.
+#'   to \code{[0.5, 1]} where 0.5 = no cohort separation.
 #' @keywords internal
 .compute_cohort_discrimination <- function(x_pooled, cohort_labels) {
   cohorts <- sort(unique(cohort_labels))
