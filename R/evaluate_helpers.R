@@ -1,8 +1,8 @@
 #' Panel Evaluation Helpers
 #'
-#' Internal helpers used by [evaluate_panel()] to build confusion matrices,
-#' compute ROC curves (via the C++ backend), and obtain predictions from a
-#' stored glmnet model.
+#' Internal helpers used by [evaluate_panel()] to build confusion matrices and
+#' compute ROC curves (via the C++ backend). Stored-model prediction lives in
+#' [.predict_panel_model()] (`R/model_prediction.R`).
 #'
 #' @name evaluate_helpers
 #' @keywords internal
@@ -69,37 +69,3 @@ NULL
   df[order(df$fpr, df$tpr), , drop = FALSE]
 }
 
-#' Predict Using Stored glmnet Model
-#'
-#' Helper function to make predictions from a cv.glmnet model stored in a
-#' BiomarkerPanelResult. Handles cohort dummy variables using the metadata
-#' stored during training.
-#'
-#' @param model A cv.glmnet model object with biomarkerPanels_meta attribute.
-#' @param x_selected Matrix of selected features for prediction.
-#' @param cohort_vec Factor of cohort membership for samples.
-#' @return Numeric vector of predicted probabilities.
-#' @keywords internal
-.predict_glmnet_model <- function(model, x_selected, cohort_vec) {
-  x_mat <- as.matrix(x_selected)
-
-  # Get metadata stored during training
-
-  meta <- model$biomarkerPanels_meta
-
-  # Add cohort dummies if the model was trained with them.
-  # Always zero out — predictions should be cohort-agnostic for
-
-  # transferability. Cohort-aware metrics split by cohort downstream.
-  if (!is.null(meta$cohort_info)) {
-    n_dummies <- meta$cohort_info$n_dummies
-    dummy_cols <- matrix(0, nrow = nrow(x_mat), ncol = n_dummies)
-    colnames(dummy_cols) <- paste0(".cohort_", seq_len(n_dummies))
-    x_mat <- cbind(x_mat, dummy_cols)
-  }
-
-  # Predict using lambda.min
-  preds <- stats::predict(model, newx = x_mat, s = "lambda.min", type = "response")[, 1]
-
-  preds
-}

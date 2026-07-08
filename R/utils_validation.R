@@ -136,15 +136,63 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
 
 #' Validate Positive Integer Parameter
 #'
-#' Checks that a parameter is a positive integer and coerces it.
+#' Checks that a parameter is a single integer no smaller than `min` and coerces
+#' it. With the default `min = 1L` this enforces a positive integer; pass a
+#' larger `min` (e.g. `2L` for a fold or split count) to require a higher floor.
 #'
 #' @param x The value to validate.
 #' @param name Parameter name for error messages.
+#' @param min Minimum allowed value (default `1L`).
 #' @return An integer value.
 #' @keywords internal
-.validate_positive_integer <- function(x, name) {
-  if (!is.numeric(x) || length(x) != 1L || is.na(x) || x < 1L) {
-    stop("`", name, "` must be a positive integer.", call. = FALSE)
+.validate_positive_integer <- function(x, name, min = 1L) {
+  if (!is.numeric(x) || length(x) != 1L || is.na(x) || x < min) {
+    msg <- if (min <= 1L) {
+      paste0("`", name, "` must be a positive integer.")
+    } else {
+      paste0("`", name, "` must be an integer >= ", min, ".")
+    }
+    stop(msg, call. = FALSE)
   }
   as.integer(x)
+}
+
+#' Validate a Numeric Scalar in the Unit Interval
+#'
+#' Checks that a parameter is a single non-missing numeric value inside the unit
+#' interval. Use `bounds = "open"` for a probability-like value in (0, 1) and
+#' `bounds = "closed"` for a value in [0, 1] where the endpoints are allowed
+#' (e.g. an elastic-net mixing parameter or a proportion).
+#'
+#' @param x The value to validate.
+#' @param name Parameter name for error messages.
+#' @param bounds Either `"open"` (0 and 1 excluded) or `"closed"` (0 and 1
+#'   allowed).
+#' @return The value coerced with [as.numeric()].
+#' @keywords internal
+.validate_probability <- function(x, name, bounds = c("open", "closed")) {
+  bounds <- match.arg(bounds)
+  ok <- is.numeric(x) && length(x) == 1L && !is.na(x)
+  if (ok) {
+    ok <- if (bounds == "open") x > 0 && x < 1 else x >= 0 && x <= 1
+  }
+  if (!ok) {
+    stop("`", name, "` must be a numeric scalar between 0 and 1.", call. = FALSE)
+  }
+  as.numeric(x)
+}
+
+#' Validate a Numeric Scalar
+#'
+#' Checks that a parameter is a single numeric value.
+#'
+#' @param x The value to validate.
+#' @param name Parameter name for error messages.
+#' @return The value coerced with [as.numeric()].
+#' @keywords internal
+.validate_numeric_scalar <- function(x, name) {
+  if (!is.numeric(x) || length(x) != 1L) {
+    stop("`", name, "` must be a numeric scalar.", call. = FALSE)
+  }
+  as.numeric(x)
 }

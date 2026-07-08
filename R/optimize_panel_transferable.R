@@ -111,11 +111,7 @@ optimize_panel_transferable <- function(
   fitness_mode <- match.arg(fitness_mode)
 
   if (fitness_mode == "within_cohort_rotating") {
-    if (!is.numeric(n_val_splits) || length(n_val_splits) != 1L ||
-        is.na(n_val_splits) || n_val_splits < 2L) {
-      stop("`n_val_splits` must be an integer >= 2.", call. = FALSE)
-    }
-    n_val_splits <- as.integer(n_val_splits)
+    n_val_splits <- .validate_positive_integer(n_val_splits, "n_val_splits", min = 2L)
   }
 
   # Validate inputs
@@ -127,10 +123,7 @@ optimize_panel_transferable <- function(
   }
 
   # Validate numeric parameters
-  if (!is.numeric(regularized_alpha) || length(regularized_alpha) != 1L ||
-      is.na(regularized_alpha) || regularized_alpha < 0 || regularized_alpha > 1) {
-    stop("`regularized_alpha` must be a single numeric value in [0, 1].", call. = FALSE)
-  }
+  .validate_probability(regularized_alpha, "regularized_alpha", bounds = "closed")
   if (!identical(selection_threshold, "adaptive")) {
     st <- suppressWarnings(as.numeric(selection_threshold))
     if (is.na(st) || st <= 0 || st >= 1) {
@@ -363,42 +356,11 @@ optimize_panel_transferable <- function(
     nsga_result <- do.call(rmoo::nsga3, nsga_params)
   }
 
-  # 7. Extract Pareto front and build solutions
-  optimal_idx <- which(nsga_result@front == 1)
-  pareto_pop <- nsga_result@population[optimal_idx, , drop = FALSE]
-  if (is.null(dim(pareto_pop))) {
-    pareto_pop <- matrix(pareto_pop, nrow = 1)
-  }
-
-  solutions <- lapply(seq_len(nrow(pareto_pop)), function(i) {
-    decision_vec <- pareto_pop[i, ]
-    fitness_fn$evaluate(decision_vec)
-  })
-
-  feasible_vec <- vapply(solutions, `[[`, logical(1), "feasible")
-  if (!any(feasible_vec)) {
-    stop("No solutions satisfied the supplied constraints.", call. = FALSE)
-  }
-  solutions <- solutions[feasible_vec]
-
-  metric_matrix <- do.call(rbind, lapply(solutions, `[[`, "metrics"))
-  colnames(metric_matrix) <- names(objectives)
-
-  # Post-filter dominated solutions (see .filter_dominated docs)
-  nondom_idx <- .filter_dominated(metric_matrix, objective_directions)
-  solutions <- solutions[nondom_idx]
-  metric_matrix <- metric_matrix[nondom_idx, , drop = FALSE]
-
-  # Build solutions data frame (all Pareto solutions)
-  solutions_df <- data.frame(
-    solution_id = seq_along(solutions),
-    stringsAsFactors = FALSE
+  # 7. Extract Pareto front, re-evaluate, drop infeasible/dominated solutions,
+  #    and assemble the wide-format solutions data frame.
+  solutions_df <- .build_pareto_solutions_df(
+    nsga_result, fitness_fn$evaluate, objectives, objective_directions
   )
-  solutions_df$base_features <- I(lapply(solutions, `[[`, "base_features"))
-  solutions_df$features <- I(lapply(solutions, `[[`, "features"))
-  for (obj_name in names(objectives)) {
-    solutions_df[[obj_name]] <- metric_matrix[, obj_name]
-  }
 
   # 8. Combine train + val raw base features for fit_panel()
   combined_x <- rbind(train_inputs$x, val_inputs$x)

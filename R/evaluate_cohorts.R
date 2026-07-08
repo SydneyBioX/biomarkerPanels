@@ -86,10 +86,7 @@ evaluate_panel_by_cohort <- function(panel,
     stop("`x` and `y` lists must have the same length.", call. = FALSE)
   }
 
-  cohort_names <- names(x)
-  if (is.null(cohort_names) || any(cohort_names == "")) {
-    cohort_names <- sprintf("cohort_%02d", seq_along(x))
-  }
+  cohort_names <- .default_cohort_names(x)
 
   # Process each cohort independently
   cohort_results <- lapply(seq_along(x), function(i) {
@@ -101,53 +98,29 @@ evaluate_panel_by_cohort <- function(panel,
                    cohort_names[i]), call. = FALSE)
     }
 
-    if (is.null(colnames(xi))) {
-      colnames(xi) <- sprintf("feature_%04d", seq_len(ncol(xi)))
-    }
+    xi <- .ensure_feature_colnames(xi)
 
-    # Validate base features are present
-    if (!all(base_features %in% colnames(xi))) {
-      missing <- setdiff(base_features, colnames(xi))
-      stop(sprintf("Cohort '%s': Base feature(s) not found: %s",
-                   cohort_names[i], paste(missing, collapse = ", ")),
-           call. = FALSE)
-    }
+    # Validate base features and apply the panel's transform on the fly.
+    x_selected <- .prepare_scoring_matrix(
+      xi, base_features, feature_transform,
+      context = sprintf("cohort '%s'", cohort_names[i])
+    )$x_selected
 
-    # Extract base features and apply transform
-    x_base <- xi[, base_features, drop = FALSE]
-    if (feature_transform != "none" && length(base_features) >= 2L) {
-      x_selected <- .apply_feature_transform_single(x_base, feature_transform)
-      # CPOP-style panels store a subset of all possible pair features; subset
-      # the transformed matrix to match the model's expected columns.
-      if (length(features) && all(features %in% colnames(x_selected))) {
-        x_selected <- x_selected[, features, drop = FALSE]
-      }
-    } else {
-      x_selected <- x_base
+    # CPOP-style panels store a subset of all possible pair features; subset
+    # the transformed matrix to match the model's expected columns.
+    if (feature_transform != "none" && length(base_features) >= 2L &&
+        length(features) && all(features %in% colnames(x_selected))) {
+      x_selected <- x_selected[, features, drop = FALSE]
     }
 
     # Generate scores using stored model
     cohort_vec <- factor(rep(cohort_names[i], nrow(x_selected)))
     if (!is.null(stored_model)) {
       scores <- tryCatch({
-        if (inherits(stored_model, "cv.glmnet")) {
-          .predict_glmnet_model(stored_model, x_selected, cohort_vec)
-        } else {
-          newdata <- as.data.frame(x_selected, check.names = TRUE)
-          expected_names <- make.names(features, unique = TRUE)
-          names(newdata) <- expected_names
-
-          model_cols <- names(stored_model$model)
-          feature_cols <- setdiff(model_cols, c(".response", ".cohort"))
-
-          if (".cohort" %in% names(stored_model$model)) {
-            train_cohort_levels <- levels(stored_model$model$.cohort)
-            newdata$.cohort <- factor(rep(train_cohort_levels[1], nrow(newdata)),
-                                      levels = train_cohort_levels)
-          }
-
-          as.numeric(stats::predict(stored_model, newdata = newdata, type = "response"))
-        }
+        .predict_panel_model(
+          stored_model, x_selected,
+          cohort = cohort_vec, expected_features = features
+        )
       }, error = function(e) {
         stop(sprintf("Cohort '%s': Failed to generate predictions: %s",
                      cohort_names[i], conditionMessage(e)), call. = FALSE)

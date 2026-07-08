@@ -52,16 +52,9 @@ select_discriminative_features <- function(x_list,
                                            min_auc = 0.6,
                                            assay = NULL) {
   n_features <- .validate_positive_integer(n_features, "n_features")
-  if (!is.numeric(lambda_cohort) || length(lambda_cohort) != 1L) {
-    stop("`lambda_cohort` must be a numeric scalar.", call. = FALSE)
-  }
-  if (!is.numeric(lambda_sd) || length(lambda_sd) != 1L) {
-    stop("`lambda_sd` must be a numeric scalar.", call. = FALSE)
-  }
-  if (!is.numeric(min_auc) || length(min_auc) != 1L ||
-    min_auc < 0 || min_auc > 1) {
-    stop("`min_auc` must be a numeric scalar in [0, 1].", call. = FALSE)
-  }
+  .validate_numeric_scalar(lambda_cohort, "lambda_cohort")
+  .validate_numeric_scalar(lambda_sd, "lambda_sd")
+  .validate_probability(min_auc, "min_auc", bounds = "closed")
 
   prepared <- .prepare_ridge_inputs(x_list, y_list, assay = assay)
   matrices <- prepared$matrices

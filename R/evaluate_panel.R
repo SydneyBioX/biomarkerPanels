@@ -58,10 +58,7 @@ evaluate_panel <- function(panel, x, y,
                            positive = NULL) {
   stopifnot(inherits(panel, "BiomarkerPanelResult"))
 
-  if (!is.numeric(cutoff_prob) || length(cutoff_prob) != 1L ||
-      is.na(cutoff_prob) || cutoff_prob <= 0 || cutoff_prob >= 1) {
-    stop("`cutoff_prob` must be a single numeric value in (0, 1).", call. = FALSE)
-  }
+  .validate_probability(cutoff_prob, "cutoff_prob", bounds = "open")
 
   # Use stored positive class from training if not explicitly specified
   if (is.null(positive)) {
@@ -110,9 +107,7 @@ evaluate_panel <- function(panel, x, y,
     if (nrow(x_raw) != length(truth)) {
       stop("`x` and `y` must have matching sample sizes.", call. = FALSE)
     }
-    if (is.null(colnames(x_raw))) {
-      colnames(x_raw) <- sprintf("feature_%04d", seq_len(ncol(x_raw)))
-    }
+    x_raw <- .ensure_feature_colnames(x_raw)
     if (is.null(cohort)) {
       cohort_vec <- factor(rep("cohort_01", nrow(x_raw)), levels = "cohort_01")
     } else {
@@ -123,24 +118,11 @@ evaluate_panel <- function(panel, x, y,
     }
   }
 
-  # Validate base features are present in validation data
-  if (!all(base_features %in% colnames(x_raw))) {
-    missing <- setdiff(base_features, colnames(x_raw))
-    stop("Base feature(s) not found in validation data: ",
-         paste(missing, collapse = ", "), call. = FALSE)
-  }
-
-  # Extract base features from validation data
-  x_base_selected <- x_raw[, base_features, drop = FALSE]
-
-  # Apply feature transform to get transformed features
-  if (feature_transform != "none" && length(base_features) >= 2L) {
-    x_selected <- .apply_feature_transform_single(x_base_selected, feature_transform)
-    selected <- colnames(x_selected)
-  } else {
-    x_selected <- x_base_selected
-    selected <- base_features
-  }
+  # Validate base features and apply the panel's transform on the fly.
+  prepped <- .prepare_scoring_matrix(x_raw, base_features, feature_transform,
+                                     context = "validation data")
+  x_selected <- prepped$x_selected
+  selected <- prepped$selected
 
   # Validate transformed features match what the model expects
   if (length(selected) == 0L) {
@@ -184,54 +166,10 @@ evaluate_panel <- function(panel, x, y,
   } else if (!is.null(stored_model)) {
     # Use the stored model for prediction (true out-of-sample evaluation)
     scores <- tryCatch({
-      # Check if this is a glmnet model (regularized) or glm model (unregularized)
-      if (inherits(stored_model, "cv.glmnet")) {
-        # Regularized model: use glmnet prediction
-        preds <- .predict_glmnet_model(
-          model = stored_model,
-          x_selected = x_selected,
-          cohort_vec = cohort_vec
-        )
-      } else if (inherits(stored_model, "npc")) {
-        # NP classifier: use nproc prediction with label inversion
-        preds <- .predict_np_model(stored_model, x_selected)
-      } else {
-        # Standard GLM model: use standard prediction
-        newdata <- as.data.frame(x_selected, check.names = TRUE)
-
-        # Get expected column names from the model (excluding .response and .cohort)
-        model_cols <- names(stored_model$model)
-        feature_cols <- setdiff(model_cols, c(".response", ".cohort"))
-
-        # Robust column name matching: the model was fit with check.names=TRUE,
-        # so we need to match original feature names to their transformed versions.
-        # Create the expected mapping by applying check.names to panel features.
-        expected_names <- make.names(selected, unique = TRUE)
-
-        # Verify the mapping matches what the model expects
-        if (!setequal(expected_names, feature_cols)) {
-          stop(
-            "Feature name mismatch between training and validation. ",
-            "Expected: ", paste(head(feature_cols, 10), collapse = ", "),
-            if (length(feature_cols) > 10) "..." else "", ". ",
-            "Got: ", paste(head(expected_names, 10), collapse = ", "),
-            if (length(expected_names) > 10) "..." else "",
-            call. = FALSE
-          )
-        }
-        # Names match -- ensure same order as model expects
-        names(newdata) <- expected_names
-        newdata <- newdata[, feature_cols, drop = FALSE]
-
-        # If model was trained with cohort, always use reference level so
-        # predictions are cohort-agnostic. Cohort-aware metrics split downstream.
-        if (".cohort" %in% names(stored_model$model)) {
-          train_cohort_levels <- levels(stored_model$model$.cohort)
-          newdata$.cohort <- factor(rep(train_cohort_levels[1], nrow(newdata)),
-                                    levels = train_cohort_levels)
-        }
-        preds <- stats::predict(stored_model, newdata = newdata, type = "response")
-      }
+      preds <- .predict_panel_model(
+        stored_model, x_selected,
+        cohort = cohort_vec, expected_features = selected
+      )
 
       if (length(preds) != nrow(x_selected) || anyNA(preds)) {
         stop("Invalid predictions from stored model.")

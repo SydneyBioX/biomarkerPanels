@@ -35,14 +35,8 @@ NULL
 #' @keywords internal
 .generate_stratified_splits <- function(y, cohort, n_splits, val_ratio,
                                         seed = NULL) {
-  if (!is.numeric(n_splits) || length(n_splits) != 1L || n_splits < 2L) {
-    stop("`n_splits` must be an integer >= 2.", call. = FALSE)
-  }
-  if (!is.numeric(val_ratio) || length(val_ratio) != 1L ||
-      val_ratio <= 0 || val_ratio >= 1) {
-    stop("`val_ratio` must be a single numeric value in (0, 1).",
-         call. = FALSE)
-  }
+  .validate_positive_integer(n_splits, "n_splits", min = 2L)
+  .validate_probability(val_ratio, "val_ratio", bounds = "open")
   if (length(y) != length(cohort)) {
     stop("`y` and `cohort` must have matching length.", call. = FALSE)
   }
@@ -177,7 +171,7 @@ NULL
       fit <- .fit_final_model_regularized(
         x_train, y_train, coh_train, alpha = alpha
       )
-      val_scores <- .predict_from_model(fit, x_val, cohort = coh_val)
+      val_scores <- .predict_panel_model(fit, x_val, cohort = coh_val)
     } else {
       val_scores <- .fit_predict_binomial_glm(
         x_train = x_train,
@@ -190,35 +184,17 @@ NULL
       )
     }
 
-    constraint_results <- if (length(constraint_specs)) {
-      setNames(vapply(seq_along(constraint_specs), function(j) {
-        res <- constraint_specs[[j]]$fun(
-          truth = y_val,
-          scores = val_scores,
-          selected = selected_base_features,
-          cohort = coh_val,
-          x = x_val
-        )
-        isTRUE(res)
-      }, logical(1)), vapply(constraint_specs, `[[`, character(1), "label"))
-    } else {
-      logical(0)
-    }
-    feasible <- if (length(constraint_results)) {
-      all(constraint_results)
-    } else {
-      TRUE
-    }
+    constraints_eval <- .evaluate_constraints(
+      constraint_specs, y_val, val_scores,
+      selected = selected_base_features, cohort = coh_val, x = x_val
+    )
+    constraint_results <- constraints_eval$results
+    feasible <- constraints_eval$feasible
 
-    metrics <- vapply(objectives, function(obj) {
-      obj$fun(
-        y_val,
-        val_scores,
-        selected = selected_base_features,
-        cohort = coh_val,
-        x = x_val
-      )
-    }, numeric(1))
+    metrics <- .evaluate_objectives(
+      objectives, y_val, val_scores,
+      selected = selected_base_features, cohort = coh_val, x = x_val
+    )
 
     list(
       metrics = metrics,
@@ -316,6 +292,16 @@ NULL
         constraint_results = logical(0),
         feasible = FALSE
       ))
+    }
+    if (!all(valid)) {
+      warning(
+        "Rotating-validation metrics for base features [",
+        paste(prep$base_features, collapse = ", "), "] are averaged over ",
+        sum(valid), " of ", length(valid), " splits; ", sum(!valid),
+        " split(s) were dropped (e.g. a single-class training fold). ",
+        "Reported metrics reflect only the surviving splits.",
+        call. = FALSE
+      )
     }
     per_split <- per_split[valid]
     metric_mat <- do.call(rbind, lapply(per_split, `[[`, "metrics"))

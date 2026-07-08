@@ -4,17 +4,21 @@
 \alias{.validate_positive_integer}
 \title{Validate Positive Integer Parameter}
 \usage{
-.validate_positive_integer(x, name)
+.validate_positive_integer(x, name, min = 1L)
 }
 \arguments{
 \item{x}{The value to validate.}
 
 \item{name}{Parameter name for error messages.}
+
+\item{min}{Minimum allowed value (default \code{1L}).}
 }
 \value{
 An integer value.
 }
 \description{
-Checks that a parameter is a positive integer and coerces it.
+Checks that a parameter is a single integer no smaller than \code{min} and coerces
+it. With the default \code{min = 1L} this enforces a positive integer; pass a
+larger \code{min} (e.g. \code{2L} for a fold or split count) to require a higher floor.
 }
 \keyword{internal}

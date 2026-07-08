@@ -289,14 +289,8 @@ fit_panel <- function(optimization_result,
   if (nrow(solutions_df) == 0L) {
     stop("OptimizationResult contains no solutions.", call. = FALSE)
   }
-  if (!is.numeric(regularized_alpha) || length(regularized_alpha) != 1L ||
-      is.na(regularized_alpha) || regularized_alpha < 0 || regularized_alpha > 1) {
-    stop("`regularized_alpha` must be a single numeric value in [0, 1].", call. = FALSE)
-  }
-  if (!is.numeric(cv_folds) || length(cv_folds) != 1L ||
-      is.na(cv_folds) || cv_folds < 2L) {
-    stop("`cv_folds` must be an integer >= 2.", call. = FALSE)
-  }
+  .validate_probability(regularized_alpha, "regularized_alpha", bounds = "closed")
+  .validate_positive_integer(cv_folds, "cv_folds", min = 2L)
 
   # Determine which features to use
   if (!is.null(features)) {
@@ -473,53 +467,15 @@ fit_panel <- function(optimization_result,
 
 #' Predict from Fitted Model
 #'
-#' Internal helper to get predictions from either glmnet or glm model.
+#' Back-compatible alias for [.predict_panel_model()]. Retained because
+#' `.predict_from_model` is a stable internal name; the dispatch logic now lives
+#' in `R/model_prediction.R`.
 #'
-#' @param model Fitted model (cv.glmnet or glm).
+#' @param model Fitted model (cv.glmnet, npc, or glm).
 #' @param newx New feature matrix for prediction.
+#' @param cohort Optional cohort factor (unused; predictions are cohort-agnostic).
 #' @return Numeric vector of predicted probabilities.
 #' @keywords internal
 .predict_from_model <- function(model, newx, cohort = NULL) {
-  if (inherits(model, "cv.glmnet")) {
-    # glmnet model
-    x_mat <- as.matrix(newx)
-
-    # Add cohort dummies if the model was trained with them
-    meta <- model$biomarkerPanels_meta
-    if (!is.null(meta$cohort_info)) {
-      # For prediction, we assume no cohort effect (set dummies to 0)
-      n_dummies <- meta$cohort_info$n_dummies
-      dummy_cols <- matrix(0, nrow = nrow(x_mat), ncol = n_dummies)
-      colnames(dummy_cols) <- paste0(".cohort_", seq_len(n_dummies))
-      x_mat <- cbind(x_mat, dummy_cols)
-    }
-
-    preds <- stats::predict(model,
-      newx = x_mat, s = "lambda.min",
-      type = "response"
-    )[, 1]
-  } else if (inherits(model, "glm")) {
-    # Standard GLM
-    # Note: as.data.frame.matrix() ignores check.names, so we must sanitize
-    # names explicitly to match the names used during training in
-    # .fit_final_model(), which wraps in data.frame(check.names = TRUE).
-    newdata <- as.data.frame(newx)
-    names(newdata) <- make.names(names(newdata), unique = TRUE)
-
-    # If model was trained with cohort covariate, always use reference level
-    # so predictions are cohort-agnostic (matching the glmnet path which zeros
-    # out cohort dummies). Cohort-aware metrics split by cohort downstream.
-    model_terms <- attr(stats::terms(model), "term.labels")
-    if (".cohort" %in% model_terms) {
-      ref_level <- model$xlevels[[".cohort"]][1]
-      newdata$.cohort <- factor(rep(ref_level, nrow(newdata)),
-                                levels = model$xlevels[[".cohort"]])
-    }
-
-    preds <- stats::predict(model, newdata = newdata, type = "response")
-  } else {
-    stop("Unknown model type: ", class(model)[1], call. = FALSE)
-  }
-
-  as.numeric(preds)
+  .predict_panel_model(model, newx, cohort = cohort)
 }

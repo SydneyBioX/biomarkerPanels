@@ -328,15 +328,10 @@ plot_feature_stability <- function(stability_result,
          call. = FALSE)
   }
 
-  if (!is.numeric(top_n) || length(top_n) != 1L || is.na(top_n) || top_n < 1L) {
-    stop("`top_n` must be a positive integer.", call. = FALSE)
-  }
-  top_n <- as.integer(top_n)
+  top_n <- .validate_positive_integer(top_n, "top_n")
 
-  if (!is.numeric(highlight_threshold) || length(highlight_threshold) != 1L ||
-      is.na(highlight_threshold) || highlight_threshold < 0 || highlight_threshold > 1) {
-    stop("`highlight_threshold` must be a number between 0 and 1.", call. = FALSE)
-  }
+  .validate_probability(highlight_threshold, "highlight_threshold",
+                        bounds = "closed")
 
   freq_df <- stability_result$frequencies
   if (!nrow(freq_df)) {

@@ -91,7 +91,7 @@ NULL
             alpha = alpha
           )
           # Predict on validation data
-          val_scores <- .predict_from_model(fit, x_val_sel, cohort = val_cohort)
+          val_scores <- .predict_panel_model(fit, x_val_sel, cohort = val_cohort)
         } else {
           val_scores <- .fit_predict_binomial_glm(
             x_train = x_train_sel,
@@ -105,34 +105,17 @@ NULL
         }
 
         # Compute constraints on validation data
-        constraint_results <- if (length(constraint_specs)) {
-          setNames(vapply(seq_along(constraint_specs), function(j) {
-            res <- constraint_specs[[j]]$fun(
-              truth = val_y,
-              scores = val_scores,
-              selected = selected_base_features,
-              cohort = val_cohort,
-              x = x_val_sel
-            )
-            isTRUE(res)
-          }, logical(1)), vapply(constraint_specs, `[[`, character(1), "label"))
-        } else {
-          logical(0)
-        }
+        constraints_eval <- .evaluate_constraints(
+          constraint_specs, val_y, val_scores,
+          selected = selected_base_features, cohort = val_cohort, x = x_val_sel
+        )
+        constraint_results <- constraints_eval$results
+        feasible <- constraints_eval$feasible
 
-        feasible <- if (length(constraint_results)) all(constraint_results) else TRUE
-
-        # Pass base features as `selected` so metric_num_features counts genes,
-        # not pairwise ratios. Other metrics ignore `selected`.
-        metrics <- vapply(objectives, function(obj) {
-          obj$fun(
-            val_y,
-            val_scores,
-            selected = selected_base_features,
-            cohort = val_cohort,
-            x = x_val_sel
-          )
-        }, numeric(1))
+        metrics <- .evaluate_objectives(
+          objectives, val_y, val_scores,
+          selected = selected_base_features, cohort = val_cohort, x = x_val_sel
+        )
 
         list(
           base_features = selected_base_features,

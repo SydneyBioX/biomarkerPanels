@@ -4,8 +4,8 @@
 \alias{evaluate_helpers}
 \title{Panel Evaluation Helpers}
 \description{
-Internal helpers used by \code{\link[=evaluate_panel]{evaluate_panel()}} to build confusion matrices,
-compute ROC curves (via the C++ backend), and obtain predictions from a
-stored glmnet model.
+Internal helpers used by \code{\link[=evaluate_panel]{evaluate_panel()}} to build confusion matrices and
+compute ROC curves (via the C++ backend). Stored-model prediction lives in
+\code{\link[=.predict_panel_model]{.predict_panel_model()}} (\code{R/model_prediction.R}).
 }
 \keyword{internal}

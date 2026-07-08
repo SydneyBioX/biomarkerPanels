@@ -65,12 +65,8 @@ select_cpop_features <- function(x_list, y_list,
   if (!is.numeric(alpha) || any(!is.finite(alpha)) || any(alpha < 0) || any(alpha > 1)) {
     stop("`alpha` must be numeric in [0, 1].", call. = FALSE)
   }
-  if (!is.numeric(sign_consistency_threshold) ||
-      length(sign_consistency_threshold) != 1L ||
-      sign_consistency_threshold < 0 || sign_consistency_threshold > 1) {
-    stop("`sign_consistency_threshold` must be a single value in [0, 1].",
-         call. = FALSE)
-  }
+  .validate_probability(sign_consistency_threshold, "sign_consistency_threshold",
+                        bounds = "closed")
   alpha <- sort(unique(alpha), decreasing = TRUE)
 
   prepared <- .cpop_prepare_inputs(x_list, y_list, assay = assay)

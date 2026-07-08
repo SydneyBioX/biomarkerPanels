@@ -145,14 +145,8 @@ optimize_panel <- function(x, y,
       call. = FALSE
     )
   }
-  if (!is.numeric(fitness_cv_folds) || length(fitness_cv_folds) != 1L ||
-      is.na(fitness_cv_folds) || fitness_cv_folds < 2L) {
-    stop("`fitness_cv_folds` must be an integer >= 2.", call. = FALSE)
-  }
-  if (!is.numeric(regularized_alpha) || length(regularized_alpha) != 1L ||
-      is.na(regularized_alpha) || regularized_alpha < 0 || regularized_alpha > 1) {
-    stop("`regularized_alpha` must be a single numeric value in [0, 1].", call. = FALSE)
-  }
+  .validate_positive_integer(fitness_cv_folds, "fitness_cv_folds", min = 2L)
+  .validate_probability(regularized_alpha, "regularized_alpha", bounds = "closed")
   if (!identical(selection_threshold, "adaptive")) {
     st <- suppressWarnings(as.numeric(selection_threshold))
     if (is.na(st) || st <= 0 || st >= 1) {
@@ -166,12 +160,8 @@ optimize_panel <- function(x, y,
 
   inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, transform = "none",
                                        feature_alignment = feature_alignment)
-  raw_x_mat <- inputs_raw$x
+  raw_x_mat <- .ensure_feature_colnames(inputs_raw$x)
   raw_feature_names <- colnames(raw_x_mat)
-  if (is.null(raw_feature_names)) {
-    raw_feature_names <- sprintf("feature_%04d", seq_len(ncol(raw_x_mat)))
-    colnames(raw_x_mat) <- raw_feature_names
-  }
 
   feature_pool_arg <- feature_pool
   feature_pool_base <- raw_feature_names
@@ -424,34 +414,18 @@ optimize_panel <- function(x, y,
     }
 
     # Step 4: Evaluate constraints
-    constraint_results <- if (length(constraint_specs)) {
-      setNames(vapply(seq_along(constraint_specs), function(j) {
-        res <- constraint_specs[[j]]$fun(
-          truth = truth,
-          scores = scores,
-          selected = selected_base_features,
-          cohort = cohort,
-          x = x_selected
-        )
-        isTRUE(res)
-      }, logical(1)), vapply(constraint_specs, `[[`, character(1), "label"))
-    } else {
-      logical(0)
-    }
-    feasible <- if (length(constraint_results)) all(constraint_results) else TRUE
+    constraints_eval <- .evaluate_constraints(
+      constraint_specs, truth, scores,
+      selected = selected_base_features, cohort = cohort, x = x_selected
+    )
+    constraint_results <- constraints_eval$results
+    feasible <- constraints_eval$feasible
 
-    # Step 5: Evaluate objectives on TRANSFORMED features
-    # Pass base features as `selected` so metric_num_features counts genes,
-    # not pairwise ratios. Other metrics ignore `selected`.
-    metrics <- vapply(objectives, function(obj) {
-      obj$fun(
-        truth,
-        scores,
-        selected = selected_base_features,
-        cohort = cohort,
-        x = x_selected
-      )
-    }, numeric(1))
+    # Step 5: Evaluate objectives on the transformed scoring matrix.
+    metrics <- .evaluate_objectives(
+      objectives, truth, scores,
+      selected = selected_base_features, cohort = cohort, x = x_selected
+    )
 
     # Return BOTH base features and transformed features
     list(
@@ -554,53 +528,12 @@ optimize_panel <- function(x, y,
     nsga_result <- do.call(rmoo::nsga3, nsga_params)
   }
 
-  # Filter to Pareto-optimal solutions (front rank == 1)
-  # rmoo returns full population; mco returned only Pareto-optimal
-  optimal_idx <- which(nsga_result@front == 1)
-  pareto_pop <- nsga_result@population[optimal_idx, , drop = FALSE]
-
-  # Handle edge case: single solution returns vector instead of matrix
-  if (is.null(dim(pareto_pop))) {
-    pareto_pop <- matrix(pareto_pop, nrow = 1)
-  }
-
-  solutions <- lapply(seq_len(nrow(pareto_pop)), function(i) {
-    decision_vec <- pareto_pop[i, ]
-    evaluate_candidate(decision_vec)
-  })
-
-  feasible_vec <- vapply(solutions, `[[`, logical(1), "feasible")
-  if (!any(feasible_vec)) {
-    stop("No solutions satisfied the supplied constraints. Consider relaxing them.",
-         call. = FALSE)
-  }
-
-  solutions <- solutions[feasible_vec]
-  metric_matrix <- do.call(rbind, lapply(solutions, `[[`, "metrics"))
-  colnames(metric_matrix) <- names(objectives)
-
-  # Post-filter dominated solutions: re-evaluation may shift metrics (e.g. due
-
-  # to non-deterministic inner CV in glmnet), introducing dominated solutions
-  # into what was originally a rank-1 front.
-  nondom_idx <- .filter_dominated(metric_matrix, objective_directions)
-  solutions <- solutions[nondom_idx]
-  metric_matrix <- metric_matrix[nondom_idx, , drop = FALSE]
-
-  # Build solutions data frame in wide format (one row per solution)
-  solutions_df <- data.frame(
-    solution_id = seq_along(solutions),
-    stringsAsFactors = FALSE
+  # Extract the Pareto front, re-evaluate, drop infeasible/dominated solutions,
+  # and assemble the wide-format solutions data frame.
+  solutions_df <- .build_pareto_solutions_df(
+    nsga_result, evaluate_candidate, objectives, objective_directions,
+    infeasible_msg = "No solutions satisfied the supplied constraints. Consider relaxing them."
   )
-
-  # Add base_features and features as list columns
-  solutions_df$base_features <- I(lapply(solutions, `[[`, "base_features"))
-  solutions_df$features <- I(lapply(solutions, `[[`, "features"))
-
-  # Add objective values as separate columns
-  for (obj_name in names(objectives)) {
-    solutions_df[[obj_name]] <- metric_matrix[, obj_name]
-  }
 
   # Build control parameters to store
   control <- list(

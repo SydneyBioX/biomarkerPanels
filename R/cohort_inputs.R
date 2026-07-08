@@ -8,6 +8,39 @@
 #' @keywords internal
 NULL
 
+#' Default Cohort Names
+#'
+#' Returns the names of a cohort list, substituting `cohort_01`, `cohort_02`,
+#' ... wherever a name is missing or empty, so every cohort has a stable
+#' identifier for per-cohort bookkeeping and messages.
+#'
+#' @param x A list (or vector) of cohorts.
+#' @return A character vector of names, one per element of `x`.
+#' @keywords internal
+.default_cohort_names <- function(x) {
+  nm <- names(x)
+  if (is.null(nm) || any(!nzchar(nm))) {
+    nm <- sprintf("cohort_%02d", seq_along(x))
+  }
+  nm
+}
+
+#' Ensure a Feature Matrix Has Column Names
+#'
+#' Assigns generated `feature_0001`, `feature_0002`, ... column names when a
+#' matrix has none, so downstream feature bookkeeping always has stable
+#' identifiers. Matrices that already have column names are returned unchanged.
+#'
+#' @param mat A matrix-like object.
+#' @return `mat` with non-`NULL` column names.
+#' @keywords internal
+.ensure_feature_colnames <- function(mat) {
+  if (is.null(colnames(mat))) {
+    colnames(mat) <- sprintf("feature_%04d", seq_len(ncol(mat)))
+  }
+  mat
+}
+
 #' Prepare Cohort Inputs for Optimization
 #'
 #' Main internal function that processes input data (single or multi-cohort)
@@ -37,20 +70,13 @@ NULL
       stop("`x` and `y` lists must have the same length.", call. = FALSE)
     }
 
-    cohort_names <- names(x)
-    if (is.null(cohort_names) || any(cohort_names == "")) {
-      cohort_names <- sprintf("cohort_%02d", seq_along(x))
-    }
+    cohort_names <- .default_cohort_names(x)
 
     matrices <- lapply(seq_along(x), function(i) {
       .extract_feature_matrix(x[[i]], assay = assay)
     })
 
-    for (i in seq_along(matrices)) {
-      if (is.null(colnames(matrices[[i]]))) {
-        colnames(matrices[[i]]) <- sprintf("feature_%04d", seq_len(ncol(matrices[[i]])))
-      }
-    }
+    matrices <- lapply(matrices, .ensure_feature_colnames)
 
     feature_sets <- lapply(matrices, colnames)
 
@@ -163,9 +189,7 @@ NULL
     if (nrow(x_mat) != length(truth)) {
       stop("`x` and `y` must have matching sample sizes.", call. = FALSE)
     }
-    if (is.null(colnames(x_mat))) {
-      colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
-    }
+    x_mat <- .ensure_feature_colnames(x_mat)
 
     if (!is.null(feature_subset)) {
       missing <- setdiff(feature_subset, colnames(x_mat))
@@ -205,9 +229,7 @@ NULL
     if (nrow(x_mat) != length(truth)) {
       stop("`x` and `y` must have matching sample sizes.", call. = FALSE)
     }
-    if (is.null(colnames(x_mat))) {
-      colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
-    }
+    x_mat <- .ensure_feature_colnames(x_mat)
 
     if (!is.null(feature_subset)) {
       missing <- setdiff(feature_subset, colnames(x_mat))
@@ -298,10 +320,7 @@ NULL
     stop("`x_list` and `y_list` must have the same length.", call. = FALSE)
   }
 
-  cohort_names <- names(x_list)
-  if (is.null(cohort_names) || any(!nzchar(cohort_names))) {
-    cohort_names <- sprintf("cohort_%02d", seq_along(x_list))
-  }
+  cohort_names <- .default_cohort_names(x_list)
 
   matrices <- vector("list", length(x_list))
   responses <- vector("list", length(x_list))
@@ -317,9 +336,7 @@ NULL
       )
     }
 
-    if (is.null(colnames(x_mat))) {
-      colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
-    }
+    x_mat <- .ensure_feature_colnames(x_mat)
 
     matrices[[i]] <- x_mat
     responses[[i]] <- as.integer(y_vec) - 1L

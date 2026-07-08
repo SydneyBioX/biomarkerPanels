@@ -17,16 +17,8 @@ NULL
 #' @return Invisibly returns TRUE if valid; otherwise throws an error.
 #' @keywords internal
 .validate_partition_ratios <- function(train_ratio, val_ratio) {
-  if (!is.numeric(train_ratio) || length(train_ratio) != 1L ||
-      is.na(train_ratio) || train_ratio < 0 || train_ratio > 1) {
-    stop("`train_ratio` must be a single numeric value between 0 and 1.",
-         call. = FALSE)
-  }
-  if (!is.numeric(val_ratio) || length(val_ratio) != 1L ||
-      is.na(val_ratio) || val_ratio < 0 || val_ratio > 1) {
-    stop("`val_ratio` must be a single numeric value between 0 and 1.",
-         call. = FALSE)
-  }
+  .validate_probability(train_ratio, "train_ratio", bounds = "closed")
+  .validate_probability(val_ratio, "val_ratio", bounds = "closed")
 
   heldout_ratio <- 1 - train_ratio - val_ratio
 
@@ -76,10 +68,7 @@ NULL
   }
 
   n_cohorts <- length(x_list)
-  cohort_names <- names(x_list)
-  if (is.null(cohort_names) || any(cohort_names == "")) {
-    cohort_names <- sprintf("cohort_%02d", seq_len(n_cohorts))
-  }
+  cohort_names <- .default_cohort_names(x_list)
 
   train_x <- vector("list", n_cohorts)
   train_y <- vector("list", n_cohorts)

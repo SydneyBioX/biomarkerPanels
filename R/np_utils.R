@@ -86,15 +86,8 @@ NULL
 #' @return Invisible TRUE if all parameters valid.
 #' @keywords internal
 .validate_np_params <- function(alpha, delta, method) {
-  if (!is.numeric(alpha) || length(alpha) != 1L ||
-      alpha <= 0 || alpha >= 1) {
-    stop("`alpha` must be a single numeric value in (0, 1).", call. = FALSE)
-  }
-
-  if (!is.numeric(delta) || length(delta) != 1L ||
-      delta <= 0 || delta >= 1) {
-    stop("`delta` must be a single numeric value in (0, 1).", call. = FALSE)
-  }
+  .validate_probability(alpha, "alpha", bounds = "open")
+  .validate_probability(delta, "delta", bounds = "open")
 
   # Must match nproc::npc's accepted method names exactly (nproc uses
   # "randomforest", not "rf").

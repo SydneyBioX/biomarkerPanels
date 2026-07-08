@@ -67,18 +67,12 @@ NULL
     stop("CPOP requires at least two cohorts.", call. = FALSE)
   }
 
-  cohort_names <- names(x_list)
-  if (is.null(cohort_names) || any(!nzchar(cohort_names))) {
-    cohort_names <- sprintf("cohort_%02d", seq_along(x_list))
-  }
+  cohort_names <- .default_cohort_names(x_list)
 
   raw_matrices <- vector("list", length(x_list))
   responses <- vector("list", length(x_list))
   for (i in seq_along(x_list)) {
-    mat <- .extract_feature_matrix(x_list[[i]], assay = assay)
-    if (is.null(colnames(mat))) {
-      colnames(mat) <- sprintf("feature_%04d", seq_len(ncol(mat)))
-    }
+    mat <- .ensure_feature_colnames(.extract_feature_matrix(x_list[[i]], assay = assay))
     yi <- ensure_binary_response(y_list[[i]])
     if (nrow(mat) != length(yi)) {
       stop("Cohort ", i, ": row count of x must match length of y.",

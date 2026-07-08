@@ -97,17 +97,10 @@ select_ruv_features <- function(x_list,
   scoring <- match.arg(scoring)
 
   if (!is.null(k)) {
-    if (!is.numeric(k) || length(k) != 1L || k < 1L) {
-      stop("`k` must be a positive integer or NULL.", call. = FALSE)
-    }
-    k <- as.integer(k)
+    k <- .validate_positive_integer(k, "k")
   }
-  if (!is.numeric(neg_control_quantile) || length(neg_control_quantile) != 1L ||
-    neg_control_quantile < 0 || neg_control_quantile > 1) {
-    stop("`neg_control_quantile` must be a numeric scalar in [0, 1].",
-      call. = FALSE
-    )
-  }
+  .validate_probability(neg_control_quantile, "neg_control_quantile",
+                        bounds = "closed")
   if (!is.numeric(epsilon) || length(epsilon) != 1L || epsilon <= 0) {
     stop("`epsilon` must be a positive numeric scalar.", call. = FALSE)
   }

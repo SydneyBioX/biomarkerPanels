@@ -117,7 +117,7 @@ NULL
 
           if (regularized) {
             fit <- .fit_final_model_regularized(x_tr, train_y, coh_tr, alpha = alpha)
-            preds <- .predict_from_model(fit, x_te, cohort = cohort[test_idx])
+            preds <- .predict_panel_model(fit, x_te, cohort = cohort[test_idx])
           } else {
             preds <- .fit_predict_binomial_glm(
               x_train = x_tr,
@@ -141,32 +141,17 @@ NULL
         eval_scores <- oof_scores[complete]
         eval_cohort <- cohort[complete]
 
-        constraint_results <- if (length(constraint_specs)) {
-          setNames(vapply(seq_along(constraint_specs), function(j) {
-            res <- constraint_specs[[j]]$fun(
-              truth = eval_truth,
-              scores = eval_scores,
-              selected = selected_base_features,
-              cohort = eval_cohort,
-              x = NULL
-            )
-            isTRUE(res)
-          }, logical(1)), vapply(constraint_specs, `[[`, character(1), "label"))
-        } else {
-          logical(0)
-        }
+        constraints_eval <- .evaluate_constraints(
+          constraint_specs, eval_truth, eval_scores,
+          selected = selected_base_features, cohort = eval_cohort, x = NULL
+        )
+        constraint_results <- constraints_eval$results
+        feasible <- constraints_eval$feasible
 
-        feasible <- if (length(constraint_results)) all(constraint_results) else TRUE
-
-        metrics <- vapply(objectives, function(obj) {
-          obj$fun(
-            eval_truth,
-            eval_scores,
-            selected = selected_base_features,
-            cohort = eval_cohort,
-            x = NULL
-          )
-        }, numeric(1))
+        metrics <- .evaluate_objectives(
+          objectives, eval_truth, eval_scores,
+          selected = selected_base_features, cohort = eval_cohort, x = NULL
+        )
 
         list(
           base_features = selected_base_features,

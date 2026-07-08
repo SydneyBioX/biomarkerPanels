@@ -30,10 +30,7 @@ NULL
     stop("`x_list` and `y_list` must have the same length.", call. = FALSE)
   }
 
-  cohort_names <- names(x_list)
-  if (is.null(cohort_names) || any(!nzchar(cohort_names))) {
-    cohort_names <- sprintf("cohort_%02d", seq_along(x_list))
-  }
+  cohort_names <- .default_cohort_names(x_list)
 
   t_list <- vector("list", length(x_list))
   se_list <- vector("list", length(x_list))
@@ -50,9 +47,7 @@ NULL
     }
 
     # Ensure feature names exist (columns of x_mat become rows of expr)
-    if (is.null(colnames(x_mat))) {
-      colnames(x_mat) <- sprintf("feature_%04d", seq_len(ncol(x_mat)))
-    }
+    x_mat <- .ensure_feature_colnames(x_mat)
 
     expr <- t(x_mat)
     design <- stats::model.matrix(~ 0 + y_vec)

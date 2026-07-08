@@ -76,7 +76,7 @@ test_that(".generate_stratified_splits rejects invalid inputs", {
   expect_error(.generate_stratified_splits(y, cohort, 1L, 0.2),
                "n_splits.*>= 2")
   expect_error(.generate_stratified_splits(y, cohort, 3L, 0),
-               "val_ratio.*\\(0, 1\\)")
+               "val_ratio.*between 0 and 1")
   expect_error(.generate_stratified_splits(y, cohort[1], 3L, 0.2),
                "matching length")
 })

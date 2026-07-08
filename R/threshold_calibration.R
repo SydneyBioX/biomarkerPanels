@@ -212,14 +212,8 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
   if (!inherits(panel, "BiomarkerPanelResult")) {
     stop("`panel` must be a BiomarkerPanelResult from fit_panel().", call. = FALSE)
   }
-  if (!is.numeric(np_alpha) || length(np_alpha) != 1L ||
-      is.na(np_alpha) || np_alpha <= 0 || np_alpha >= 1) {
-    stop("`np_alpha` must be a single numeric value in (0, 1).", call. = FALSE)
-  }
-  if (!is.numeric(np_delta) || length(np_delta) != 1L ||
-      is.na(np_delta) || np_delta <= 0 || np_delta >= 1) {
-    stop("`np_delta` must be a single numeric value in (0, 1).", call. = FALSE)
-  }
+  .validate_probability(np_alpha, "np_alpha", bounds = "open")
+  .validate_probability(np_delta, "np_delta", bounds = "open")
 
   # Get base features and feature transform from panel
   base_features <- panel@base_features
@@ -229,21 +223,10 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
   feature_transform <- panel@control$feature_transform
   if (is.null(feature_transform)) feature_transform <- "none"
 
-  # Prepare held-out matrix
+  # Prepare held-out matrix: validate base features and apply the transform.
   x_ho <- as.matrix(x_heldout)
-  if (!all(base_features %in% colnames(x_ho))) {
-    missing <- setdiff(base_features, colnames(x_ho))
-    stop("Base feature(s) not found in held-out data: ",
-         paste(missing, collapse = ", "), call. = FALSE)
-  }
-  x_base <- x_ho[, base_features, drop = FALSE]
-
-  # Apply feature transform
-  if (feature_transform != "none" && length(base_features) >= 2L) {
-    x_selected <- .apply_feature_transform_single(x_base, feature_transform)
-  } else {
-    x_selected <- x_base
-  }
+  x_selected <- .prepare_scoring_matrix(x_ho, base_features, feature_transform,
+                                        context = "held-out data")$x_selected
 
   # Ensure response is properly formatted
   y_ho <- ensure_binary_response(y_heldout)
@@ -256,7 +239,7 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
   }
 
   # Generate predictions using stored model
-  heldout_scores <- .predict_from_model(panel@model, x_selected, cohort = cohort_ho)
+  heldout_scores <- .predict_panel_model(panel@model, x_selected, cohort = cohort_ho)
 
   # NP threshold selection
   np_result <- .select_np_threshold(

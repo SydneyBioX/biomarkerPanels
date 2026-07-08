@@ -7,14 +7,18 @@
 .predict_from_model(model, newx, cohort = NULL)
 }
 \arguments{
-\item{model}{Fitted model (cv.glmnet or glm).}
+\item{model}{Fitted model (cv.glmnet, npc, or glm).}
 
 \item{newx}{New feature matrix for prediction.}
+
+\item{cohort}{Optional cohort factor (unused; predictions are cohort-agnostic).}
 }
 \value{
 Numeric vector of predicted probabilities.
 }
 \description{
-Internal helper to get predictions from either glmnet or glm model.
+Back-compatible alias for \code{\link[=.predict_panel_model]{.predict_panel_model()}}. Retained because
+\code{.predict_from_model} is a stable internal name; the dispatch logic now lives
+in \code{R/model_prediction.R}.
 }
 \keyword{internal}
