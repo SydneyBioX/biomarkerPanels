@@ -19,6 +19,7 @@ refs/
 # inst files
 inst/doc
 inst/benchmarks/
+dev/
 
 # R markdowns
 *.Rmd
