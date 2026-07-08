@@ -33,6 +33,7 @@
 <url><loc>/reference/dot-apply_feature_transform_single.html</loc></url>
 <url><loc>/reference/dot-as_cohort_list.html</loc></url>
 <url><loc>/reference/dot-auto_select_k.html</loc></url>
+<url><loc>/reference/dot-build_pareto_solutions_df.html</loc></url>
 <url><loc>/reference/dot-cap_k.html</loc></url>
 <url><loc>/reference/dot-center_within_cohort.html</loc></url>
 <url><loc>/reference/dot-check_nproc_available.html</loc></url>
@@ -53,7 +54,11 @@
 <url><loc>/reference/dot-cpop_build_shell_model.html</loc></url>
 <url><loc>/reference/dot-cpop_step2.html</loc></url>
 <url><loc>/reference/dot-create_stratified_folds.html</loc></url>
+<url><loc>/reference/dot-default_cohort_names.html</loc></url>
 <url><loc>/reference/dot-default_scoring_fn.html</loc></url>
+<url><loc>/reference/dot-ensure_feature_colnames.html</loc></url>
+<url><loc>/reference/dot-evaluate_constraints.html</loc></url>
+<url><loc>/reference/dot-evaluate_objectives.html</loc></url>
 <url><loc>/reference/dot-extract_feature_matrix.html</loc></url>
 <url><loc>/reference/dot-extract_glmnet_coefficients.html</loc></url>
 <url><loc>/reference/dot-extract_optimization_features.html</loc></url>
@@ -83,11 +88,12 @@
 <url><loc>/reference/dot-pairwise_col_diff_cpp.html</loc></url>
 <url><loc>/reference/dot-pool_cohort_data.html</loc></url>
 <url><loc>/reference/dot-predict_from_model.html</loc></url>
-<url><loc>/reference/dot-predict_glmnet_model.html</loc></url>
 <url><loc>/reference/dot-predict_np_model.html</loc></url>
+<url><loc>/reference/dot-predict_panel_model.html</loc></url>
 <url><loc>/reference/dot-prepare_cohort_inputs.html</loc></url>
 <url><loc>/reference/dot-prepare_np_labels.html</loc></url>
 <url><loc>/reference/dot-prepare_ridge_inputs.html</loc></url>
+<url><loc>/reference/dot-prepare_scoring_matrix.html</loc></url>
 <url><loc>/reference/dot-reference_diff_cpp.html</loc></url>
 <url><loc>/reference/dot-register_default_metric.html</loc></url>
 <url><loc>/reference/dot-resolve_contrast.html</loc></url>
@@ -106,8 +112,10 @@
 <url><loc>/reference/dot-select_stable_genes_cpp.html</loc></url>
 <url><loc>/reference/dot-stratified_partition_cohorts.html</loc></url>
 <url><loc>/reference/dot-validate_np_params.html</loc></url>
+<url><loc>/reference/dot-validate_numeric_scalar.html</loc></url>
 <url><loc>/reference/dot-validate_partition_ratios.html</loc></url>
 <url><loc>/reference/dot-validate_positive_integer.html</loc></url>
+<url><loc>/reference/dot-validate_probability.html</loc></url>
 <url><loc>/reference/dot-variance_aggregator.html</loc></url>
 <url><loc>/reference/dot-w1.html</loc></url>
 <url><loc>/reference/dual_stream_ratios.html</loc></url>
@@ -130,6 +138,7 @@
 <url><loc>/reference/fit_np_panel.html</loc></url>
 <url><loc>/reference/fit_panel.html</loc></url>
 <url><loc>/reference/fitness_cache_utils.html</loc></url>
+<url><loc>/reference/fitness_eval.html</loc></url>
 <url><loc>/reference/fitness_loco.html</loc></url>
 <url><loc>/reference/fitness_rotating_validation.html</loc></url>
 <url><loc>/reference/fitness_validation.html</loc></url>
@@ -164,6 +173,7 @@
 <url><loc>/reference/metric_specificity_at_sensitivity.html</loc></url>
 <url><loc>/reference/min_metric_constraint.html</loc></url>
 <url><loc>/reference/model_fitting.html</loc></url>
+<url><loc>/reference/model_prediction.html</loc></url>
 <url><loc>/reference/n_solutions.html</loc></url>
 <url><loc>/reference/np_fit.html</loc></url>
 <url><loc>/reference/np_threshold.html</loc></url>
@@ -171,10 +181,12 @@
 <url><loc>/reference/nsga_config.html</loc></url>
 <url><loc>/reference/nsga_history.html</loc></url>
 <url><loc>/reference/nsga_history_utils.html</loc></url>
+<url><loc>/reference/nsga_results.html</loc></url>
 <url><loc>/reference/optimize_panel.html</loc></url>
 <url><loc>/reference/optimize_panel_transferable.html</loc></url>
 <url><loc>/reference/pairwise_col_diff.html</loc></url>
 <url><loc>/reference/panel_base_features.html</loc></url>
+<url><loc>/reference/panel_feature_helpers.html</loc></url>
 <url><loc>/reference/panel_features.html</loc></url>
 <url><loc>/reference/panel_metrics.html</loc></url>
 <url><loc>/reference/panel_model.html</loc></url>
