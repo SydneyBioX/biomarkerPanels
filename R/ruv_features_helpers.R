@@ -28,7 +28,7 @@ NULL
 
 #' Pool Cohort Data into Single Matrix
 #'
-#' Combines per-cohort matrices and responses from [.prepare_ridge_inputs()]
+#' Combines per-cohort matrices and responses from [.prepare_selection_inputs()]
 #' into a single pooled dataset suitable for RUV-4.
 #'
 #' @param matrices List of per-cohort feature matrices (samples x features).
@@ -263,9 +263,11 @@ NULL
 #'
 #' @param fit RUV-4 fit object.
 #' @param cohort Factor of cohort labels.
+#' @param feature_names Character vector of gene names, ordered as the columns
+#'   of the pooled expression matrix passed to RUV-4.
 #' @return List of diagnostic values.
 #' @keywords internal
-.ruv_diagnostics <- function(fit, cohort) {
+.ruv_diagnostics <- function(fit, cohort, feature_names) {
   k <- ncol(fit$W)
   W <- fit$W
   outcome <- fit$X[, 1]
@@ -294,11 +296,11 @@ NULL
     )
   }
 
-  ctl_genes <- colnames(fit$Y)
-  if (is.null(ctl_genes)) ctl_genes <- character()
+  # ruv::RUV4 does not return the expression matrix, so control gene names are
+  # recovered from `feature_names` (columns of the pooled matrix) via fit$ctl.
   ctl_idx <- if (is.logical(fit$ctl)) which(fit$ctl) else fit$ctl
-  control_genes <- if (length(ctl_genes) && length(ctl_idx)) {
-    ctl_genes[ctl_idx]
+  control_genes <- if (length(feature_names) && length(ctl_idx)) {
+    feature_names[ctl_idx]
   } else {
     character()
   }

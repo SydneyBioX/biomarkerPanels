@@ -4,12 +4,15 @@
 \alias{.ruv_diagnostics}
 \title{Compute RUV-4 Diagnostics}
 \usage{
-.ruv_diagnostics(fit, cohort)
+.ruv_diagnostics(fit, cohort, feature_names)
 }
 \arguments{
 \item{fit}{RUV-4 fit object.}
 
 \item{cohort}{Factor of cohort labels.}
+
+\item{feature_names}{Character vector of gene names, ordered as the columns
+of the pooled expression matrix passed to RUV-4.}
 }
 \value{
 List of diagnostic values.

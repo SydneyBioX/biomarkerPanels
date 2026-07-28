@@ -74,7 +74,7 @@ NULL
 #' high discrimination and low alpha_norm are prioritised.
 #'
 #' @seealso [select_transferable_features()], [select_discriminative_features()],
-#'   [get_top_de_features()]
+#'   [select_de_features()]
 #'
 #' @export
 select_ruv_features <- function(x_list,
@@ -110,7 +110,7 @@ select_ruv_features <- function(x_list,
     )
   }
 
-  prepared <- .prepare_ridge_inputs(x_list, y_list, assay = assay)
+  prepared <- .prepare_selection_inputs(x_list, y_list, assay = assay)
   pooled <- .pool_cohort_data(prepared$matrices, prepared$responses,
     prepared$cohort_names
   )
@@ -141,7 +141,7 @@ select_ruv_features <- function(x_list,
   }
 
   scored <- .score_ruv_features(fit, scoring, epsilon, pooled$feature_names)
-  diagnostics <- .ruv_diagnostics(fit, pooled$cohort)
+  diagnostics <- .ruv_diagnostics(fit, pooled$cohort, pooled$feature_names)
 
   top_n <- min(n_features, nrow(scored))
   if (top_n == 0L) {

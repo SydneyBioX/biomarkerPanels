@@ -1,12 +1,12 @@
-#' Feature Pre-selection
+#' Differential Expression Feature Selection
 #'
-#' Differential-expression-based pre-selection of candidate features to seed
+#' Differential-expression-based selection of candidate features to seed
 #' downstream optimization and ratio-construction workflows.
 #'
-#' @name feature_preselection
+#' @name de_features
 NULL
 
-#' Get Top Differentially Expressed Features
+#' Select Top Differentially Expressed Features
 #'
 #' Applies moderated t-statistics via `limma` across one or more cohorts, then
 #' aggregates the resulting evidence into a ranked list of candidate features.
@@ -27,16 +27,18 @@ NULL
 #' @param assay For `SummarizedExperiment` inputs, the assay name or index to
 #'   extract prior to modelling.
 #' @return Character vector of feature identifiers ordered by significance.
+#' @seealso [select_transferable_features()], [select_discriminative_features()],
+#'   [select_ruv_features()], [select_cpop_features()]
 #' @export
 #'
 #' @importFrom stats model.matrix pnorm qnorm weighted.mean sd
 #' @importFrom limma lmFit makeContrasts contrasts.fit eBayes topTable
-get_top_de_features <- function(x_list,
-                                y_list,
-                                contrast = NULL,
-                                n_features = 50L,
-                                combination_method = c("OSP", "Stouffer", "Fisher", "maxP"),
-                                assay = NULL) {
+select_de_features <- function(x_list,
+                               y_list,
+                               contrast = NULL,
+                               n_features = 50L,
+                               combination_method = c("OSP", "Stouffer", "Fisher", "maxP"),
+                               assay = NULL) {
   combination_method <- match.arg(combination_method)
   n_features <- .validate_positive_integer(n_features, "n_features")
 
@@ -46,14 +48,6 @@ get_top_de_features <- function(x_list,
     contrast = contrast,
     assay = assay
   )
-
-  if (!length(limma_stats$feature_names)) {
-    stop(
-      "No features available for differential expression analysis. ",
-      "Check that input matrices have column names and contain numeric data.",
-      call. = FALSE
-    )
-  }
 
   ordered_p <- .aggregate_de_pvalues(limma_stats$t_matrix, combination_method)
   if (!length(ordered_p)) {

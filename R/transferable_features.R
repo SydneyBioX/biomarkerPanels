@@ -62,7 +62,7 @@ select_transferable_features <- function(x_list,
     stop("`min_coefficient` must be a numeric scalar.", call. = FALSE)
   }
 
-  prepared <- .prepare_ridge_inputs(x_list, y_list, assay = assay)
+  prepared <- .prepare_selection_inputs(x_list, y_list, assay = assay)
   matrices <- prepared$matrices
   responses <- prepared$responses
   cohort_names <- prepared$cohort_names

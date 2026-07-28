@@ -22,10 +22,10 @@ make_ratio_fixture <- function() {
   )
 }
 
-test_that("get_top_de_features ranks shared signals", {
+test_that("select_de_features ranks shared signals", {
   fixture <- make_ratio_fixture()
 
-  selected <- get_top_de_features(
+  selected <- select_de_features(
     lapply(fixture$cohorts, `[[`, "x"),
     lapply(fixture$cohorts, `[[`, "y"),
     n_features = 3,
@@ -35,6 +35,21 @@ test_that("get_top_de_features ranks shared signals", {
   expect_type(selected, "character")
   expect_lte(length(selected), 3)
   expect_true("gene1" %in% selected)
+})
+
+test_that("get_top_de_features is deprecated but still forwards", {
+  fixture <- make_ratio_fixture()
+  x <- lapply(fixture$cohorts, `[[`, "x")
+  y <- lapply(fixture$cohorts, `[[`, "y")
+
+  expect_warning(
+    old <- get_top_de_features(x, y, n_features = 3,
+                               combination_method = "Stouffer"),
+    "deprecated"
+  )
+  new <- select_de_features(x, y, n_features = 3,
+                            combination_method = "Stouffer")
+  expect_identical(old, new)
 })
 
 test_that("select_features_for_ratios returns stable and informative sets", {

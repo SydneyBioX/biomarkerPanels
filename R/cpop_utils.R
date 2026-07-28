@@ -58,38 +58,20 @@ NULL
 }
 
 .cpop_prepare_inputs <- function(x_list, y_list, assay = NULL) {
-  x_list <- .as_cohort_list(x_list)
-  y_list <- .as_cohort_list(y_list)
-  if (length(x_list) != length(y_list)) {
-    stop("`x_list` and `y_list` must have the same length.", call. = FALSE)
-  }
-  if (length(x_list) < 2L) {
+  if (length(.as_cohort_list(x_list)) < 2L) {
     stop("CPOP requires at least two cohorts.", call. = FALSE)
   }
 
-  cohort_names <- .default_cohort_names(x_list)
-
-  raw_matrices <- vector("list", length(x_list))
-  responses <- vector("list", length(x_list))
-  for (i in seq_along(x_list)) {
-    mat <- .ensure_feature_colnames(.extract_feature_matrix(x_list[[i]], assay = assay))
-    yi <- ensure_binary_response(y_list[[i]])
-    if (nrow(mat) != length(yi)) {
-      stop("Cohort ", i, ": row count of x must match length of y.",
-           call. = FALSE)
-    }
-    raw_matrices[[i]] <- mat
-    responses[[i]] <- yi
-  }
-
-  common_features <- Reduce(intersect, lapply(raw_matrices, colnames))
-  if (!length(common_features)) {
-    stop("No shared features found across cohorts.", call. = FALSE)
-  }
-  ordered_features <- sort(common_features)
-  raw_matrices <- lapply(raw_matrices, function(m) {
-    m[, ordered_features, drop = FALSE]
-  })
+  prepared <- .prepare_selection_inputs(
+    x_list, y_list,
+    assay = assay,
+    response = "factor",
+    feature_order = "sorted"
+  )
+  raw_matrices <- prepared$matrices
+  responses <- prepared$responses
+  cohort_names <- prepared$cohort_names
+  ordered_features <- prepared$feature_names
 
   if (length(ordered_features) < 2L) {
     stop("CPOP requires at least two shared base features to construct ",

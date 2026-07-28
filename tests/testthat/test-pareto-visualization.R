@@ -31,7 +31,7 @@ test_that("plot_pareto_front rejects non-OptimizationResult input", {
   x_test  <- x_all[-train_idx, , drop = FALSE]
   y_test  <- y_all[-train_idx]
 
-  top_feats <- get_top_de_features(list(x_train), list(y_train), n_features = 30)
+  top_feats <- select_de_features(list(x_train), list(y_train), n_features = 30)
   objectives <- define_objectives(
     metrics = c("num_features", "sensitivity", "specificity")
   )

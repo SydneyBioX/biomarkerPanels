@@ -56,7 +56,7 @@ select_discriminative_features <- function(x_list,
   .validate_numeric_scalar(lambda_sd, "lambda_sd")
   .validate_probability(min_auc, "min_auc", bounds = "closed")
 
-  prepared <- .prepare_ridge_inputs(x_list, y_list, assay = assay)
+  prepared <- .prepare_selection_inputs(x_list, y_list, assay = assay)
   matrices <- prepared$matrices
   responses <- prepared$responses
   cohort_names <- prepared$cohort_names

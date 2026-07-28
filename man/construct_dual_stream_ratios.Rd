@@ -51,7 +51,7 @@ filtering.
 denom_result <- select_denominator_features(x, cohort, y)
 
 # Get signal genes (e.g., from DE analysis)
-numerators <- get_top_de_features(
+numerators <- select_de_features(
   x_list = list(x1, x2),
   y_list = list(y1, y2),
   n_features = 30
@@ -71,6 +71,6 @@ result <- optimize_panel(x_ratios, y, ...)
 }
 \seealso{
 \code{\link[=select_denominator_features]{select_denominator_features()}} for selecting batch-proxy genes,
-\code{\link[=get_top_de_features]{get_top_de_features()}} for selecting signal genes,
+\code{\link[=select_de_features]{select_de_features()}} for selecting signal genes,
 \code{\link[=pairwise_col_diff]{pairwise_col_diff()}} for an alternative all-pairs ratio construction.
 }

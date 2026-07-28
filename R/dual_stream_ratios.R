@@ -48,7 +48,7 @@ NULL
 #' denom_result <- select_denominator_features(x, cohort, y)
 #'
 #' # Get signal genes (e.g., from DE analysis)
-#' numerators <- get_top_de_features(
+#' numerators <- select_de_features(
 #'   x_list = list(x1, x2),
 #'   y_list = list(y1, y2),
 #'   n_features = 30
@@ -66,7 +66,7 @@ NULL
 #' }
 #'
 #' @seealso [select_denominator_features()] for selecting batch-proxy genes,
-#'   [get_top_de_features()] for selecting signal genes,
+#'   [select_de_features()] for selecting signal genes,
 #'   [pairwise_col_diff()] for an alternative all-pairs ratio construction.
 #'
 #' @export

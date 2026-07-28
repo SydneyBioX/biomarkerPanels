@@ -2,9 +2,9 @@
 #'
 #' Internal helpers for computing differential expression statistics via limma
 #' and aggregating p-values across cohorts using meta-analysis methods. The
-#' public entry point is [get_top_de_features()].
+#' public entry point is [select_de_features()].
 #'
-#' @name de_analysis
+#' @name de_features_helpers
 NULL
 
 #' Compute Limma Statistics Across Cohorts
@@ -23,31 +23,26 @@ NULL
                                       y_list,
                                       contrast = NULL,
                                       assay = NULL) {
-  x_list <- .as_cohort_list(x_list)
-  y_list <- .as_cohort_list(y_list)
+  # Union alignment: a feature present in only some cohorts is still modelled
+  # where it exists and padded with NA elsewhere, so partially-overlapping
+  # cohorts still contribute evidence to the meta-analysis.
+  prepared <- .prepare_selection_inputs(
+    x_list, y_list,
+    assay = assay,
+    response = "factor",
+    align = "union"
+  )
+  matrices <- prepared$matrices
+  responses <- prepared$responses
+  cohort_names <- prepared$cohort_names
+  feature_names <- prepared$feature_names
 
-  if (length(x_list) != length(y_list)) {
-    stop("`x_list` and `y_list` must have the same length.", call. = FALSE)
-  }
+  t_list <- vector("list", length(matrices))
+  se_list <- vector("list", length(matrices))
 
-  cohort_names <- .default_cohort_names(x_list)
-
-  t_list <- vector("list", length(x_list))
-  se_list <- vector("list", length(x_list))
-
-  for (i in seq_along(x_list)) {
-    x_mat <- .extract_feature_matrix(x_list[[i]], assay = assay)
-    y_vec <- ensure_binary_response(y_list[[i]])
-
-    if (nrow(x_mat) != length(y_vec)) {
-      stop("Number of rows in `x_list[[", i, "]]` must match the length of ",
-        "`y_list[[", i, "]]`.",
-        call. = FALSE
-      )
-    }
-
-    # Ensure feature names exist (columns of x_mat become rows of expr)
-    x_mat <- .ensure_feature_colnames(x_mat)
+  for (i in seq_along(matrices)) {
+    x_mat <- matrices[[i]]
+    y_vec <- responses[[i]]
 
     expr <- t(x_mat)
     design <- stats::model.matrix(~ 0 + y_vec)
@@ -56,7 +51,7 @@ NULL
     contrast_str <- .resolve_contrast(
       contrast = contrast,
       cohort_index = i,
-      total_cohorts = length(x_list),
+      total_cohorts = length(matrices),
       level_names = levels(y_vec)
     )
 
@@ -85,13 +80,6 @@ NULL
 
     t_list[[i]] <- t_vals
     se_list[[i]] <- se_vals
-  }
-
-  feature_names <- unique(unlist(lapply(t_list, names), use.names = FALSE))
-
-  # Throw an error if no features are detected.
-  if (!length(feature_names)) {
-    stop("No features detected in input data after computing test statistics.", call. = FALSE)
   }
 
   t_matrix <- matrix(

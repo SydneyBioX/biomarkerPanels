@@ -92,10 +92,10 @@ Reduce the search space before optimization:
 
 ```r
 # Via differential expression
-top_de <- get_top_de_features(x, y, n = 50)
+top_de <- select_de_features(x, y, n_features = 50)
 
 # Via cross-cohort transferability
-transferable <- select_transferable_features(x_list, y_list, n = 50)
+transferable <- select_transferable_features(x_list, y_list, n_features = 50)$features
 
 result <- optimize_panel(x, y, feature_pool = top_de, ...)
 ```
@@ -112,8 +112,11 @@ result <- optimize_panel(x, y, feature_pool = top_de, ...)
 | `min_metric_constraint()` | Add hard performance constraints |
 | `select_panel_top_sensitivity()` | Select solution from Pareto front by sensitivity |
 | `select_panel_inclusion_frequency()` | Select solution by feature frequency across solutions |
-| `get_top_de_features()` | Pre-filter features via differential expression |
-| `select_transferable_features()` | Pre-filter features by cross-cohort stability |
+| `select_de_features()` | Pre-filter features via differential expression |
+| `select_transferable_features()` | Pre-filter features by cross-cohort ridge stability |
+| `select_discriminative_features()` | Pre-filter by within-cohort AUC, penalised for batch separation |
+| `select_ruv_features()` | Pre-filter via RUV-4 signal vs. unwanted-variation scoring |
+| `select_cpop_features()` | Pre-filter pairwise log-ratios via the CPOP algorithm |
 | `metric_registry()` | View all available objective functions |
 
 ## 📊 Available Objectives

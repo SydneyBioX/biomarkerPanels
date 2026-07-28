@@ -301,18 +301,67 @@ NULL
   x
 }
 
-#' Prepare Inputs for Ridge Regression
+#' Report an Empty Cross-Cohort Feature Intersection
 #'
-#' Extracts feature matrices and responses from cohort lists, aligns features
-#' across cohorts via intersection, and converts responses to binary integers.
+#' Shared error for every path that aligns cohorts by intersecting feature
+#' names. Reports the per-cohort feature counts so the caller can tell an
+#' identifier-convention mismatch (all cohorts populated, zero overlap) from an
+#' empty input.
+#'
+#' @param feature_sets List of per-cohort feature name vectors.
+#' @param cohort_names Character vector of cohort identifiers.
+#' @return Never returns; always signals an error.
+#' @keywords internal
+.stop_no_shared_features <- function(feature_sets, cohort_names) {
+  counts <- vapply(feature_sets, length, integer(1))
+  stop(
+    "No shared features were found across cohorts.\n",
+    "Feature counts per cohort: ",
+    paste(sprintf("%s: %d", cohort_names, counts), collapse = ", "), ".\n",
+    "Cohorts must share at least one feature identifier. Check that every ",
+    "cohort uses the same naming convention (e.g. all gene symbols, or all ",
+    "Ensembl IDs).",
+    call. = FALSE
+  )
+}
+
+#' Prepare Cohort Inputs for Feature Selection
+#'
+#' Shared input preparation for the feature-selection entry points. Coerces
+#' single objects to cohort lists, extracts numeric feature matrices from
+#' matrices / data frames / `SummarizedExperiment`s, standardises responses,
+#' checks sample-count agreement, and aligns features across cohorts.
+#'
+#' This is deliberately separate from [.prepare_cohort_inputs()], which serves
+#' the optimisation path and additionally handles feature transforms,
+#' `feature_subset`, and the richer [.align_features()] strategies.
 #'
 #' @param x_list A matrix, `SummarizedExperiment`, or list of such objects.
 #' @param y_list A binary response aligned with `x_list`.
 #' @param assay For `SummarizedExperiment` inputs, the assay name or index.
+#' @param response Response encoding to return: `"integer"` for 0/1 (the form
+#'   `glmnet` and RUV want) or `"factor"` for the standard `No`/`Yes` factor.
+#' @param align `"intersection"` keeps only features shared by every cohort and
+#'   subsets each matrix to them. `"union"` keeps every feature seen in any
+#'   cohort and leaves the matrices ragged — the caller is then responsible for
+#'   handling features absent from a given cohort (limma fits per cohort and
+#'   pads the resulting statistic matrix with `NA`).
+#' @param feature_order `"input"` preserves the column order of the first
+#'   cohort; `"sorted"` sorts feature names alphabetically.
 #' @return A list with `matrices`, `responses`, `cohort_names`, and
+#'   `feature_names`. Under `align = "union"` the matrices are *not* subset to
 #'   `feature_names`.
 #' @keywords internal
-.prepare_ridge_inputs <- function(x_list, y_list, assay = NULL) {
+.prepare_selection_inputs <- function(x_list,
+                                      y_list,
+                                      assay = NULL,
+                                      response = c("integer", "factor"),
+                                      align = c("intersection", "union"),
+                                      feature_order = c("input", "sorted")) {
+  response <- match.arg(response)
+  align <- match.arg(align)
+  feature_order <- match.arg(feature_order)
+
   x_list <- .as_cohort_list(x_list)
   y_list <- .as_cohort_list(y_list)
 
@@ -326,7 +375,9 @@ NULL
   responses <- vector("list", length(x_list))
 
   for (i in seq_along(x_list)) {
-    x_mat <- .extract_feature_matrix(x_list[[i]], assay = assay)
+    x_mat <- .ensure_feature_colnames(
+      .extract_feature_matrix(x_list[[i]], assay = assay)
+    )
     y_vec <- ensure_binary_response(y_list[[i]])
 
     if (nrow(x_mat) != length(y_vec)) {
@@ -336,25 +387,48 @@ NULL
       )
     }
 
-    x_mat <- .ensure_feature_colnames(x_mat)
-
     matrices[[i]] <- x_mat
-    responses[[i]] <- as.integer(y_vec) - 1L
+    responses[[i]] <- if (response == "integer") {
+      as.integer(y_vec) - 1L
+    } else {
+      y_vec
+    }
   }
 
   feature_sets <- lapply(matrices, colnames)
-  # Uses intersection alignment for consistency with ridge models across cohorts
-  # For more flexible alignment, use .align_features() from cohort_preparation.R
+
+  if (align == "union") {
+    ordered_features <- unique(unlist(feature_sets, use.names = FALSE))
+    if (feature_order == "sorted") {
+      ordered_features <- sort(ordered_features)
+    }
+    if (!length(ordered_features)) {
+      stop(
+        "No features were found in any cohort. Check that the input matrices ",
+        "have at least one column of numeric data.",
+        call. = FALSE
+      )
+    }
+    # Matrices stay ragged: callers under "union" model each cohort separately.
+    return(list(
+      matrices = matrices,
+      responses = responses,
+      cohort_names = cohort_names,
+      feature_names = ordered_features
+    ))
+  }
+
   common_features <- Reduce(intersect, feature_sets)
   if (is.null(common_features) || !length(common_features)) {
-    stop(
-      "No shared features were found across cohorts. Provide data with ",
-      "overlapping feature identifiers (future releases will support more ",
-      "flexible alignment).",
-      call. = FALSE
-    )
+    .stop_no_shared_features(feature_sets, cohort_names)
   }
-  ordered_features <- feature_sets[[1]][feature_sets[[1]] %in% common_features]
+
+  ordered_features <- if (feature_order == "sorted") {
+    sort(common_features)
+  } else {
+    feature_sets[[1]][feature_sets[[1]] %in% common_features]
+  }
+
   matrices <- lapply(matrices, function(mat) {
     mat[, ordered_features, drop = FALSE]
   })

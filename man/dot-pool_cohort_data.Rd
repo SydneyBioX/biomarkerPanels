@@ -18,7 +18,7 @@ List with \code{Y} (pooled matrix), \code{X_outcome} (design matrix),
 \code{cohort} (factor), \code{feature_names}.
 }
 \description{
-Combines per-cohort matrices and responses from \code{\link[=.prepare_ridge_inputs]{.prepare_ridge_inputs()}}
+Combines per-cohort matrices and responses from \code{\link[=.prepare_selection_inputs]{.prepare_selection_inputs()}}
 into a single pooled dataset suitable for RUV-4.
 }
 \keyword{internal}

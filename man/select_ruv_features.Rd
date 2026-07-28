@@ -103,5 +103,5 @@ high discrimination and low alpha_norm are prioritised.
 }
 \seealso{
 \code{\link[=select_transferable_features]{select_transferable_features()}}, \code{\link[=select_discriminative_features]{select_discriminative_features()}},
-\code{\link[=get_top_de_features]{get_top_de_features()}}
+\code{\link[=select_de_features]{select_de_features()}}
 }
