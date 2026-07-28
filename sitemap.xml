@@ -10,6 +10,7 @@
 <url><loc>/reference/OptimizationResult-class.html</loc></url>
 <url><loc>/reference/TransferablePanelResult-class.html</loc></url>
 <url><loc>/reference/analyze_feature_stability.html</loc></url>
+<url><loc>/reference/biomarkerPanels-deprecated.html</loc></url>
 <url><loc>/reference/biomarkerPanels-package.html</loc></url>
 <url><loc>/reference/build_objectives.html</loc></url>
 <url><loc>/reference/calibrate_panel.html</loc></url>
@@ -22,7 +23,8 @@
 <url><loc>/reference/cpop_utils.html</loc></url>
 <url><loc>/reference/cv_scoring.html</loc></url>
 <url><loc>/reference/data_partitioning.html</loc></url>
-<url><loc>/reference/de_analysis.html</loc></url>
+<url><loc>/reference/de_features.html</loc></url>
+<url><loc>/reference/de_features_helpers.html</loc></url>
 <url><loc>/reference/define_objectives.html</loc></url>
 <url><loc>/reference/denominator_features.html</loc></url>
 <url><loc>/reference/discriminative_features.html</loc></url>
@@ -92,8 +94,8 @@
 <url><loc>/reference/dot-predict_panel_model.html</loc></url>
 <url><loc>/reference/dot-prepare_cohort_inputs.html</loc></url>
 <url><loc>/reference/dot-prepare_np_labels.html</loc></url>
-<url><loc>/reference/dot-prepare_ridge_inputs.html</loc></url>
 <url><loc>/reference/dot-prepare_scoring_matrix.html</loc></url>
+<url><loc>/reference/dot-prepare_selection_inputs.html</loc></url>
 <url><loc>/reference/dot-reference_diff_cpp.html</loc></url>
 <url><loc>/reference/dot-register_default_metric.html</loc></url>
 <url><loc>/reference/dot-resolve_contrast.html</loc></url>
@@ -110,6 +112,7 @@
 <url><loc>/reference/dot-select_np_threshold.html</loc></url>
 <url><loc>/reference/dot-select_stable_genes.html</loc></url>
 <url><loc>/reference/dot-select_stable_genes_cpp.html</loc></url>
+<url><loc>/reference/dot-stop_no_shared_features.html</loc></url>
 <url><loc>/reference/dot-stratified_partition_cohorts.html</loc></url>
 <url><loc>/reference/dot-validate_np_params.html</loc></url>
 <url><loc>/reference/dot-validate_numeric_scalar.html</loc></url>
@@ -129,7 +132,6 @@
 <url><loc>/reference/evaluate_sensitivity.html</loc></url>
 <url><loc>/reference/fake_gene_expression.html</loc></url>
 <url><loc>/reference/feature_alignment.html</loc></url>
-<url><loc>/reference/feature_preselection.html</loc></url>
 <url><loc>/reference/feature_stability.html</loc></url>
 <url><loc>/reference/feature_stability_analysis.html</loc></url>
 <url><loc>/reference/feature_transform_registry.html</loc></url>
@@ -144,7 +146,6 @@
 <url><loc>/reference/fitness_validation.html</loc></url>
 <url><loc>/reference/get_solution_base_features.html</loc></url>
 <url><loc>/reference/get_solution_features.html</loc></url>
-<url><loc>/reference/get_top_de_features.html</loc></url>
 <url><loc>/reference/hypervolume.html</loc></url>
 <url><loc>/reference/hypervolume_history.html</loc></url>
 <url><loc>/reference/index.html</loc></url>
@@ -200,6 +201,7 @@
 <url><loc>/reference/ruv_features.html</loc></url>
 <url><loc>/reference/ruv_features_helpers.html</loc></url>
 <url><loc>/reference/select_cpop_features.html</loc></url>
+<url><loc>/reference/select_de_features.html</loc></url>
 <url><loc>/reference/select_denominator_features.html</loc></url>
 <url><loc>/reference/select_discriminative_features.html</loc></url>
 <url><loc>/reference/select_features_for_ratios.html</loc></url>

@@ -178,10 +178,10 @@
 <p>Reduce the search space before optimization:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Via differential expression</span></span>
-<span><span class="va">top_de</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/get_top_de_features.html">get_top_de_features</a></span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, n <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<span><span class="va">top_de</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/select_de_features.html">select_de_features</a></span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, n_features <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Via cross-cohort transferability</span></span>
-<span><span class="va">transferable</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/select_transferable_features.html">select_transferable_features</a></span><span class="op">(</span><span class="va">x_list</span>, <span class="va">y_list</span>, n <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<span><span class="va">transferable</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/select_transferable_features.html">select_transferable_features</a></span><span class="op">(</span><span class="va">x_list</span>, <span class="va">y_list</span>, n_features <span class="op">=</span> <span class="fl">50</span><span class="op">)</span><span class="op">$</span><span class="va">features</span></span>
 <span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/optimize_panel.html">optimize_panel</a></span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, feature_pool <span class="op">=</span> <span class="va">top_de</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -233,12 +233,24 @@
 <td>Select solution by feature frequency across solutions</td>
 </tr>
 <tr>
-<td><code><a href="reference/get_top_de_features.html">get_top_de_features()</a></code></td>
+<td><code><a href="reference/select_de_features.html">select_de_features()</a></code></td>
 <td>Pre-filter features via differential expression</td>
 </tr>
 <tr>
 <td><code><a href="reference/select_transferable_features.html">select_transferable_features()</a></code></td>
-<td>Pre-filter features by cross-cohort stability</td>
+<td>Pre-filter features by cross-cohort ridge stability</td>
+</tr>
+<tr>
+<td><code><a href="reference/select_discriminative_features.html">select_discriminative_features()</a></code></td>
+<td>Pre-filter by within-cohort AUC, penalised for batch separation</td>
+</tr>
+<tr>
+<td><code><a href="reference/select_ruv_features.html">select_ruv_features()</a></code></td>
+<td>Pre-filter via RUV-4 signal vs. unwanted-variation scoring</td>
+</tr>
+<tr>
+<td><code><a href="reference/select_cpop_features.html">select_cpop_features()</a></code></td>
+<td>Pre-filter pairwise log-ratios via the CPOP algorithm</td>
 </tr>
 <tr>
 <td><code><a href="reference/metric_registry.html">metric_registry()</a></code></td>
@@ -390,7 +402,7 @@
 
 <div class="pkgdown">
   <p></p>
-<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
       </footer>
