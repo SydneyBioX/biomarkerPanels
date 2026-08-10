@@ -10,6 +10,7 @@
 <url><loc>/reference/OptimizationResult-class.html</loc></url>
 <url><loc>/reference/TransferablePanelResult-class.html</loc></url>
 <url><loc>/reference/analyze_feature_stability.html</loc></url>
+<url><loc>/reference/batch_associated_features.html</loc></url>
 <url><loc>/reference/biomarkerPanels-deprecated.html</loc></url>
 <url><loc>/reference/biomarkerPanels-package.html</loc></url>
 <url><loc>/reference/build_objectives.html</loc></url>
@@ -26,7 +27,6 @@
 <url><loc>/reference/de_features.html</loc></url>
 <url><loc>/reference/de_features_helpers.html</loc></url>
 <url><loc>/reference/define_objectives.html</loc></url>
-<url><loc>/reference/denominator_features.html</loc></url>
 <url><loc>/reference/discriminative_features.html</loc></url>
 <url><loc>/reference/dot-aggregate_de_pvalues.html</loc></url>
 <url><loc>/reference/dot-aggregate_de_pvalues_cpp.html</loc></url>
@@ -170,6 +170,7 @@
 <url><loc>/reference/metric_precision.html</loc></url>
 <url><loc>/reference/metric_registry.html</loc></url>
 <url><loc>/reference/metric_sensitivity.html</loc></url>
+<url><loc>/reference/metric_sensitivity_at_specificity.html</loc></url>
 <url><loc>/reference/metric_specificity.html</loc></url>
 <url><loc>/reference/metric_specificity_at_sensitivity.html</loc></url>
 <url><loc>/reference/min_metric_constraint.html</loc></url>
@@ -200,9 +201,9 @@
 <url><loc>/reference/register_metric.html</loc></url>
 <url><loc>/reference/ruv_features.html</loc></url>
 <url><loc>/reference/ruv_features_helpers.html</loc></url>
+<url><loc>/reference/select_batch_associated_features.html</loc></url>
 <url><loc>/reference/select_cpop_features.html</loc></url>
 <url><loc>/reference/select_de_features.html</loc></url>
-<url><loc>/reference/select_denominator_features.html</loc></url>
 <url><loc>/reference/select_discriminative_features.html</loc></url>
 <url><loc>/reference/select_features_for_ratios.html</loc></url>
 <url><loc>/reference/select_panel_by_pathway.html</loc></url>

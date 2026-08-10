@@ -74,6 +74,17 @@ future release.</p>
 <span>  n_features <span class="op">=</span> <span class="fl">50L</span>,</span>
 <span>  combination_method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"OSP"</span>, <span class="st">"Stouffer"</span>, <span class="st">"Fisher"</span>, <span class="st">"maxP"</span><span class="op">)</span>,</span>
 <span>  assay <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">select_denominator_features</span><span class="op">(</span></span>
+<span>  <span class="va">x</span>,</span>
+<span>  <span class="va">cohort</span>,</span>
+<span>  y <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  n_denominators <span class="op">=</span> <span class="fl">20L</span>,</span>
+<span>  n_pcs <span class="op">=</span> <span class="fl">50L</span>,</span>
+<span>  batch_pvalue_threshold <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  biology_pvalue_threshold <span class="op">=</span> <span class="fl">0.2</span>,</span>
+<span>  biology_penalty_quantile <span class="op">=</span> <span class="fl">0.5</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -111,10 +122,56 @@ One of <code>"OSP"</code>, <code>"Stouffer"</code>, <code>"Fisher"</code>, or <c
 <dd><p>For <code>SummarizedExperiment</code> inputs, the assay name or index to
 extract prior to modelling.</p></dd>
 
+
+<dt id="arg-x">x<a class="anchor" aria-label="anchor" href="#arg-x"></a></dt>
+<dd><p>Expression matrix (samples x genes). Should contain log-transformed
+expression values.</p></dd>
+
+
+<dt id="arg-cohort">cohort<a class="anchor" aria-label="anchor" href="#arg-cohort"></a></dt>
+<dd><p>Factor of cohort/batch labels, one per row of <code>x</code>.</p></dd>
+
+
+<dt id="arg-y">y<a class="anchor" aria-label="anchor" href="#arg-y"></a></dt>
+<dd><p>Binary outcome labels for biology filtering. Set to <code>NULL</code> to skip
+biology filtering (features selected purely on batch association).</p></dd>
+
+
+<dt id="arg-n-denominators">n_denominators<a class="anchor" aria-label="anchor" href="#arg-n-denominators"></a></dt>
+<dd><p>Number of genes to select. Renamed to <code>n_features</code> in
+<code><a href="select_batch_associated_features.html">select_batch_associated_features()</a></code>.</p></dd>
+
+
+<dt id="arg-n-pcs">n_pcs<a class="anchor" aria-label="anchor" href="#arg-n-pcs"></a></dt>
+<dd><p>Number of principal components to analyze (default 50).</p></dd>
+
+
+<dt id="arg-batch-pvalue-threshold">batch_pvalue_threshold<a class="anchor" aria-label="anchor" href="#arg-batch-pvalue-threshold"></a></dt>
+<dd><p>P-value threshold for batch association. PCs
+with ANOVA p &lt; this threshold are considered batch-associated (default
+0.10).</p></dd>
+
+
+<dt id="arg-biology-pvalue-threshold">biology_pvalue_threshold<a class="anchor" aria-label="anchor" href="#arg-biology-pvalue-threshold"></a></dt>
+<dd><p>P-value threshold for biology non-association.
+PCs with biology p &gt; this threshold are considered biology-free (default
+0.20).</p></dd>
+
+
+<dt id="arg-biology-penalty-quantile">biology_penalty_quantile<a class="anchor" aria-label="anchor" href="#arg-biology-penalty-quantile"></a></dt>
+<dd><p>Quantile of the per-gene biology scores used
+to stabilise the batch/biology ratio (default <code>0.5</code>, the median). This acts
+as a data-driven estimate of the biology-score noise floor; see Details.
+Larger values weaken the biology penalty, with <code>1.0</code> reducing the ranking
+to <code>batch_score</code> alone.</p></dd>
+
 </dl></div>
     <div id="value">
     <h2>Value</h2>
     <p>Character vector of feature identifiers ordered by significance.</p>
+<p>A list as returned by <code><a href="select_batch_associated_features.html">select_batch_associated_features()</a></code>, with the
+<code>features</code> element additionally exposed under its former name
+<code>denominators</code>.</p>
     </div>
     <div id="functions">
     <h2>Functions</h2>
@@ -122,6 +179,12 @@ extract prior to modelling.</p></dd>
 <ul><li><p><code>get_top_de_features()</code>: Renamed to <code><a href="select_de_features.html">select_de_features()</a></code> so
 that every feature-selection entry point shares the <code>select_*_features()</code>
 convention.</p></li>
+<li><p><code>select_denominator_features()</code>: Renamed to
+<code><a href="select_batch_associated_features.html">select_batch_associated_features()</a></code>. The old name described the genes'
+downstream role as log-ratio denominators rather than the selection
+criterion (association with batch, not biology). The argument order is
+unchanged, so positional calls still work; <code>n_denominators</code> is now
+<code>n_features</code> and the returned <code>denominators</code> element is now <code>features</code>.</p></li>
 </ul></div>
 
   </div>
