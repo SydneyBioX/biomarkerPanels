@@ -3,6 +3,7 @@
 \name{biomarkerPanels-deprecated}
 \alias{biomarkerPanels-deprecated}
 \alias{get_top_de_features}
+\alias{select_denominator_features}
 \title{Deprecated Functions}
 \usage{
 get_top_de_features(
@@ -12,6 +13,17 @@ get_top_de_features(
   n_features = 50L,
   combination_method = c("OSP", "Stouffer", "Fisher", "maxP"),
   assay = NULL
+)
+
+select_denominator_features(
+  x,
+  cohort,
+  y = NULL,
+  n_denominators = 20L,
+  n_pcs = 50L,
+  batch_pvalue_threshold = 0.1,
+  biology_pvalue_threshold = 0.2,
+  biology_penalty_quantile = 0.5
 )
 }
 \arguments{
@@ -33,9 +45,40 @@ One of \code{"OSP"}, \code{"Stouffer"}, \code{"Fisher"}, or \code{"maxP"}.}
 
 \item{assay}{For \code{SummarizedExperiment} inputs, the assay name or index to
 extract prior to modelling.}
+
+\item{x}{Expression matrix (samples x genes). Should contain log-transformed
+expression values.}
+
+\item{cohort}{Factor of cohort/batch labels, one per row of \code{x}.}
+
+\item{y}{Binary outcome labels for biology filtering. Set to \code{NULL} to skip
+biology filtering (features selected purely on batch association).}
+
+\item{n_denominators}{Number of genes to select. Renamed to \code{n_features} in
+\code{\link[=select_batch_associated_features]{select_batch_associated_features()}}.}
+
+\item{n_pcs}{Number of principal components to analyze (default 50).}
+
+\item{batch_pvalue_threshold}{P-value threshold for batch association. PCs
+with ANOVA p < this threshold are considered batch-associated (default
+0.10).}
+
+\item{biology_pvalue_threshold}{P-value threshold for biology non-association.
+PCs with biology p > this threshold are considered biology-free (default
+0.20).}
+
+\item{biology_penalty_quantile}{Quantile of the per-gene biology scores used
+to stabilise the batch/biology ratio (default \code{0.5}, the median). This acts
+as a data-driven estimate of the biology-score noise floor; see Details.
+Larger values weaken the biology penalty, with \code{1.0} reducing the ranking
+to \code{batch_score} alone.}
 }
 \value{
 Character vector of feature identifiers ordered by significance.
+
+A list as returned by \code{\link[=select_batch_associated_features]{select_batch_associated_features()}}, with the
+\code{features} element additionally exposed under its former name
+\code{denominators}.
 }
 \description{
 Functions retained for backward compatibility. Each forwards to its
@@ -47,5 +90,12 @@ future release.
 \item \code{get_top_de_features()}: Renamed to \code{\link[=select_de_features]{select_de_features()}} so
 that every feature-selection entry point shares the \verb{select_*_features()}
 convention.
+
+\item \code{select_denominator_features()}: Renamed to
+\code{\link[=select_batch_associated_features]{select_batch_associated_features()}}. The old name described the genes'
+downstream role as log-ratio denominators rather than the selection
+criterion (association with batch, not biology). The argument order is
+unchanged, so positional calls still work; \code{n_denominators} is now
+\code{n_features} and the returned \code{denominators} element is now \code{features}.
 
 }}

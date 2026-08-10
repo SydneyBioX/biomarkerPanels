@@ -10,7 +10,7 @@ NULL
 #'
 #' Creates pairwise ratio features by combining numerator genes (signal genes,
 #' typically differentially expressed) with denominator genes (batch-proxy genes
-#' from [select_denominator_features()]).
+#' from [select_batch_associated_features()]).
 #'
 #' For log-transformed expression data, log-ratios are computed as:
 #' `log(Numerator) - log(Denominator) = log(Numerator/Denominator)`
@@ -24,7 +24,7 @@ NULL
 #'   expression values when `log_transform = TRUE`.
 #' @param numerators Character vector of numerator gene names (signal genes).
 #' @param denominators Character vector of denominator gene names (batch-proxy
-#'   genes, typically from [select_denominator_features()]).
+#'   genes, typically from [select_batch_associated_features()]).
 #' @param log_transform Logical. If `TRUE` (default), compute log-ratios by
 
 #'   subtraction (appropriate for log-transformed expression). If `FALSE`,
@@ -45,7 +45,7 @@ NULL
 #' @examples
 #' \dontrun{
 #' # First select denominators
-#' denom_result <- select_denominator_features(x, cohort, y)
+#' denom_result <- select_batch_associated_features(x, cohort, y)
 #'
 #' # Get signal genes (e.g., from DE analysis)
 #' numerators <- select_de_features(
@@ -58,14 +58,14 @@ NULL
 #' x_ratios <- construct_dual_stream_ratios(
 #'   x = x,
 #'   numerators = numerators,
-#'   denominators = denom_result$denominators
+#'   denominators = denom_result$features
 #' )
 #'
 #' # Use ratios for optimization
 #' result <- optimize_panel(x_ratios, y, ...)
 #' }
 #'
-#' @seealso [select_denominator_features()] for selecting batch-proxy genes,
+#' @seealso [select_batch_associated_features()] for selecting batch-proxy genes,
 #'   [select_de_features()] for selecting signal genes,
 #'   [pairwise_col_diff()] for an alternative all-pairs ratio construction.
 #'

@@ -13,7 +13,7 @@ expression values when \code{log_transform = TRUE}.}
 \item{numerators}{Character vector of numerator gene names (signal genes).}
 
 \item{denominators}{Character vector of denominator gene names (batch-proxy
-genes, typically from \code{\link[=select_denominator_features]{select_denominator_features()}}).}
+genes, typically from \code{\link[=select_batch_associated_features]{select_batch_associated_features()}}).}
 
 \item{log_transform}{Logical. If \code{TRUE} (default), compute log-ratios by
 subtraction (appropriate for log-transformed expression). If \code{FALSE},
@@ -27,7 +27,7 @@ A matrix of ratio features with dimensions (n_samples x
 \description{
 Creates pairwise ratio features by combining numerator genes (signal genes,
 typically differentially expressed) with denominator genes (batch-proxy genes
-from \code{\link[=select_denominator_features]{select_denominator_features()}}).
+from \code{\link[=select_batch_associated_features]{select_batch_associated_features()}}).
 }
 \details{
 For log-transformed expression data, log-ratios are computed as:
@@ -48,7 +48,7 @@ filtering.
 \examples{
 \dontrun{
 # First select denominators
-denom_result <- select_denominator_features(x, cohort, y)
+denom_result <- select_batch_associated_features(x, cohort, y)
 
 # Get signal genes (e.g., from DE analysis)
 numerators <- select_de_features(
@@ -61,7 +61,7 @@ numerators <- select_de_features(
 x_ratios <- construct_dual_stream_ratios(
   x = x,
   numerators = numerators,
-  denominators = denom_result$denominators
+  denominators = denom_result$features
 )
 
 # Use ratios for optimization
@@ -70,7 +70,7 @@ result <- optimize_panel(x_ratios, y, ...)
 
 }
 \seealso{
-\code{\link[=select_denominator_features]{select_denominator_features()}} for selecting batch-proxy genes,
+\code{\link[=select_batch_associated_features]{select_batch_associated_features()}} for selecting batch-proxy genes,
 \code{\link[=select_de_features]{select_de_features()}} for selecting signal genes,
 \code{\link[=pairwise_col_diff]{pairwise_col_diff()}} for an alternative all-pairs ratio construction.
 }

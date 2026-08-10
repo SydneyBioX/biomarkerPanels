@@ -74,7 +74,8 @@ NULL
 #' high discrimination and low alpha_norm are prioritised.
 #'
 #' @seealso [select_transferable_features()], [select_discriminative_features()],
-#'   [select_de_features()]
+#'   [select_de_features()], [select_batch_associated_features()] for the
+#'   label-based counterpart that targets batch-associated genes directly.
 #'
 #' @export
 select_ruv_features <- function(x_list,

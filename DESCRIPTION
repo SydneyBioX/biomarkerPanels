@@ -52,6 +52,7 @@ BugReports: https://github.com/SydneyBioX/biomarkerPanels/issues
 VignetteBuilder: knitr
 Collate: 
     'RcppExports.R'
+    'batch_associated_features.R'
     'biomarkerPanels-package.R'
     'cohort_inputs.R'
     'cpop_fit.R'
@@ -63,7 +64,6 @@ Collate:
     'data_partitioning.R'
     'de_features.R'
     'de_features_helpers.R'
-    'denominator_features.R'
     'deprecated.R'
     'discriminative_features.R'
     'dual_stream_ratios.R'
