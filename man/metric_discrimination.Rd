@@ -6,5 +6,6 @@
 \description{
 Threshold-free metric functions that measure classifier discrimination
 ability without requiring a probability cutoff. Includes AUC, partial AUC,
-specificity at fixed sensitivity, and panel size metrics.
+specificity at fixed sensitivity, sensitivity at fixed specificity, and
+panel size metrics.
 }

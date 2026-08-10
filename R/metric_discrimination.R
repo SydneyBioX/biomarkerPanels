@@ -2,7 +2,8 @@
 #'
 #' Threshold-free metric functions that measure classifier discrimination
 #' ability without requiring a probability cutoff. Includes AUC, partial AUC,
-#' specificity at fixed sensitivity, and panel size metrics.
+#' specificity at fixed sensitivity, sensitivity at fixed specificity, and
+#' panel size metrics.
 #'
 #' @name metric_discrimination
 NULL
@@ -215,6 +216,93 @@ metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = N
       call. = FALSE
     )
   })
+}
+
+#' Sensitivity at a Fixed Specificity Threshold
+#'
+#' Computes the sensitivity achievable when the classifier operates at a
+#' specified specificity level. This is the transpose of
+#' [metric_specificity_at_sensitivity()], and is the natural objective for
+#' "rule-in" applications where a minimum specificity (i.e. a tolerable false
+#' positive rate) is mandatory and we want the best achievable detection rate
+#' at that operating point.
+#'
+#' Uses [pROC::coords()] to find the operating point on the ROC curve
+#' corresponding to the target specificity, then returns the sensitivity at
+#' that point. If the exact target specificity cannot be achieved, pROC
+#' interpolates to the nearest achievable point.
+#'
+#' Unlike [metric_specificity_at_sensitivity()], degenerate inputs (a
+#' single-class subset, or a `coords()` call that yields nothing usable)
+#' return `0` — the worst achievable value — rather than erroring or returning
+#' `NA_real_`. This keeps the metric safe to use directly as an NSGA
+#' objective, since the fitness path does not guard against `NA` objective
+#' values. Argument errors (missing `scores`, out-of-range
+#' `target_specificity`) still signal an error.
+#'
+#' @inheritParams metric_auc
+#' @param target_specificity The specificity threshold at which to evaluate
+#'   sensitivity (default 0.90). Must be between 0 and 1.
+#' @return Sensitivity at the target specificity, between 0 and 1. Returns `0`
+#'   for degenerate inputs.
+#' @seealso [metric_specificity_at_sensitivity()] for the transpose,
+#'   [metric_pauc()] for partial AUC in the high-sensitivity region,
+#'   [metric_sensitivity()] and [metric_specificity()] for threshold-based metrics.
+#' @export
+#' @examples
+#' truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
+#' scores <- c(runif(50, 0, 0.6), runif(50, 0.4, 1))
+#'
+#' # Sensitivity when specificity is fixed at 90%
+#' metric_sensitivity_at_specificity(truth, scores, target_specificity = 0.90)
+#'
+#' # Sensitivity when specificity is fixed at 95%
+#' metric_sensitivity_at_specificity(truth, scores, target_specificity = 0.95)
+metric_sensitivity_at_specificity <- function(truth, scores = NULL, selected = NULL,
+                                              positive = "Yes",
+                                              target_specificity = 0.90) {
+  if (!requireNamespace("pROC", quietly = TRUE)) {
+    stop("The 'pROC' package is required for this metric. ",
+         "Install it via install.packages('pROC').", call. = FALSE)
+  }
+  truth <- ensure_binary_response(truth)
+  if (is.null(scores)) {
+    stop("`scores` must be supplied to compute sensitivity at specificity.", call. = FALSE)
+  }
+
+  if (target_specificity < 0 || target_specificity > 1) {
+    stop("`target_specificity` must be between 0 and 1.", call. = FALSE)
+  }
+
+  # Degenerate cases return the worst achievable value rather than NA — the NSGA
+  # fitness path does not guard against NA objective values.
+  if (sum(truth == positive) == 0L || sum(truth != positive) == 0L) {
+    return(0)
+  }
+
+  tryCatch({
+    roc_obj <- pROC::roc(
+      response = truth,
+      predictor = scores,
+      levels = c(setdiff(levels(truth), positive), positive),
+      direction = "<",
+      quiet = TRUE
+    )
+
+    sens_value <- pROC::coords(
+      roc_obj,
+      x = target_specificity,
+      input = "specificity",
+      ret = "sensitivity"
+    )$sensitivity
+
+    # coords may return several ties; take the best achievable sensitivity
+    if (length(sens_value) == 0L) {
+      return(0)
+    }
+    sens_value <- suppressWarnings(max(sens_value, na.rm = TRUE))
+    if (!is.finite(sens_value)) 0 else as.numeric(sens_value)
+  }, error = function(e) 0)
 }
 
 #' Panel Size Penalty
