@@ -561,7 +561,11 @@ optimize_panel <- function(x, y,
     cache_max_entries = cache_max_entries,
     regularized = regularized,
     regularized_alpha = if (regularized) regularized_alpha else NULL,
-    objective_directions = objective_directions
+    objective_directions = objective_directions,
+    # Full objective descriptors (label/direction/fun, including any metric
+    # params such as target specificity) so downstream evaluation can re-score
+    # held-out data on the criteria the search actually optimised.
+    objectives = objectives
   )
 
   # Build training signature

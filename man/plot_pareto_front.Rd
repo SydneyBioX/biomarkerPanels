@@ -8,6 +8,8 @@ plot_pareto_front(
   optimization_result,
   x = NULL,
   y = NULL,
+  cohort = NULL,
+  objectives = NULL,
   x_metric = "sensitivity",
   y_metric = "specificity",
   color_by = "n_features",
@@ -36,14 +38,23 @@ automatically uses held-out data stored by
 is a list). When \code{NULL} (default), automatically uses held-out labels
 stored by \code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}.}
 
-\item{x_metric}{Character; metric name for the x-axis. Must be one of
-\code{"sensitivity"}, \code{"specificity"}, or \code{"auc"}. Default \code{"sensitivity"}.}
+\item{cohort}{Optional cohort factor for single-matrix \code{x}; passed to
+\code{\link[=evaluate_pareto_solutions]{evaluate_pareto_solutions()}}.}
 
-\item{y_metric}{Character; metric name for the y-axis. Same options as
+\item{objectives}{Optional objective override; passed to
+\code{\link[=evaluate_pareto_solutions]{evaluate_pareto_solutions()}}.}
+
+\item{x_metric}{Character; column name for the x-axis. Any column of
+\code{\link[=evaluate_pareto_solutions]{evaluate_pareto_solutions()}} output, i.e. \code{"sensitivity"},
+\code{"specificity"}, \code{"auc"}, \code{"n_features"}, \code{"n_base_features"}, or an
+\code{obj_}-prefixed optimisation objective such as \code{"obj_auc"}. Default
+\code{"sensitivity"}.}
+
+\item{y_metric}{Character; column name for the y-axis. Same options as
 \code{x_metric}. Default \code{"specificity"}.}
 
-\item{color_by}{One of \code{"n_features"}, \code{"n_base_features"}, \code{"auc"},
-\code{"sensitivity"}, \code{"specificity"}, or \code{NULL} to disable. Default
+\item{color_by}{Column name to map to point colour (e.g. \code{"n_features"},
+\code{"auc"}, an \code{obj_} column), or \code{NULL} to disable. Default
 \code{"n_features"}.}
 
 \item{point_size}{Numeric; point size. Default \code{4}.}

@@ -392,6 +392,10 @@ optimize_panel_transferable <- function(
     fitness_mode = fitness_mode,
     n_val_splits = if (fitness_mode == "within_cohort_rotating") n_val_splits else NULL,
     objective_directions = objective_directions,
+    # Full objective descriptors (label/direction/fun, including any metric
+    # params such as target specificity) so downstream evaluation can re-score
+    # held-out data on the criteria the search actually optimised.
+    objectives = objectives,
     # Transferable-specific: held-out data for calibrate_panel()
     heldout_x = heldout_inputs$x,
     heldout_y = heldout_inputs$truth,

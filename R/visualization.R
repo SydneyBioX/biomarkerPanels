@@ -194,12 +194,19 @@ plot_pareto_evolution <- function(optimization_result,
 #' @param y Held-out validation labels: a factor (or list of factors when `x`
 #'   is a list). When `NULL` (default), automatically uses held-out labels
 #'   stored by [optimize_panel_transferable()].
-#' @param x_metric Character; metric name for the x-axis. Must be one of
-#'   `"sensitivity"`, `"specificity"`, or `"auc"`. Default `"sensitivity"`.
-#' @param y_metric Character; metric name for the y-axis. Same options as
+#' @param cohort Optional cohort factor for single-matrix `x`; passed to
+#'   [evaluate_pareto_solutions()].
+#' @param objectives Optional objective override; passed to
+#'   [evaluate_pareto_solutions()].
+#' @param x_metric Character; column name for the x-axis. Any column of
+#'   [evaluate_pareto_solutions()] output, i.e. `"sensitivity"`,
+#'   `"specificity"`, `"auc"`, `"n_features"`, `"n_base_features"`, or an
+#'   `obj_`-prefixed optimisation objective such as `"obj_auc"`. Default
+#'   `"sensitivity"`.
+#' @param y_metric Character; column name for the y-axis. Same options as
 #'   `x_metric`. Default `"specificity"`.
-#' @param color_by One of `"n_features"`, `"n_base_features"`, `"auc"`,
-#'   `"sensitivity"`, `"specificity"`, or `NULL` to disable. Default
+#' @param color_by Column name to map to point colour (e.g. `"n_features"`,
+#'   `"auc"`, an `obj_` column), or `NULL` to disable. Default
 #'   `"n_features"`.
 #' @param point_size Numeric; point size. Default `4`.
 #' @param point_alpha Numeric; point transparency. Default `0.7`.
@@ -231,6 +238,8 @@ plot_pareto_evolution <- function(optimization_result,
 plot_pareto_front <- function(optimization_result,
                               x = NULL,
                               y = NULL,
+                              cohort = NULL,
+                              objectives = NULL,
                               x_metric = "sensitivity",
                               y_metric = "specificity",
                               color_by = "n_features",
@@ -252,10 +261,20 @@ plot_pareto_front <- function(optimization_result,
     optimization_result,
     x = x,
     y = y,
+    cohort = cohort,
+    objectives = objectives,
     on_error = on_error,
     regularized = regularized,
     verbose = verbose
   )
+
+  requested <- c(x_metric, y_metric, color_by)
+  missing_cols <- setdiff(requested, names(plot_df))
+  if (length(missing_cols)) {
+    stop("Column(s) not available in the evaluated Pareto data: ",
+         paste(missing_cols, collapse = ", "), ". Available: ",
+         paste(names(plot_df), collapse = ", "), ".", call. = FALSE)
+  }
 
   # Build plot
   if (is.null(title)) {

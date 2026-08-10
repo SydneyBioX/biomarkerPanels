@@ -8,6 +8,8 @@ evaluate_pareto_solutions(
   optimization_result,
   x = NULL,
   y = NULL,
+  cohort = NULL,
+  objectives = NULL,
   on_error = c("warn", "stop"),
   regularized = TRUE,
   verbose = interactive()
@@ -25,6 +27,16 @@ automatically uses held-out data stored by
 is a list). When \code{NULL} (default), automatically uses held-out labels
 stored by \code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}.}
 
+\item{cohort}{Optional factor identifying cohort membership for each sample
+when \code{x} is a single matrix. Ignored when \code{x} is a list of cohorts. When
+\code{x}/\code{y} are taken from the stored held-out partition, the stored cohort
+labels are used unless overridden here.}
+
+\item{objectives}{Optional named list of objective descriptors (as returned
+by \code{\link[=define_objectives]{define_objectives()}}) overriding the objectives stored on
+\code{optimization_result}. Set to \code{NA} to skip objective re-scoring entirely
+and return only the descriptive columns.}
+
 \item{on_error}{One of \code{"warn"} or \code{"stop"}. Controls behaviour when a
 solution fails evaluation. \code{"warn"} (default) skips the solution with a
 warning; \code{"stop"} raises an error immediately.}
@@ -36,12 +48,29 @@ warning; \code{"stop"} raises an error immediately.}
 \value{
 A data frame with one row per successfully evaluated solution and
 columns \code{solution_id}, \code{n_features}, \code{n_base_features}, \code{sensitivity},
-\code{specificity}, and \code{auc}.
+\code{specificity}, \code{auc}, plus one \verb{obj_<name>} column per optimisation
+objective. Attributes \code{objective_labels} and \code{objective_directions} map
+the \code{obj_} columns back to their metric labels and optimisation
+directions.
 }
 \description{
 Fits and evaluates every Pareto-optimal solution from \code{\link[=optimize_panel]{optimize_panel()}} on
 held-out validation data. This provides the metrics data frame used by
 \code{\link[=plot_pareto_front]{plot_pareto_front()}} without requiring a plot.
+}
+\details{
+In addition to the always-present descriptive columns (\code{sensitivity},
+\code{specificity}, \code{auc} at a 0.5 cutoff), each solution is re-scored on the
+objectives the optimisation actually targeted. Those are recovered from
+\code{optimization_result@control$objectives} (stored by \code{\link[=optimize_panel]{optimize_panel()}} and
+\code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}) and reported in columns prefixed \code{obj_},
+so \code{obj_auc} or \code{obj_sensitivity_at_specificity} are directly comparable to
+the training-side values in \code{solutions(optimization_result)}.
+
+Objectives whose metric is cohort-aware (e.g. \code{cohort_auc_gap},
+\code{min_cohort_auc}) cannot be computed when the evaluation data contains a
+single cohort; those columns are returned as \code{NA} with a warning. Supply
+\code{x} as a list of cohorts, or pass \code{cohort}, to make them computable.
 }
 \examples{
 \dontrun{
