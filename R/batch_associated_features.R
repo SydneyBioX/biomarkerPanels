@@ -1,25 +1,26 @@
-#' Denominator Feature Selection for Batch-Aware Ratio Normalization
+#' Batch-Associated Feature Selection
 #'
 #' Functions for identifying genes that capture batch effects but not biological
-#' signal. These "denominator" genes can be used to construct log-ratio features
-#' that normalize out batch-specific scaling factors.
+#' signal, using explicitly supplied cohort/batch labels.
 #'
-#' @name denominator_features
+#' @name batch_associated_features
 NULL
 
-#' Select Denominator Features for Batch-Aware Ratio Normalization
+#' Select Batch-Associated Features
 #'
 #' Identifies genes that are associated with batch/cohort effects but NOT with
-#' the biological outcome. These serve as "noise proxy" genes that can normalize
-#' signal genes through log-ratios: `log(Signal) - log(Denominator)` cancels
-#' batch-specific scaling factors.
+#' the biological outcome, using PCA plus per-component ANOVA against supplied
+#' cohort labels. The returned genes act as proxies for the batch axis: they
+#' are useful as a confounding diagnostic in their own right, and as log-ratio
+#' denominators, where `log(Signal) - log(BatchProxy)` cancels batch-specific
+#' scaling factors (see [construct_dual_stream_ratios()]).
 #'
 #' @param x Expression matrix (samples x genes). Should contain log-transformed
 #'   expression values.
-#' @param cohort Factor of cohort/batch labels.
+#' @param cohort Factor of cohort/batch labels, one per row of `x`.
 #' @param y Binary outcome labels for biology filtering. Set to `NULL` to skip
-#'   biology filtering (denominators selected purely on batch association).
-#' @param n_denominators Number of denominator genes to select (default 20).
+#'   biology filtering (features selected purely on batch association).
+#' @param n_features Number of batch-associated genes to select (default 20).
 #' @param n_pcs Number of principal components to analyze (default 50).
 #' @param batch_pvalue_threshold P-value threshold for batch association. PCs
 #'   with ANOVA p < this threshold are considered batch-associated (default
@@ -27,10 +28,17 @@ NULL
 #' @param biology_pvalue_threshold P-value threshold for biology non-association.
 #'   PCs with biology p > this threshold are considered biology-free (default
 #'   0.20).
+#' @param biology_penalty_quantile Quantile of the per-gene biology scores used
+#'   to stabilise the batch/biology ratio (default `0.5`, the median). This acts
+#'   as a data-driven estimate of the biology-score noise floor; see Details.
+#'   Larger values weaken the biology penalty, with `1.0` reducing the ranking
+#'   to `batch_score` alone.
 #'
 #' @return A list with components:
 #' \describe{
-#'   \item{denominators}{Character vector of selected denominator gene names.}
+#'   \item{features}{Character vector of selected batch-associated gene names.}
+#'   \item{biology_epsilon}{The stabilising constant actually added to the
+#'     biology scores when computing `ratio`.}
 #'   \item{diagnostics}{Data frame with per-PC statistics including variance
 #'     explained, batch p-value/R^2, and biology p-value/R^2.
 #'   }
@@ -50,37 +58,55 @@ NULL
 #' 4. If no pure batch PCs found, fall back to LDA-based cohort discrimination
 #' 5. Extract genes with highest loadings on pure batch PCs
 #' 6. Score genes by ratio of batch to biology contribution
-#' 7. Return top n_denominators genes
+#' 7. Return top `n_features` genes
+#'
+#' Step 6 ranks by `batch_score / (biology_score + epsilon)`. Both scores are
+#' variance-weighted means of absolute PCA loadings, so they share a scale that
+#' depends on the number of genes and the data at hand. `epsilon` is therefore
+#' set to the `biology_penalty_quantile` quantile of the observed biology
+#' scores rather than a fixed constant: a fixed tiny epsilon lets genes whose
+#' biology score is pure numerical noise (batch and biology both near zero)
+#' generate arbitrarily large ratios and outrank genuinely batch-driven genes.
+#' The median default assumes most genes are biologically null, making it a
+#' robust estimate of the biology-score noise floor.
+#'
+#' Unlike [select_ruv_features()], which estimates a *latent* unwanted-variation
+#' subspace from negative control genes, this function requires explicit
+#' cohort/batch labels and targets the batch axis directly.
+#'
+#' @seealso [construct_dual_stream_ratios()] for using the selected genes as
+#'   ratio denominators, [select_ruv_features()] for the label-free alternative.
 #'
 #' @examples
 #' \dontrun{
 #' # Assume x is samples x genes, cohort and y are factors
-#' result <- select_denominator_features(
+#' result <- select_batch_associated_features(
 #'   x = expression_matrix,
 #'   cohort = cohort_labels,
 #'   y = disease_labels,
-#'   n_denominators = 20
+#'   n_features = 20
 #' )
 #'
-#' # Use denominators with construct_dual_stream_ratios()
+#' # Use the batch-proxy genes as denominators
 #' ratios <- construct_dual_stream_ratios(
 #'   x = expression_matrix,
 #'   numerators = signal_genes,
-#'   denominators = result$denominators
+#'   denominators = result$features
 #' )
 #' }
 #'
 #' @export
 #' @importFrom stats prcomp aov t.test var
 #' @importFrom MASS lda
-select_denominator_features <- function(
+select_batch_associated_features <- function(
     x,
     cohort,
     y = NULL,
-    n_denominators = 20L,
+    n_features = 20L,
     n_pcs = 50L,
     batch_pvalue_threshold = 0.10,
-    biology_pvalue_threshold = 0.20) {
+    biology_pvalue_threshold = 0.20,
+    biology_penalty_quantile = 0.5) {
   # Input validation
   if (!is.matrix(x) && !is.data.frame(x)) {
     stop("`x` must be a matrix or data.frame.", call. = FALSE)
@@ -91,8 +117,11 @@ select_denominator_features <- function(
     stop("`x` must have column names (gene identifiers).", call. = FALSE)
   }
 
-  n_denominators <- .validate_positive_integer(n_denominators, "n_denominators")
+  n_features <- .validate_positive_integer(n_features, "n_features")
   n_pcs <- .validate_positive_integer(n_pcs, "n_pcs")
+  .validate_probability(biology_penalty_quantile, "biology_penalty_quantile",
+    bounds = "closed"
+  )
 
   cohort <- as.factor(cohort)
   if (length(cohort) != nrow(x)) {
@@ -219,7 +248,7 @@ select_denominator_features <- function(
 
   problematic_cohort <- cohort_levels[which.max(one_vs_rest$mean_separation)]
 
-  # Step 5: Extract denominator genes from PCA loadings
+  # Step 5: Extract batch-associated genes from PCA loadings
   if (length(pure_batch_pcs) > 0L) {
     batch_loadings <- abs(pca_result$rotation[, pure_batch_pcs, drop = FALSE])
 
@@ -233,8 +262,8 @@ select_denominator_features <- function(
   } else {
     warning(
       "No batch-associated principal components were found after all fallbacks; ",
-      "batch scores are all zero, so denominator selection carries no batch ",
-      "information and the resulting ratios will not cancel batch effects. ",
+      "batch scores are all zero, so the returned features carry no batch ",
+      "information and any ratios built from them will not cancel batch effects. ",
       "Inspect the data or relax the batch-PC criteria.",
       call. = FALSE
     )
@@ -258,24 +287,42 @@ select_denominator_features <- function(
     }
   }
 
+  # Stabilise the batch/biology ratio. A fixed tiny epsilon lets genes whose
+  # biology score is pure numerical noise (both scores ~0) produce enormous
+  # ratios and outrank genuinely batch-driven genes. Anchoring epsilon to a
+  # quantile of the observed biology scores makes it scale-free: genes below
+  # the biology noise floor are ordered by batch_score among themselves, while
+  # genes above it are still penalised.
+  biology_epsilon <- unname(stats::quantile(
+    gene_biology_scores,
+    probs = biology_penalty_quantile,
+    na.rm = TRUE
+  ))
+  if (!is.finite(biology_epsilon) || biology_epsilon <= 0) {
+    # No biology signal detected (y = NULL, no biology-associated PCs, or a
+    # degenerate quantile). Fall back to a tiny constant, which makes `ratio`
+    # monotone in batch_score - i.e. rank on batch association alone.
+    biology_epsilon <- .Machine$double.eps
+  }
+
   # Create gene score data frame
   gene_scores <- data.frame(
     gene = colnames(x),
     batch_score = gene_batch_scores,
     biology_score = gene_biology_scores,
-    ratio = gene_batch_scores / (gene_biology_scores + 1e-10),
+    ratio = gene_batch_scores / (gene_biology_scores + biology_epsilon),
     stringsAsFactors = FALSE
   )
 
-  # Select denominators: high batch score, low biology score
+  # Select features: high batch score, low biology score
   gene_scores <- gene_scores[order(-gene_scores$ratio, -gene_scores$batch_score), ]
 
-  denominators <- gene_scores$gene[seq_len(min(n_denominators, nrow(gene_scores)))]
+  features <- gene_scores$gene[seq_len(min(n_features, nrow(gene_scores)))]
 
-  # Step 7: Validation - compute simple DE p-values for denominators
+  # Step 7: Validation - compute simple DE p-values for the selected features
   if (!is.null(y)) {
     levels_y <- levels(y)
-    denom_de_pvalues <- vapply(denominators, function(g) {
+    selected_de_pvalues <- vapply(features, function(g) {
       stats::t.test(
         x[y == levels_y[1], g],
         x[y == levels_y[2], g]
@@ -283,11 +330,12 @@ select_denominator_features <- function(
     }, FUN.VALUE = numeric(1))
 
     gene_scores$de_pvalue <- NA_real_
-    gene_scores$de_pvalue[match(denominators, gene_scores$gene)] <- denom_de_pvalues
+    gene_scores$de_pvalue[match(features, gene_scores$gene)] <- selected_de_pvalues
   }
 
   list(
-    denominators = denominators,
+    features = features,
+    biology_epsilon = biology_epsilon,
     diagnostics = pc_diagnostics,
     problematic_cohort = problematic_cohort,
     one_vs_rest = one_vs_rest,
