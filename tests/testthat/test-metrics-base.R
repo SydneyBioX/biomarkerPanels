@@ -213,6 +213,104 @@ test_that("metric_specificity_at_sensitivity handles edge cases", {
   )
 })
 
+# Tests for metric_sensitivity_at_specificity
+test_that("metric_sensitivity_at_specificity computes correctly", {
+  set.seed(42)
+  truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
+  # Well-separated scores
+  scores <- c(rnorm(50, 0.3, 0.1), rnorm(50, 0.7, 0.1))
+
+  sens_at_90 <- metric_sensitivity_at_specificity(truth, scores, target_specificity = 0.90)
+  expect_true(is.numeric(sens_at_90))
+  expect_length(sens_at_90, 1L)
+  expect_gte(sens_at_90, 0)
+  expect_lte(sens_at_90, 1)
+
+  # Higher target specificity should yield lower or equal sensitivity
+  sens_at_95 <- metric_sensitivity_at_specificity(truth, scores, target_specificity = 0.95)
+  expect_lte(sens_at_95, sens_at_90 + 0.01)  # small tolerance for interpolation
+
+  # Lower target specificity should yield higher or equal sensitivity
+  sens_at_80 <- metric_sensitivity_at_specificity(truth, scores, target_specificity = 0.80)
+  expect_gte(sens_at_80, sens_at_90 - 0.01)  # small tolerance for interpolation
+})
+
+test_that("metric_sensitivity_at_specificity is the transpose of its sibling", {
+  set.seed(7)
+  truth <- factor(c(rep("No", 60), rep("Yes", 60)), levels = c("No", "Yes"))
+  scores <- c(rnorm(60, 0.3, 0.15), rnorm(60, 0.7, 0.15))
+
+  # Round-trip: the specificity reported at a target sensitivity should recover
+  # (at least) that sensitivity when fed back in as the specificity target.
+  spec <- metric_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.90)
+  sens <- metric_sensitivity_at_specificity(truth, scores, target_specificity = spec)
+  expect_gte(sens, 0.90 - 0.02)
+
+  # A perfectly separated classifier hits 1 on both axes.
+  perfect_truth <- factor(c(rep("No", 20), rep("Yes", 20)), levels = c("No", "Yes"))
+  perfect_scores <- c(runif(20, 0, 0.4), runif(20, 0.6, 1))
+  expect_equal(
+    metric_sensitivity_at_specificity(perfect_truth, perfect_scores,
+                                      target_specificity = 0.95),
+    1
+  )
+})
+
+test_that("metric_sensitivity_at_specificity handles edge cases", {
+  truth <- factor(c(rep("No", 10), rep("Yes", 10)), levels = c("No", "Yes"))
+
+  # Poor discrimination
+  poor_scores <- c(runif(10, 0.4, 0.6), runif(10, 0.4, 0.6))
+  sens_poor <- metric_sensitivity_at_specificity(truth, poor_scores, target_specificity = 0.90)
+  expect_true(is.numeric(sens_poor))
+  expect_false(is.na(sens_poor))
+
+  # Degenerate single-class inputs return the worst value (0), not NA, so the
+  # NSGA fitness path never sees a missing objective value.
+  truth_no_pos <- factor(rep("No", 10), levels = c("No", "Yes"))
+  expect_equal(metric_sensitivity_at_specificity(truth_no_pos, runif(10)), 0)
+
+  truth_no_neg <- factor(rep("Yes", 10), levels = c("No", "Yes"))
+  expect_equal(metric_sensitivity_at_specificity(truth_no_neg, runif(10)), 0)
+
+  # Constant scores are degenerate but still return a finite value
+  const <- metric_sensitivity_at_specificity(truth, rep(0.5, 20))
+  expect_true(is.finite(const))
+
+  # Invalid target_specificity
+  expect_error(
+    metric_sensitivity_at_specificity(truth, runif(20), target_specificity = 1.5),
+    "between 0 and 1"
+  )
+
+  # Missing scores
+  expect_error(
+    metric_sensitivity_at_specificity(truth),
+    "scores.*must be supplied"
+  )
+})
+
+test_that("sensitivity_at_specificity is registered and usable as an objective", {
+  registry <- metric_registry()
+  expect_true("sensitivity_at_specificity" %in% names(registry))
+  expect_equal(registry$sensitivity_at_specificity$direction, "maximize")
+  expect_false(isTRUE(registry$sensitivity_at_specificity$cutoff_dependent))
+
+  set.seed(11)
+  truth <- factor(c(rep("No", 30), rep("Yes", 30)), levels = c("No", "Yes"))
+  scores <- c(rnorm(30, 0.3, 0.1), rnorm(30, 0.7, 0.1))
+
+  objs <- build_objectives(
+    metrics = c("sensitivity_at_specificity", "num_features"),
+    params = list(sensitivity_at_specificity = list(target_specificity = 0.95))
+  )
+  value <- objs$sensitivity_at_specificity$fun(truth, scores, selected = c("A", "B"))
+  expect_equal(
+    value,
+    metric_sensitivity_at_specificity(truth, scores, target_specificity = 0.95)
+  )
+})
+
 # --- Hand-calculated ground truth tests ---
 
 test_that("classification metrics match hand-calculated confusion matrix", {

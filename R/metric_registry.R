@@ -92,6 +92,10 @@ NULL
   "Specificity at Target Sensitivity"
 )
 .register_default_metric(
+  "sensitivity_at_specificity", metric_sensitivity_at_specificity, "maximize",
+  "Sensitivity at Target Specificity"
+)
+.register_default_metric(
   "cohort_leakage", metric_cohort_leakage, "minimize",
   "Cohort Leakage (Adjusted R-squared)"
 )
