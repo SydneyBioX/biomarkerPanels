@@ -19,7 +19,7 @@ NULL
 #' @param selected Ignored; kept for signature compatibility.
 #' @param positive Label treated as the positive ("event") class.
 #' @return AUC between 0 and 1, or `NA_real_` if computation fails.
-#' @export
+#' @keywords internal
 metric_auc <- function(truth, scores = NULL, selected = NULL,
                      positive = "Yes") {
   if (!requireNamespace("pROC", quietly = TRUE)) {
@@ -74,7 +74,7 @@ metric_auc <- function(truth, scores = NULL, selected = NULL,
 #' @param partial_auc_correct Logical; apply McClish correction to normalize
 #'   partial AUC to 0-1 scale (default TRUE).
 #' @return Partial AUC value, or `NA_real_` if computation fails.
-#' @export
+#' @keywords internal
 metric_pauc <- function(truth, scores = NULL, selected = NULL,
                       positive = "Yes", sens_floor = 0.90,
                       partial_auc_correct = TRUE) {
@@ -248,7 +248,7 @@ metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = N
 #' @seealso [metric_specificity_at_sensitivity()] for the transpose,
 #'   [metric_pauc()] for partial AUC in the high-sensitivity region,
 #'   [metric_sensitivity()] and [metric_specificity()] for threshold-based metrics.
-#' @export
+#' @keywords internal
 #' @examples
 #' truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
 #' scores <- c(runif(50, 0, 0.6), runif(50, 0.4, 1))
@@ -315,7 +315,7 @@ metric_sensitivity_at_specificity <- function(truth, scores = NULL, selected = N
 #' @param selected Vector of selected base features (character, numeric, or logical).
 #' @param ... Additional arguments (ignored).
 #' @return Count of selected base biomarkers (genes).
-#' @export
+#' @keywords internal
 metric_num_features <- function(truth = NULL, scores = NULL, selected = NULL, ...) {
   if (is.null(selected)) {
     return(0)

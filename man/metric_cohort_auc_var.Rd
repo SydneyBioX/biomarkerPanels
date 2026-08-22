@@ -38,3 +38,4 @@ metric can be.
 Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
 of each class.
 }
+\keyword{internal}

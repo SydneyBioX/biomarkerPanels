@@ -37,3 +37,4 @@ Computes the proportion of predicted negatives that are true negatives.
 Important for rule-out diagnostics where a negative prediction should
 reliably exclude disease.
 }
+\keyword{internal}

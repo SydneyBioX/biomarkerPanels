@@ -35,3 +35,4 @@ Mean of sensitivity and specificity.
 \description{
 Balanced Accuracy
 }
+\keyword{internal}

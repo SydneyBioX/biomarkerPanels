@@ -117,7 +117,7 @@ NULL
 #' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
 #'   of each class. Consider using `metric_auc` as the primary objective and
 #'   this metric for monitoring.
-#' @export
+#' @keywords internal
 metric_min_cohort_auc <- .make_cohort_aware_metric(
   base_metric = metric_auc,
   aggregator = min,
@@ -133,7 +133,7 @@ metric_min_cohort_auc <- .make_cohort_aware_metric(
 #' @return AUC range across cohorts.
 #' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
 #'   of each class.
-#' @export
+#' @keywords internal
 metric_cohort_auc_gap <- .make_cohort_aware_metric(
   base_metric = metric_auc,
   aggregator = .gap_aggregator,
@@ -151,7 +151,7 @@ metric_cohort_auc_gap <- .make_cohort_aware_metric(
 #' @return Variance of per-cohort AUC values.
 #' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
 #'   of each class.
-#' @export
+#' @keywords internal
 metric_cohort_auc_var <- .make_cohort_aware_metric(
   base_metric = metric_auc,
   aggregator = .variance_aggregator,
@@ -166,7 +166,7 @@ metric_cohort_auc_var <- .make_cohort_aware_metric(
 #'
 #' @inheritParams metric_min_cohort_auc
 #' @return Maximum Brier score across cohorts.
-#' @export
+#' @keywords internal
 metric_max_cohort_brier <- function(truth, scores = NULL, selected = NULL,
                                   positive = "Yes", cohort = NULL) {
   truth <- ensure_binary_response(truth)
@@ -212,7 +212,7 @@ metric_max_cohort_brier <- function(truth, scores = NULL, selected = NULL,
 #' @param ... Additional arguments (ignored).
 #' @return Maximum adjusted R-squared across classes, clamped to \code{[0, 1]}.
 #'   Returns 0 when \code{cohort} is \code{NULL} or contains a single level.
-#' @export
+#' @keywords internal
 metric_cohort_leakage <- function(truth, scores = NULL, selected = NULL,
                                   positive = "Yes", cohort = NULL, ...) {
   truth <- ensure_binary_response(truth)

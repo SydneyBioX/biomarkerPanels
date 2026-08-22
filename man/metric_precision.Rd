@@ -36,3 +36,4 @@ Precision between 0 and 1, or \code{NA_real_} if undefined.
 Computes the proportion of predicted positives that are true positives.
 Also known as Positive Predictive Value (PPV).
 }
+\keyword{internal}

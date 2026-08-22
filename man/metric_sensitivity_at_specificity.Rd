@@ -65,3 +65,4 @@ metric_sensitivity_at_specificity(truth, scores, target_specificity = 0.95)
 \code{\link[=metric_pauc]{metric_pauc()}} for partial AUC in the high-sensitivity region,
 \code{\link[=metric_sensitivity]{metric_sensitivity()}} and \code{\link[=metric_specificity]{metric_specificity()}} for threshold-based metrics.
 }
+\keyword{internal}

@@ -19,7 +19,7 @@ NULL
 #'   `"youden"` (optimal Youden's J). Default is `"fixed"`.
 #' @param positive Label treated as the positive ("event") class.
 #' @return Sensitivity between 0 and 1, or `NA_real_` if undefined.
-#' @export
+#' @keywords internal
 metric_sensitivity <- function(truth, scores = NULL, selected = NULL,
                              cutoff_prob = 0.5,
                              cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -44,7 +44,7 @@ metric_sensitivity <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return Specificity between 0 and 1, or `NA_real_` if undefined.
-#' @export
+#' @keywords internal
 metric_specificity <- function(truth, scores = NULL, selected = NULL,
                              cutoff_prob = 0.5,
                              cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -72,7 +72,7 @@ metric_specificity <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return Precision between 0 and 1, or `NA_real_` if undefined.
-#' @export
+#' @keywords internal
 metric_precision <- function(truth, scores = NULL, selected = NULL,
                            cutoff_prob = 0.5,
                            cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -104,7 +104,7 @@ metric_precision <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return NPV between 0 and 1, or `NA_real_` if undefined.
-#' @export
+#' @keywords internal
 metric_npv <- function(truth, scores = NULL, selected = NULL,
                      cutoff_prob = 0.5,
                      cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -135,7 +135,7 @@ metric_npv <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return F1 score between 0 and 1, or `NA_real_` if undefined.
-#' @export
+#' @keywords internal
 metric_f1 <- function(truth, scores = NULL, selected = NULL,
                     cutoff_prob = 0.5,
                     cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -167,7 +167,7 @@ metric_f1 <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return Mean of sensitivity and specificity.
-#' @export
+#' @keywords internal
 metric_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
                                    cutoff_prob = 0.5,
                                    cutoff_strategy = c("fixed", "prevalence", "youden"),

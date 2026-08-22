@@ -36,3 +36,4 @@ F1 score between 0 and 1, or \code{NA_real_} if undefined.
 Computes the harmonic mean of precision and recall (sensitivity).
 F1 = 2 * (precision * recall) / (precision + recall).
 }
+\keyword{internal}

@@ -35,3 +35,4 @@ Sensitivity between 0 and 1, or \code{NA_real_} if undefined.
 \description{
 Sensitivity (True Positive Rate)
 }
+\keyword{internal}

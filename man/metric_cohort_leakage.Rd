@@ -42,3 +42,4 @@ A value near 0 indicates scores are independent of cohort within each class
 (good transferability). A value near 1 indicates scores are almost entirely
 determined by cohort (batch-effect leakage).
 }
+\keyword{internal}
