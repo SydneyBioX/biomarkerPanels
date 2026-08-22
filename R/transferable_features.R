@@ -128,6 +128,14 @@ select_transferable_features <- function(x_list,
     sign_consistency_threshold = sign_consistency_threshold
   )
 
+  settings <- list(
+    lambda_choice = if (is.null(lambda_vec)) lambda_choice else "fixed",
+    min_coefficient = min_coefficient,
+    require_sign_consistency = require_sign_consistency,
+    sign_consistency_threshold = sign_consistency_threshold,
+    standardize = standardize
+  )
+
   if (!nrow(combined_scores)) {
     warning(
       "No transferable features passed the sign-consistency and minimum-",
@@ -141,13 +149,7 @@ select_transferable_features <- function(x_list,
       scores = combined_scores,
       coefficients = coefficient_matrix[NULL, , drop = FALSE],
       lambda = lambda_used,
-      settings = list(
-        lambda_choice = if (is.null(lambda_vec)) lambda_choice else "fixed",
-        min_coefficient = min_coefficient,
-        require_sign_consistency = require_sign_consistency,
-        sign_consistency_threshold = sign_consistency_threshold,
-        standardize = standardize
-      )
+      settings = settings
     ))
   }
 
@@ -165,13 +167,7 @@ select_transferable_features <- function(x_list,
     scores = selected_scores,
     coefficients = coefficients_subset,
     lambda = lambda_used,
-    settings = list(
-      lambda_choice = if (is.null(lambda_vec)) lambda_choice else "fixed",
-      min_coefficient = min_coefficient,
-      require_sign_consistency = require_sign_consistency,
-      sign_consistency_threshold = sign_consistency_threshold,
-      standardize = standardize
-    )
+    settings = settings
   )
 }
 

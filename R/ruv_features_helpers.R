@@ -53,6 +53,28 @@ NULL
   )
 }
 
+#' Empirical Negative Controls from a Pooled Limma Fit
+#'
+#' Fits a naive pooled limma model (expression ~ outcome, ignoring cohort) and
+#' flags genes whose p-value falls above the `neg_control_quantile` threshold
+#' as negative controls. Shared by the initial control selection and the
+#' iterative refinement so the two passes cannot drift apart.
+#'
+#' @param Y Pooled expression matrix (samples x genes).
+#' @param X_outcome Design matrix for outcome (samples x 1).
+#' @param neg_control_quantile Quantile threshold for empirical selection.
+#' @return Logical vector of length `ncol(Y)`.
+#' @keywords internal
+.pooled_pvalue_controls <- function(Y, X_outcome, neg_control_quantile) {
+  expr <- t(Y) # genes x samples for limma
+  design <- stats::model.matrix(~X_outcome[, 1])
+  fit <- limma::lmFit(expr, design)
+  fit <- limma::eBayes(fit)
+  pvals <- fit$p.value[, 2]
+  threshold <- stats::quantile(pvals, probs = neg_control_quantile, na.rm = TRUE)
+  pvals > threshold
+}
+
 #' Select Negative Control Genes
 #'
 #' Identifies genes to serve as negative controls for RUV-4. Empirical mode
@@ -83,14 +105,7 @@ NULL
   }
 
   # Empirical: pooled limma ignoring cohort
-  expr <- t(Y) # genes x samples for limma
-  design <- stats::model.matrix(~X_outcome[, 1])
-  fit <- limma::lmFit(expr, design)
-  fit <- limma::eBayes(fit)
-  pvals <- fit$p.value[, 2]
-
-  threshold <- stats::quantile(pvals, probs = neg_control_quantile, na.rm = TRUE)
-  ctl <- pvals > threshold
+  ctl <- .pooled_pvalue_controls(Y, X_outcome, neg_control_quantile)
 
   if (sum(ctl) < 20L) {
     warning(
@@ -190,16 +205,9 @@ NULL
 
   for (iter in seq_len(max_iterations)) {
     Y_corrected <- Y - fit$W %*% fit$alpha
-    expr_corr <- t(Y_corrected)
-    design <- stats::model.matrix(~X_outcome[, 1])
-    lm_fit <- limma::lmFit(expr_corr, design)
-    lm_fit <- limma::eBayes(lm_fit)
-    pvals <- lm_fit$p.value[, 2]
-
-    threshold <- stats::quantile(pvals, probs = neg_control_quantile,
-      na.rm = TRUE
+    new_ctl <- .pooled_pvalue_controls(Y_corrected, X_outcome,
+      neg_control_quantile
     )
-    new_ctl <- pvals > threshold
 
     if (identical(which(new_ctl), which(ctl))) break
     ctl <- new_ctl

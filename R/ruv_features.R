@@ -130,8 +130,6 @@ select_ruv_features <- function(x_list,
   }
   k <- .cap_k(k, sum(ctl), nrow(pooled$Y))
 
-  fit <- .fit_ruv4(pooled$Y, pooled$X_outcome, ctl, k, ebayes)
-
   if (iterate_controls) {
     result <- .iterate_ruv_controls(
       pooled$Y, pooled$X_outcome, ctl, k, ebayes,
@@ -139,6 +137,8 @@ select_ruv_features <- function(x_list,
     )
     fit <- result$fit
     ctl <- result$ctl
+  } else {
+    fit <- .fit_ruv4(pooled$Y, pooled$X_outcome, ctl, k, ebayes)
   }
 
   scored <- .score_ruv_features(fit, scoring, epsilon, pooled$feature_names)

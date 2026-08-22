@@ -182,47 +182,8 @@ NULL
     )
   }
 
-  else if (inherits(x, "SummarizedExperiment")) {
-    # Handle single SummarizedExperiment input (same as matrix case)
-    x_mat <- .extract_feature_matrix(x, assay = assay)
-    truth <- ensure_binary_response(y)
-    if (nrow(x_mat) != length(truth)) {
-      stop("`x` and `y` must have matching sample sizes.", call. = FALSE)
-    }
-    x_mat <- .ensure_feature_colnames(x_mat)
-
-    if (!is.null(feature_subset)) {
-      missing <- setdiff(feature_subset, colnames(x_mat))
-      if (length(missing)) {
-        stop(
-          "Feature(s) not found in `x`: ",
-          paste(missing, collapse = ", "),
-          call. = FALSE
-        )
-      }
-      ref_attr <- attr(x_mat, "reference_feature")
-      x_mat <- x_mat[, feature_subset, drop = FALSE]
-      if (!is.null(ref_attr)) {
-        attr(x_mat, "reference_feature") <- ref_attr
-      }
-    }
-
-    x_mat <- .apply_feature_transform(list(x_mat), transform)[[1]]
-    if (is.null(colnames(x_mat))) {
-      stop("`x` must have column names in order to align with panel features.",
-           call. = FALSE)
-    }
-    cohort_names <- "cohort_01"
-    list(
-      x = x_mat,
-      truth = truth,
-      cohort = factor(rep(cohort_names, nrow(x_mat)), levels = cohort_names),
-      cohort_names = cohort_names,
-      cohort_counts = setNames(list(nrow(x_mat)), cohort_names)
-    )
-  }
-
-  # Handle single matrix/data.frame input
+  # Handle single-cohort input; .extract_feature_matrix() dispatches on
+  # matrix, data.frame, and SummarizedExperiment alike.
   else {
     x_mat <- .extract_feature_matrix(x, assay = assay)
     truth <- ensure_binary_response(y)
