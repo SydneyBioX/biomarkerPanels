@@ -464,18 +464,3 @@ fit_panel <- function(optimization_result,
 
   panel
 }
-
-#' Predict from Fitted Model
-#'
-#' Back-compatible alias for [.predict_panel_model()]. Retained because
-#' `.predict_from_model` is a stable internal name; the dispatch logic now lives
-#' in `R/model_prediction.R`.
-#'
-#' @param model Fitted model (cv.glmnet, npc, or glm).
-#' @param newx New feature matrix for prediction.
-#' @param cohort Optional cohort factor (unused; predictions are cohort-agnostic).
-#' @return Numeric vector of predicted probabilities.
-#' @keywords internal
-.predict_from_model <- function(model, newx, cohort = NULL) {
-  .predict_panel_model(model, newx, cohort = cohort)
-}

@@ -99,15 +99,6 @@ NULL
   "cohort_leakage", metric_cohort_leakage, "minimize",
   "Cohort Leakage (Adjusted R-squared)"
 )
-.register_default_metric(
-  "conditional_score_shift", metric_conditional_score_shift, "minimize",
-  "Class-Conditional Score Shift (W1)"
-)
-.register_default_metric(
-  "easy_hard_accuracy", metric_easy_hard_accuracy, "maximize",
-  "Easy-Hard Balanced Accuracy",
-  cutoff_dependent = TRUE
-)
 
 #' Register a metric function.
 #'

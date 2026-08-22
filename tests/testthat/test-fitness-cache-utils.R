@@ -68,7 +68,7 @@ test_that("fast binomial glm predictions match glm for no-cohort and cohort case
   expect_equal(pred_fast_cohort, pred_glm_cohort, tolerance = 1e-10)
 
   stored_fit <- .fit_final_model(x_train, truth, cohort_train)
-  pred_reference <- .predict_from_model(stored_fit, x_new, cohort_new)
+  pred_reference <- .predict_panel_model(stored_fit, x_new, cohort = cohort_new)
   pred_fast_reference <- .fit_predict_binomial_glm(
     x_train = x_train,
     truth = truth,

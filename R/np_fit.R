@@ -49,8 +49,15 @@ NULL
 #' @seealso [optimize_panel()], [fit_panel()], [evaluate_panel()]
 #' @examples
 #' \dontrun{
-#' # Run optimization
-#' opt <- optimize_panel(x, y, objectives = define_ruleout_objectives())
+#' # Run optimization targeting the high-sensitivity region
+#' opt <- optimize_panel(
+#'   x, y,
+#'   objectives = define_objectives(
+#'     metrics = c("pauc", "num_features"),
+#'     params = list(pauc = list(sens_floor = 0.90))
+#'   ),
+#'   constraints = list(min_metric_constraint("sensitivity", 0.90))
+#' )
 #'
 #' # Fit NP classifier for rule-out test (control FNR to achieve high sensitivity)
 #' panel <- fit_np_panel(opt, minimize_FPR = FALSE, alpha = 0.05)

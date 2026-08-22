@@ -18,3 +18,5 @@
 ^doc$
 ^docs$
 ^DEVELOPER\.md$
+^inst/benchmarks$
+^\.claude$

@@ -188,9 +188,11 @@ plot_pareto_front(
 
 ### Inspect Cohort-level Scores
 
-The default scoring function averages selected features per sample. Users can
-provide richer models through the `scoring_fn` argument to incorporate
-cohort-specific classifiers.
+By default candidates are scored with a (regularized) logistic model fitted by
+cross-validation. A custom `scoring_fn` is only used on the in-sample scoring
+path, so it requires `fitness_cv = FALSE` and `regularized = FALSE` — note that
+this combination scores candidates on their own training data and is prone to
+overfitting.
 
 ```{r custom-scoring, eval=FALSE}
 logit_scoring <- function(x_selected, selected_features, truth, cohort, ...) {
@@ -216,6 +218,8 @@ result_glm <- optimize_panel(
   max_features = 5,
   feature_pool = colnames(cohorts$x_list[[1]])[1:50],
   scoring_fn = logit_scoring,
+  fitness_cv = FALSE,
+  regularized = FALSE,
   nsga_control = list(popsize = 32, generations = 40)
 )
 ```

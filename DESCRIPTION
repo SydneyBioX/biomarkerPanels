@@ -85,8 +85,6 @@ Collate:
     'hypervolume.R'
     'metric_classification.R'
     'metric_cohort.R'
-    'metric_cohort_transferability.R'
-    'metric_difficulty.R'
     'metric_discrimination.R'
     'metric_registry.R'
     'model_fitting.R'

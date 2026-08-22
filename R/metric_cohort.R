@@ -187,3 +187,55 @@ metric_max_cohort_brier <- function(truth, scores = NULL, selected = NULL,
   }, numeric(1))
   max(values, na.rm = TRUE)
 }
+
+# -----------------------------------------------------------------------------
+# Cohort Leakage (R-squared)
+# -----------------------------------------------------------------------------
+
+#' Cohort Leakage
+#'
+#' Measures how much of the within-class score variance is explained by cohort
+#' membership, using adjusted R-squared from a one-way ANOVA
+#' (\code{lm(scores ~ cohort)}). For each class (positives and negatives), the
+#' adjusted R-squared is computed separately; the metric returns the maximum
+#' across both classes.
+#'
+#' A value near 0 indicates scores are independent of cohort within each class
+#' (good transferability). A value near 1 indicates scores are almost entirely
+#' determined by cohort (batch-effect leakage).
+#'
+#' @param truth Binary outcome; coerced with [ensure_binary_response()].
+#' @param scores Numeric scores or probabilities.
+#' @param selected Ignored; kept for signature compatibility.
+#' @param positive Label treated as the positive ("event") class.
+#' @param cohort Factor indicating cohort membership.
+#' @param ... Additional arguments (ignored).
+#' @return Maximum adjusted R-squared across classes, clamped to \code{[0, 1]}.
+#'   Returns 0 when \code{cohort} is \code{NULL} or contains a single level.
+#' @export
+metric_cohort_leakage <- function(truth, scores = NULL, selected = NULL,
+                                  positive = "Yes", cohort = NULL, ...) {
+  truth <- ensure_binary_response(truth)
+  if (is.null(scores)) {
+    stop("`scores` must be supplied to compute cohort leakage.", call. = FALSE)
+  }
+  if (is.null(cohort)) return(0)
+
+  cohort <- droplevels(factor(cohort))
+  y <- truth == positive
+
+  leakage_one_class <- function(idx) {
+    c_sub <- droplevels(cohort[idx])
+    s_sub <- scores[idx]
+    if (nlevels(c_sub) < 2L || length(s_sub) < 10L) return(0)
+    # Constant scores carry no cohort signal; lm() would otherwise return a
+    # spurious (non-NA) adj.r.squared with an "essentially perfect fit" warning.
+    if (stats::var(s_sub) == 0) return(0)
+    adj_r2 <- summary(lm(s_sub ~ c_sub))$adj.r.squared
+    max(0, adj_r2)
+  }
+
+  leak_case    <- leakage_one_class(which(y))
+  leak_control <- leakage_one_class(which(!y))
+  max(leak_case, leak_control, na.rm = TRUE)
+}
