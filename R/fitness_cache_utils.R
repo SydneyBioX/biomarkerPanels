@@ -1,6 +1,10 @@
-#' Fitness Selection, Caching, and Fast GLM Helpers
+#' Fitness Caching Utilities
 #'
-#' Internal utilities shared by standard and transferable panel optimization.
+#' Cache primitives keyed by selected base-feature panel, the shared panel
+#' transformer, and population-level fitness evaluation with panel-level
+#' deduplication (NSGA populations contain many duplicate panels; without the
+#' dedup every duplicate would refit its model). Panel selection lives in
+#' `R/panel_selection.R`; the fast GLM path lives in `R/glm_fitting.R`.
 #'
 #' @name fitness_cache_utils
 #' @keywords internal
@@ -71,77 +75,6 @@ NULL
   invisible(value)
 }
 
-.select_panel_indices <- function(decision_vec, feature_pool, max_features,
-                                  min_features_required,
-                                  selection_threshold = "adaptive") {
-  n_pool <- length(feature_pool)
-  if (identical(selection_threshold, "adaptive")) {
-    ord <- order(decision_vec, feature_pool,
-                 decreasing = c(TRUE, FALSE), method = "radix")
-    sorted_weights <- decision_vec[ord]
-
-    if (n_pool > max_features) {
-      top_n <- min(max_features + 5L, n_pool)
-      weight_diffs <- -diff(sorted_weights[seq_len(top_n)])
-      search_range <- seq(min_features_required, top_n - 1L)
-      if (length(search_range) > 0L) {
-        gap_idx <- which.max(weight_diffs[search_range])
-        natural_cutoff <- min_features_required + gap_idx
-      } else {
-        natural_cutoff <- min_features_required
-      }
-      n_selected <- min(natural_cutoff, max_features)
-      n_selected <- max(n_selected, min_features_required)
-    } else {
-      above_median <- sum(decision_vec > 0.5)
-      n_selected <- max(min_features_required, min(above_median, max_features))
-    }
-    selected_idx <- ord[seq_len(n_selected)]
-  } else {
-    threshold <- as.numeric(selection_threshold)
-    above_threshold <- which(decision_vec > threshold)
-
-    if (length(above_threshold) < min_features_required) {
-      ord <- order(decision_vec, feature_pool,
-                   decreasing = c(TRUE, FALSE), method = "radix")
-      selected_idx <- ord[seq_len(min(min_features_required, length(ord)))]
-    } else if (length(above_threshold) > max_features) {
-      weights_above <- decision_vec[above_threshold]
-      names_above <- feature_pool[above_threshold]
-      ord <- order(weights_above, names_above,
-                   decreasing = c(TRUE, FALSE), method = "radix")
-      selected_idx <- above_threshold[ord[seq_len(max_features)]]
-    } else {
-      selected_idx <- above_threshold
-    }
-  }
-
-  selected_idx[order(decision_vec[selected_idx], decreasing = TRUE)]
-}
-
-.make_panel_selector <- function(feature_pool, max_features,
-                                 min_features_required,
-                                 selection_threshold = "adaptive") {
-  force(feature_pool)
-  force(max_features)
-  force(min_features_required)
-  force(selection_threshold)
-  function(decision_vec) {
-    selected_idx <- .select_panel_indices(
-      decision_vec = decision_vec,
-      feature_pool = feature_pool,
-      max_features = max_features,
-      min_features_required = min_features_required,
-      selection_threshold = selection_threshold
-    )
-    base_features <- feature_pool[selected_idx]
-    list(
-      indices = selected_idx,
-      base_features = base_features,
-      key = .panel_key(base_features)
-    )
-  }
-}
 
 .make_panel_transformer <- function(matrices, feature_transform,
                                     cache_max_entries = Inf) {
@@ -266,117 +199,3 @@ NULL
   result
 }
 
-.cohort_dummy_matrix <- function(cohort, levels) {
-  n <- length(cohort)
-  if (length(levels) <= 1L) {
-    return(NULL)
-  }
-  cohort_factor <- factor(cohort, levels = levels)
-  dummies <- matrix(0, nrow = n, ncol = length(levels) - 1L)
-  colnames(dummies) <- paste0(".cohort_", seq_len(ncol(dummies)))
-  for (j in seq_along(levels[-1L])) {
-    dummies[, j] <- ifelse(
-      is.na(cohort_factor),
-      NA_real_,
-      as.numeric(cohort_factor == levels[-1L][[j]])
-    )
-  }
-  dummies
-}
-
-.prepare_glm_design_terms <- function(cohort_train = NULL, cohort_new = NULL,
-                                      predict_cohort = c("observed", "reference")) {
-  predict_cohort <- match.arg(predict_cohort)
-  if (is.null(cohort_train) || length(unique(cohort_train)) <= 1L) {
-    return(list(train_extra = NULL, new_extra = NULL))
-  }
-
-  cohort_train <- factor(cohort_train)
-  levels_train <- levels(cohort_train)
-  train_extra <- .cohort_dummy_matrix(cohort_train, levels_train)
-
-  if (is.null(cohort_new)) {
-    cohort_new <- cohort_train
-  }
-
-  if (predict_cohort == "reference") {
-    new_extra <- matrix(0, nrow = length(cohort_new),
-                        ncol = length(levels_train) - 1L)
-    colnames(new_extra) <- colnames(train_extra)
-  } else {
-    new_extra <- .cohort_dummy_matrix(cohort_new, levels_train)
-  }
-
-  list(
-    train_extra = train_extra,
-    new_extra = new_extra,
-    levels = levels_train,
-    predict_cohort = predict_cohort
-  )
-}
-
-.prepare_cv_glm_design_terms <- function(cohort, fold_ids) {
-  if (is.null(cohort)) {
-    return(NULL)
-  }
-  unique_folds <- sort(unique(fold_ids))
-  terms <- lapply(unique_folds, function(fold) {
-    test_idx <- which(fold_ids == fold)
-    train_idx <- which(fold_ids != fold)
-    .prepare_glm_design_terms(
-      cohort_train = cohort[train_idx],
-      cohort_new = cohort[test_idx],
-      predict_cohort = "observed"
-    )
-  })
-  names(terms) <- as.character(unique_folds)
-  terms
-}
-
-.build_glm_design_matrix <- function(x, extra = NULL) {
-  x_mat <- as.matrix(x)
-  storage.mode(x_mat) <- "double"
-  design <- cbind("(Intercept)" = 1, x_mat)
-  if (!is.null(extra) && ncol(extra) > 0L) {
-    design <- cbind(design, extra)
-  }
-  design
-}
-
-.fit_predict_binomial_glm <- function(x_train, truth, x_new = NULL,
-                                      cohort_train = NULL, cohort_new = NULL,
-                                      predict_cohort = c("observed", "reference"),
-                                      design_terms = NULL) {
-  predict_cohort <- match.arg(predict_cohort)
-  if (is.null(x_train) || ncol(x_train) == 0L) {
-    stop("No features selected for GLM scoring.", call. = FALSE)
-  }
-  if (length(unique(truth)) < 2L) {
-    stop("Response contains only one class. Cannot fit classification model.",
-         call. = FALSE)
-  }
-  if (is.null(x_new)) {
-    x_new <- x_train
-  }
-  if (is.null(design_terms)) {
-    design_terms <- .prepare_glm_design_terms(
-      cohort_train = cohort_train,
-      cohort_new = if (is.null(cohort_new)) cohort_train else cohort_new,
-      predict_cohort = predict_cohort
-    )
-  }
-
-  x_design <- .build_glm_design_matrix(x_train, design_terms$train_extra)
-  new_design <- .build_glm_design_matrix(x_new, design_terms$new_extra)
-  y_vec <- as.integer(truth) - 1L
-
-  fit <- stats::glm.fit(
-    x = x_design,
-    y = y_vec,
-    family = stats::binomial()
-  )
-  coefs <- fit$coefficients
-  coefs[is.na(coefs)] <- 0
-  preds <- stats::binomial()$linkinv(drop(new_design %*% coefs))
-  as.numeric(preds)
-}

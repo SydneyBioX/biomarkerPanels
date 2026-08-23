@@ -116,24 +116,6 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
   factor(mapped, levels = c("No", "Yes"))
 }
 
-#' Ensure Input is a List of Cohorts
-#'
-#' Wraps single objects in a list for consistent multi-cohort handling.
-#'
-#' @param x An object or list of objects.
-#' @return A list.
-#' @keywords internal
-.as_cohort_list <- function(x) { # nocov start
-  if (is.null(x)) {
-    stop("Input cannot be NULL.", call. = FALSE)
-  }
-
-  if (is.list(x)) {
-    return(x)
-  }
-  list(x)
-} # nocov end
-
 #' Validate Positive Integer Parameter
 #'
 #' Checks that a parameter is a single integer no smaller than `min` and coerces
@@ -195,4 +177,24 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
     stop("`", name, "` must be a numeric scalar.", call. = FALSE)
   }
   as.numeric(x)
+}
+
+#' Validate a Panel Selection Threshold
+#'
+#' Accepts the string `"adaptive"` or a numeric value strictly inside (0, 1).
+#'
+#' @param selection_threshold The value to validate.
+#' @return The input, invisibly.
+#' @keywords internal
+.validate_selection_threshold <- function(selection_threshold) {
+  if (!identical(selection_threshold, "adaptive")) {
+    st <- suppressWarnings(as.numeric(selection_threshold))
+    if (is.na(st) || st <= 0 || st >= 1) {
+      stop(
+        "`selection_threshold` must be \"adaptive\" or a numeric value in (0, 1).",
+        call. = FALSE
+      )
+    }
+  }
+  invisible(selection_threshold)
 }

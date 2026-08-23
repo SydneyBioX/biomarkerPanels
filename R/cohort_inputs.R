@@ -401,3 +401,21 @@ NULL
     feature_names = ordered_features
   )
 }
+
+#' Ensure Input is a List of Cohorts
+#'
+#' Wraps single objects in a list for consistent multi-cohort handling.
+#'
+#' @param x An object or list of objects.
+#' @return A list.
+#' @keywords internal
+.as_cohort_list <- function(x) { # nocov start
+  if (is.null(x)) {
+    stop("Input cannot be NULL.", call. = FALSE)
+  }
+
+  if (is.list(x)) {
+    return(x)
+  }
+  list(x)
+} # nocov end

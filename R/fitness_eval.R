@@ -78,3 +78,92 @@ NULL
     )
   }, numeric(1))
 }
+
+# Large finite penalty instead of Inf — NSGA-III normalization produces NaN
+# from Inf values, causing "missing value where TRUE/FALSE needed" errors.
+.FITNESS_PENALTY <- 1e6
+
+#' Build the Shared Fitness Scaffold
+#'
+#' Every fitness implementation (the inline [optimize_panel()] fitness and the
+#' validation / rotating-validation / LOCO factories) shares the same skeleton:
+#' a panel selector, an on-the-fly panel transformer, an objective cache, and
+#' the candidate-to-objective conversion handed to rmoo. This factory owns that
+#' skeleton; each fitness strategy supplies only its `evaluate_candidate`
+#' scoring body.
+#'
+#' @param feature_pool Character vector of base feature names.
+#' @param max_features Maximum base features to include.
+#' @param min_features_required Minimum number of base features.
+#' @param selection_threshold Either `"adaptive"` or a fixed numeric threshold.
+#' @param matrices Named list of raw base-feature matrices handed to
+#'   [.make_panel_transformer()].
+#' @param feature_transform Name of the feature transform to apply.
+#' @param objectives Objective list from [define_objectives()].
+#' @param constraints Constraint list.
+#' @param cache_max_entries Maximum entries retained per cache.
+#' @return List with `selector`, `transform`, `cache`, `directions`,
+#'   `constraint_specs`, and `finalize(evaluate_candidate, cache_fitness)`,
+#'   which wraps a scoring body into the `list(wrapper, evaluate)` contract the
+#'   optimizers consume.
+#' @keywords internal
+.make_fitness_scaffold <- function(feature_pool, max_features,
+                                   min_features_required,
+                                   selection_threshold,
+                                   matrices, feature_transform,
+                                   objectives, constraints,
+                                   cache_max_entries = Inf) {
+  objective_directions <- vapply(objectives, `[[`, character(1), "direction")
+  constraint_specs <- .normalize_constraints(constraints)
+
+  panel_selector <- .make_panel_selector(
+    feature_pool = feature_pool,
+    max_features = max_features,
+    min_features_required = min_features_required,
+    selection_threshold = selection_threshold
+  )
+  transform_panel <- .make_panel_transformer(
+    matrices = matrices,
+    feature_transform = feature_transform,
+    cache_max_entries = cache_max_entries
+  )
+  objective_cache <- .new_fitness_cache(cache_max_entries)
+
+  finalize <- function(evaluate_candidate, cache_fitness = TRUE) {
+    evaluate_single <- function(decision_vec = NULL, selection = NULL) {
+      evaluated <- evaluate_candidate(decision_vec = decision_vec,
+                                      selection = selection)
+      if (length(constraint_specs) && !evaluated$feasible) {
+        return(rep(.FITNESS_PENALTY, length(objectives)))
+      }
+      .convert_metrics_to_objectives(evaluated$metrics, objective_directions,
+                                     penalty = .FITNESS_PENALTY)
+    }
+
+    # rmoo fitness: receives a matrix (rows = individuals) or a single vector;
+    # `...` absorbs extra arguments rmoo passes (e.g. reference_dirs).
+    wrapper <- function(x, ...) {
+      .evaluate_fitness_population(
+        x = x,
+        selector = panel_selector,
+        evaluate_selection = function(selection) {
+          evaluate_single(selection = selection)
+        },
+        n_objectives = length(objectives),
+        cache = objective_cache,
+        cache_fitness = cache_fitness
+      )
+    }
+
+    list(wrapper = wrapper, evaluate = evaluate_candidate)
+  }
+
+  list(
+    selector = panel_selector,
+    transform = transform_panel,
+    cache = objective_cache,
+    directions = objective_directions,
+    constraint_specs = constraint_specs,
+    finalize = finalize
+  )
+}
