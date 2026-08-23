@@ -54,11 +54,11 @@ values. Argument errors (missing \code{scores}, out-of-range
 truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
 scores <- c(runif(50, 0, 0.6), runif(50, 0.4, 1))
 
-# Sensitivity when specificity is fixed at 90\%
-metric_sensitivity_at_specificity(truth, scores, target_specificity = 0.90)
-
-# Sensitivity when specificity is fixed at 95\%
-metric_sensitivity_at_specificity(truth, scores, target_specificity = 0.95)
+# Sensitivity when specificity is fixed at 90\% (internal function; users
+# normally reach it via define_objectives(metrics = "sensitivity_at_specificity"))
+biomarkerPanels:::metric_sensitivity_at_specificity(
+  truth, scores, target_specificity = 0.90
+)
 }
 \seealso{
 \code{\link[=metric_specificity_at_sensitivity]{metric_specificity_at_sensitivity()}} for the transpose,
