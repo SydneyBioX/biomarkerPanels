@@ -124,17 +124,8 @@ NULL
     n_yes <- sum(coh_truth == "Yes")
     n_no <- sum(coh_truth == "No")
 
-    pred_class <- ifelse(coh_scores >= threshold, "Yes", "No")
-
-    # Sensitivity: TP / (TP + FN)
-    tp <- sum(pred_class == "Yes" & coh_truth == "Yes")
-    fn <- sum(pred_class == "No" & coh_truth == "Yes")
-    sens <- if ((tp + fn) > 0) tp / (tp + fn) else NA_real_
-
-    # Specificity: TN / (TN + FP)
-    tn <- sum(pred_class == "No" & coh_truth == "No")
-    fp <- sum(pred_class == "Yes" & coh_truth == "No")
-    spec <- if ((tn + fp) > 0) tn / (tn + fp) else NA_real_
+    sens <- metric_sensitivity(coh_truth, coh_scores, cutoff_prob = threshold)
+    spec <- metric_specificity(coh_truth, coh_scores, cutoff_prob = threshold)
 
     data.frame(
       cohort = coh,

@@ -56,11 +56,6 @@ find_threshold_for_sensitivity <- function(panel,
                                             positive = NULL,
                                             feature_transform = NULL,
                                             assay = NULL) {
-  if (!requireNamespace("pROC", quietly = TRUE)) {
-    stop("The 'pROC' package is required. Install it via install.packages('pROC').",
-         call. = FALSE)
-  }
-
   stopifnot(inherits(panel, "BiomarkerPanelResult"))
 
   if (target_sensitivity < 0 || target_sensitivity > 1) {
@@ -90,13 +85,7 @@ find_threshold_for_sensitivity <- function(panel,
   truth <- ensure_binary_response(truth, positive = positive)
 
   # Build ROC curve
-  roc_obj <- pROC::roc(
-    response = truth,
-    predictor = scores,
-    levels = c(setdiff(levels(truth), positive), positive),
-    direction = "<",
-    quiet = TRUE
-  )
+  roc_obj <- .build_roc(truth, scores, positive)
 
   # Extract ROC curve data to find actual threshold
 

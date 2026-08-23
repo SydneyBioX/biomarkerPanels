@@ -18,7 +18,9 @@ NULL
 #'   evaluation. Names of the list become cohort identifiers.
 #' @param y Validation binary response factor, or a list of factors when `x` is
 #'   a list.
-#' @param metrics Character vector of metric names to compute. Defaults to
+#' @param metrics Character vector of registered metric names to compute (any
+#'   name in [metric_registry()], e.g. `"pauc"` or
+#'   `"specificity_at_sensitivity"`). Defaults to
 #'   `c("sensitivity", "specificity", "auc")`.
 #' @param cutoff_prob Classification probability threshold. Defaults to `0.5`.
 #' @param positive Label treated as the positive class. Defaults to the value
@@ -74,6 +76,8 @@ evaluate_panel_by_cohort <- function(panel,
   if (is.null(feature_transform)) {
     feature_transform <- if (is.null(stored_transform)) "none" else stored_transform
   }
+
+  metric_objs <- build_objectives(metrics)
 
   # Normalize single-cohort input to list format
 
@@ -137,15 +141,11 @@ evaluate_panel_by_cohort <- function(panel,
     n_pos <- sum(yi == positive)
     n_neg <- sum(yi != positive)
 
+    # Any registered metric works here; the wrapper drops arguments a metric
+    # does not accept (e.g. cutoff_prob for the threshold-free metrics).
     metric_values <- vapply(metrics, function(m) {
-      switch(m,
-        sensitivity = metric_sensitivity(truth = yi, scores = scores,
-                                        cutoff_prob = cutoff_prob, positive = positive),
-        specificity = metric_specificity(truth = yi, scores = scores,
-                                        cutoff_prob = cutoff_prob, positive = positive),
-        auc = metric_auc(truth = yi, scores = scores, positive = positive),
-        stop(sprintf("Unknown metric: %s", m), call. = FALSE)
-      )
+      metric_objs[[m]]$fun(yi, scores,
+                           cutoff_prob = cutoff_prob, positive = positive)
     }, numeric(1))
 
     c(
