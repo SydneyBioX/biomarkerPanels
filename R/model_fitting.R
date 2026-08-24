@@ -175,7 +175,6 @@ NULL
     return(NULL)
   }
 
-  n <- nrow(x_selected)
   x_mat <- as.matrix(x_selected)
   y_vec <- as.integer(truth) - 1L
 
@@ -195,16 +194,7 @@ NULL
   }
 
   tryCatch({
-    nfolds <- min(10L, max(3L, floor(n / 5L)))
-
-    fit <- glmnet::cv.glmnet(
-      x = x_mat,
-      y = y_vec,
-      family = "binomial",
-      alpha = alpha,
-      nfolds = nfolds,
-      type.measure = "deviance"
-    )
+    fit <- .fit_binomial_glmnet(x_mat, y_vec, alpha)
 
     # Store additional metadata for prediction
     fit$biomarkerPanels_meta <- list(

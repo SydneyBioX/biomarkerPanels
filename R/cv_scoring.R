@@ -8,6 +8,35 @@
 #' @keywords internal
 NULL
 
+#' Fit a Cross-Validated Binomial Elastic Net
+#'
+#' Shared `cv.glmnet()` wrapper used by every inner-CV fit in the package
+#' (fold scoring, in-sample regularized scoring, and the stored final model).
+#' Keeping the call in one place holds the family, loss, and fold rule
+#' identical across those sites: `nfolds` is `min(5, max(3, floor(n / 5)))`,
+#' so small panels never drop below 3 folds and large ones never exceed 5.
+#'
+#' Errors propagate; callers needing a softer failure wrap the call in their
+#' own `tryCatch()`.
+#'
+#' @param x Numeric design matrix (samples x predictors), with cohort dummies
+#'   already appended if the caller uses them.
+#' @param y Integer 0/1 response aligned with the rows of `x`.
+#' @param alpha Elastic net mixing parameter (0 = ridge, 1 = lasso).
+#' @return A fitted `cv.glmnet` object.
+#' @keywords internal
+.fit_binomial_glmnet <- function(x, y, alpha) {
+  nfolds <- min(5L, max(3L, floor(nrow(x) / 5L)))
+  glmnet::cv.glmnet(
+    x = x,
+    y = y,
+    family = "binomial",
+    alpha = alpha,
+    nfolds = nfolds,
+    type.measure = "deviance"
+  )
+}
+
 #' Create Stratified Folds for Cross-Validation
 #'
 #' Creates class-aware fold assignments that maintain class balance within each fold.
@@ -173,18 +202,7 @@ NULL
       }
     }
 
-    # Determine inner CV folds
-    n_train <- nrow(x_train_mat)
-    inner_nfolds <- min(5L, max(3L, floor(n_train / 5L)))
-
-    fit <- glmnet::cv.glmnet(
-      x = x_train_mat,
-      y = y_train_vec,
-      family = "binomial",
-      alpha = alpha,
-      nfolds = inner_nfolds,
-      type.measure = "deviance"
-    )
+    fit <- .fit_binomial_glmnet(x_train_mat, y_train_vec, alpha)
 
     y_pred <- stats::predict(fit, newx = x_test_mat, s = "lambda.min",
                              type = "response")[, 1]
@@ -301,16 +319,7 @@ NULL
       }
     }
 
-    nfolds <- min(5L, max(3L, floor(n / 5L)))
-
-    fit <- glmnet::cv.glmnet(
-      x = x_mat,
-      y = y_vec,
-      family = "binomial",
-      alpha = alpha,
-      nfolds = nfolds,
-      type.measure = "deviance"
-    )
+    fit <- .fit_binomial_glmnet(x_mat, y_vec, alpha)
 
     predictions <- stats::predict(fit, newx = x_mat, s = "lambda.min",
                                    type = "response")[, 1]
