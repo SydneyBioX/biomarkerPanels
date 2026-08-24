@@ -43,25 +43,24 @@ NULL
   cache_fitness = TRUE,
   cache_max_entries = Inf
 ) {
-  objective_directions <- vapply(objectives, `[[`, character(1), "direction")
-  constraint_specs <- .normalize_constraints(constraints)
-
   if (is.null(min_features_required)) {
-    min_features_required <- if (regularized) 2L else 1L
+    min_features_required <- .min_features_required(regularized, feature_transform)
   }
 
-  panel_selector <- .make_panel_selector(
+  scaffold <- .make_fitness_scaffold(
     feature_pool = feature_pool,
     max_features = max_features,
     min_features_required = min_features_required,
-    selection_threshold = selection_threshold
-  )
-  transform_panel <- .make_panel_transformer(
+    selection_threshold = selection_threshold,
     matrices = list(train = train_x, val = val_x),
     feature_transform = feature_transform,
+    objectives = objectives,
+    constraints = constraints,
     cache_max_entries = cache_max_entries
   )
-  objective_cache <- .new_fitness_cache(cache_max_entries)
+  panel_selector <- scaffold$selector
+  transform_panel <- scaffold$transform
+  constraint_specs <- scaffold$constraint_specs
   glm_design_terms <- if (!regularized) {
     .prepare_glm_design_terms(
       cohort_train = train_cohort,
@@ -142,35 +141,5 @@ NULL
     )
   }
 
-  # Large finite penalty instead of Inf -- NSGA-III normalization produces NaN
-  # from Inf values, causing "missing value where TRUE/FALSE needed" errors
-  .PENALTY <- 1e6
-
-  evaluate_single <- function(decision_vec = NULL, selection = NULL) {
-    evaluated <- evaluate_candidate(decision_vec = decision_vec,
-                                    selection = selection)
-    if (length(constraint_specs) && !evaluated$feasible) {
-      return(rep(.PENALTY, length(objectives)))
-    }
-    .convert_metrics_to_objectives(evaluated$metrics, objective_directions,
-                                   penalty = .PENALTY)
-  }
-
-  objective_wrapper <- function(x, ...) {
-    .evaluate_fitness_population(
-      x = x,
-      selector = panel_selector,
-      evaluate_selection = function(selection) {
-        evaluate_single(selection = selection)
-      },
-      n_objectives = length(objectives),
-      cache = objective_cache,
-      cache_fitness = cache_fitness
-    )
-  }
-
-  list(
-    wrapper = objective_wrapper,
-    evaluate = evaluate_candidate
-  )
+  scaffold$finalize(evaluate_candidate, cache_fitness = cache_fitness)
 }

@@ -8,6 +8,33 @@
 #' @name metric_discrimination
 NULL
 
+#' Build a pROC ROC Object with the Package's Score Convention
+#'
+#' Central constructor for every ROC computation in the package. The level
+#' ordering (negative class first, `positive` last) together with
+#' `direction = "<"` encodes the load-bearing convention that higher scores
+#' mean the positive class; changing it would silently flip every
+#' ROC-derived metric.
+#'
+#' @param truth Binary outcome factor (already coerced).
+#' @param scores Numeric scores or probabilities.
+#' @param positive Label treated as the positive ("event") class.
+#' @return A `pROC::roc` object.
+#' @keywords internal
+.build_roc <- function(truth, scores, positive = "Yes") {
+  if (!requireNamespace("pROC", quietly = TRUE)) {
+    stop("The 'pROC' package is required for ROC-based metrics. ",
+         "Install it via install.packages('pROC').", call. = FALSE)
+  }
+  pROC::roc(
+    response = truth,
+    predictor = scores,
+    levels = c(setdiff(levels(truth), positive), positive),
+    direction = "<",
+    quiet = TRUE
+  )
+}
+
 #' Area Under the ROC Curve (AUC)
 #'
 #' Computes the Area Under the ROC Curve using [pROC::auc()]. AUC represents
@@ -19,13 +46,9 @@ NULL
 #' @param selected Ignored; kept for signature compatibility.
 #' @param positive Label treated as the positive ("event") class.
 #' @return AUC between 0 and 1, or `NA_real_` if computation fails.
-#' @export
+#' @keywords internal
 metric_auc <- function(truth, scores = NULL, selected = NULL,
                      positive = "Yes") {
-  if (!requireNamespace("pROC", quietly = TRUE)) {
-    stop("The 'pROC' package is required for AUC computation. ",
-         "Install it via install.packages('pROC').", call. = FALSE)
-  }
   truth <- ensure_binary_response(truth)
   if (is.null(scores)) {
     stop("`scores` must be supplied to compute AUC.", call. = FALSE)
@@ -43,13 +66,7 @@ metric_auc <- function(truth, scores = NULL, selected = NULL,
   }
 
   tryCatch({
-    roc_obj <- pROC::roc(
-      response = truth,
-      predictor = scores,
-      levels = c(setdiff(levels(truth), positive), positive),
-      direction = "<",
-      quiet = TRUE
-    )
+    roc_obj <- .build_roc(truth, scores, positive)
     as.numeric(pROC::auc(roc_obj))
   }, error = function(e) {
     stop(
@@ -74,14 +91,10 @@ metric_auc <- function(truth, scores = NULL, selected = NULL,
 #' @param partial_auc_correct Logical; apply McClish correction to normalize
 #'   partial AUC to 0-1 scale (default TRUE).
 #' @return Partial AUC value, or `NA_real_` if computation fails.
-#' @export
+#' @keywords internal
 metric_pauc <- function(truth, scores = NULL, selected = NULL,
                       positive = "Yes", sens_floor = 0.90,
                       partial_auc_correct = TRUE) {
-  if (!requireNamespace("pROC", quietly = TRUE)) {
-    stop("The 'pROC' package is required for partial AUC. ",
-         "Install it via install.packages('pROC').", call. = FALSE)
-  }
   truth <- ensure_binary_response(truth)
   if (is.null(scores)) {
     stop("`scores` must be supplied to compute partial AUC.", call. = FALSE)
@@ -92,16 +105,9 @@ metric_pauc <- function(truth, scores = NULL, selected = NULL,
   }
 
   tryCatch({
-    # pROC expects: response = truth, predictor = scores
     # partial.auc = c(sens_floor, 1) means sensitivity range [sens_floor, 1]
     # partial.auc.focus = "sens" focuses on sensitivity axis
-    roc_obj <- pROC::roc(
-      response = truth,
-      predictor = scores,
-      levels = c(setdiff(levels(truth), positive), positive),
-      direction = "<",
-      quiet = TRUE
-    )
+    roc_obj <- .build_roc(truth, scores, positive)
 
     pauc <- pROC::auc(
       roc_obj,
@@ -163,10 +169,6 @@ metric_pauc <- function(truth, scores = NULL, selected = NULL,
 metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = NULL,
                                              positive = "Yes",
                                              target_sensitivity = 0.90) {
-  if (!requireNamespace("pROC", quietly = TRUE)) {
-    stop("The 'pROC' package is required for this metric. ",
-         "Install it via install.packages('pROC').", call. = FALSE)
-  }
   truth <- ensure_binary_response(truth)
   if (is.null(scores)) {
     stop("`scores` must be supplied to compute specificity at sensitivity.", call. = FALSE)
@@ -183,13 +185,7 @@ metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = N
   }
 
   tryCatch({
-    roc_obj <- pROC::roc(
-      response = truth,
-      predictor = scores,
-      levels = c(setdiff(levels(truth), positive), positive),
-      direction = "<",
-      quiet = TRUE
-    )
+    roc_obj <- .build_roc(truth, scores, positive)
 
     spec_value <- pROC::coords(
       roc_obj,
@@ -239,23 +235,19 @@ metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = N
 #' @seealso [metric_specificity_at_sensitivity()] for the transpose,
 #'   [metric_pauc()] for partial AUC in the high-sensitivity region,
 #'   [metric_sensitivity()] and [metric_specificity()] for threshold-based metrics.
-#' @export
+#' @keywords internal
 #' @examples
 #' truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
 #' scores <- c(runif(50, 0, 0.6), runif(50, 0.4, 1))
 #'
-#' # Sensitivity when specificity is fixed at 90%
-#' metric_sensitivity_at_specificity(truth, scores, target_specificity = 0.90)
-#'
-#' # Sensitivity when specificity is fixed at 95%
-#' metric_sensitivity_at_specificity(truth, scores, target_specificity = 0.95)
+#' # Sensitivity when specificity is fixed at 90% (internal function; users
+#' # normally reach it via define_objectives(metrics = "sensitivity_at_specificity"))
+#' biomarkerPanels:::metric_sensitivity_at_specificity(
+#'   truth, scores, target_specificity = 0.90
+#' )
 metric_sensitivity_at_specificity <- function(truth, scores = NULL, selected = NULL,
                                               positive = "Yes",
                                               target_specificity = 0.90) {
-  if (!requireNamespace("pROC", quietly = TRUE)) {
-    stop("The 'pROC' package is required for this metric. ",
-         "Install it via install.packages('pROC').", call. = FALSE)
-  }
   truth <- ensure_binary_response(truth)
   if (is.null(scores)) {
     stop("`scores` must be supplied to compute sensitivity at specificity.", call. = FALSE)
@@ -272,13 +264,7 @@ metric_sensitivity_at_specificity <- function(truth, scores = NULL, selected = N
   }
 
   tryCatch({
-    roc_obj <- pROC::roc(
-      response = truth,
-      predictor = scores,
-      levels = c(setdiff(levels(truth), positive), positive),
-      direction = "<",
-      quiet = TRUE
-    )
+    roc_obj <- .build_roc(truth, scores, positive)
 
     sens_value <- pROC::coords(
       roc_obj,
@@ -306,7 +292,7 @@ metric_sensitivity_at_specificity <- function(truth, scores = NULL, selected = N
 #' @param selected Vector of selected base features (character, numeric, or logical).
 #' @param ... Additional arguments (ignored).
 #' @return Count of selected base biomarkers (genes).
-#' @export
+#' @keywords internal
 metric_num_features <- function(truth = NULL, scores = NULL, selected = NULL, ...) {
   if (is.null(selected)) {
     return(0)

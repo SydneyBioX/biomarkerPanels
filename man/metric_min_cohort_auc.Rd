@@ -39,3 +39,4 @@ Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
 of each class. Consider using \code{metric_auc} as the primary objective and
 this metric for monitoring.
 }
+\keyword{internal}

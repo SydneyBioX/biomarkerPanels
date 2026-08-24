@@ -92,16 +92,18 @@ select_discriminative_features <- function(x_list,
     min_auc = min_auc
   )
 
+  settings <- list(
+    lambda_cohort = lambda_cohort,
+    lambda_sd = lambda_sd,
+    min_auc = min_auc
+  )
+
   if (!nrow(scored)) {
     return(list(
       features = character(),
       scores = scored,
       per_cohort_auc = auc_matrix[integer(0), , drop = FALSE],
-      settings = list(
-        lambda_cohort = lambda_cohort,
-        lambda_sd = lambda_sd,
-        min_auc = min_auc
-      )
+      settings = settings
     ))
   }
 
@@ -112,11 +114,7 @@ select_discriminative_features <- function(x_list,
     features = selected$feature,
     scores = selected,
     per_cohort_auc = auc_matrix[selected$feature, , drop = FALSE],
-    settings = list(
-      lambda_cohort = lambda_cohort,
-      lambda_sd = lambda_sd,
-      min_auc = min_auc
-    )
+    settings = settings
   )
 }
 

@@ -82,11 +82,9 @@ NULL
   pair_features <- colnames(pair_matrices[[1]])
 
   list(
-    raw_matrices = raw_matrices,
     pair_matrices = pair_matrices,
     responses = responses,
     cohort_names = cohort_names,
-    base_features = ordered_features,
     pair_features = pair_features
   )
 }

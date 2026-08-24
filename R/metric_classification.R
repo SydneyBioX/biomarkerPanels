@@ -7,6 +7,39 @@
 #' @name metric_classification
 NULL
 
+#' Confusion Counts at a Classification Cutoff
+#'
+#' Shared preamble for the cutoff-dependent metrics: coerces `truth`, resolves
+#' the cutoff via [.compute_cutoff()], and tabulates the confusion matrix
+#' using the package convention `predicted positive == scores >= cutoff`.
+#'
+#' @param truth Binary outcome; coerced with [ensure_binary_response()].
+#' @param scores Numeric scores or probabilities.
+#' @param cutoff_prob Classification probability cutoff applied to `scores`.
+#' @param cutoff_strategy One of `"fixed"`, `"prevalence"`, or `"youden"`
+#'   (already matched by the caller).
+#' @param positive Label treated as the positive ("event") class.
+#' @param metric_name Metric name used in the missing-scores error message.
+#' @return List with counts `tp`, `fp`, `tn`, and `fn`.
+#' @keywords internal
+.confusion_counts <- function(truth, scores, cutoff_prob, cutoff_strategy,
+                              positive, metric_name) {
+  truth <- ensure_binary_response(truth)
+  if (is.null(scores)) {
+    stop("`scores` must be supplied to compute ", metric_name, ".",
+         call. = FALSE)
+  }
+  cutoff <- .compute_cutoff(truth, scores, cutoff_prob, cutoff_strategy, positive)
+  positives <- truth == positive
+  predicted <- scores >= cutoff
+  list(
+    tp = sum(positives & predicted),
+    fp = sum(!positives & predicted),
+    tn = sum(!positives & !predicted),
+    fn = sum(positives & !predicted)
+  )
+}
+
 #' Sensitivity (True Positive Rate)
 #'
 #' @param truth Binary outcome; coerced with [ensure_binary_response()].
@@ -19,50 +52,36 @@ NULL
 #'   `"youden"` (optimal Youden's J). Default is `"fixed"`.
 #' @param positive Label treated as the positive ("event") class.
 #' @return Sensitivity between 0 and 1, or `NA_real_` if undefined.
-#' @export
+#' @keywords internal
 metric_sensitivity <- function(truth, scores = NULL, selected = NULL,
                              cutoff_prob = 0.5,
                              cutoff_strategy = c("fixed", "prevalence", "youden"),
                              positive = "Yes") {
-  truth <- ensure_binary_response(truth)
-  if (is.null(scores)) {
-    stop("`scores` must be supplied to compute sensitivity.", call. = FALSE)
-  }
   cutoff_strategy <- match.arg(cutoff_strategy)
-  cutoff <- .compute_cutoff(truth, scores, cutoff_prob, cutoff_strategy, positive)
-  positives <- truth == positive
-  predicted <- scores >= cutoff
-  tp <- sum(positives & predicted)
-  fn <- sum(positives & !predicted)
-  if ((tp + fn) == 0) {
+  cc <- .confusion_counts(truth, scores, cutoff_prob, cutoff_strategy,
+                          positive, "sensitivity")
+  if ((cc$tp + cc$fn) == 0) {
     return(NA_real_)
   }
-  tp / (tp + fn)
+  cc$tp / (cc$tp + cc$fn)
 }
 
 #' Specificity (True Negative Rate)
 #'
 #' @inheritParams metric_sensitivity
 #' @return Specificity between 0 and 1, or `NA_real_` if undefined.
-#' @export
+#' @keywords internal
 metric_specificity <- function(truth, scores = NULL, selected = NULL,
                              cutoff_prob = 0.5,
                              cutoff_strategy = c("fixed", "prevalence", "youden"),
                              positive = "Yes") {
-  truth <- ensure_binary_response(truth)
-  if (is.null(scores)) {
-    stop("`scores` must be supplied to compute specificity.", call. = FALSE)
-  }
   cutoff_strategy <- match.arg(cutoff_strategy)
-  cutoff <- .compute_cutoff(truth, scores, cutoff_prob, cutoff_strategy, positive)
-  negatives <- truth != positive
-  predicted <- scores >= cutoff
-  tn <- sum(negatives & !predicted)
-  fp <- sum(negatives & predicted)
-  if ((tn + fp) == 0) {
+  cc <- .confusion_counts(truth, scores, cutoff_prob, cutoff_strategy,
+                          positive, "specificity")
+  if ((cc$tn + cc$fp) == 0) {
     return(NA_real_)
   }
-  tn / (tn + fp)
+  cc$tn / (cc$tn + cc$fp)
 }
 
 #' Precision (Positive Predictive Value)
@@ -72,28 +91,18 @@ metric_specificity <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return Precision between 0 and 1, or `NA_real_` if undefined.
-#' @export
+#' @keywords internal
 metric_precision <- function(truth, scores = NULL, selected = NULL,
                            cutoff_prob = 0.5,
                            cutoff_strategy = c("fixed", "prevalence", "youden"),
                            positive = "Yes") {
-  truth <- ensure_binary_response(truth)
-  if (is.null(scores)) {
-    stop("`scores` must be supplied to compute precision.", call. = FALSE)
-  }
   cutoff_strategy <- match.arg(cutoff_strategy)
-  cutoff <- .compute_cutoff(truth, scores, cutoff_prob, cutoff_strategy, positive)
-
-  positives <- truth == positive
-  predicted <- scores >= cutoff
-
-  tp <- sum(positives & predicted)
-  fp <- sum(!positives & predicted)
-
-  if ((tp + fp) == 0) {
+  cc <- .confusion_counts(truth, scores, cutoff_prob, cutoff_strategy,
+                          positive, "precision")
+  if ((cc$tp + cc$fp) == 0) {
     return(NA_real_)
   }
-  tp / (tp + fp)
+  cc$tp / (cc$tp + cc$fp)
 }
 
 #' Negative Predictive Value (NPV)
@@ -104,28 +113,18 @@ metric_precision <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return NPV between 0 and 1, or `NA_real_` if undefined.
-#' @export
+#' @keywords internal
 metric_npv <- function(truth, scores = NULL, selected = NULL,
                      cutoff_prob = 0.5,
                      cutoff_strategy = c("fixed", "prevalence", "youden"),
                      positive = "Yes") {
-  truth <- ensure_binary_response(truth)
-  if (is.null(scores)) {
-    stop("`scores` must be supplied to compute NPV.", call. = FALSE)
-  }
   cutoff_strategy <- match.arg(cutoff_strategy)
-  cutoff <- .compute_cutoff(truth, scores, cutoff_prob, cutoff_strategy, positive)
-
-  negatives <- truth != positive
-  predicted_negative <- scores < cutoff
-
-  tn <- sum(negatives & predicted_negative)
-  fn <- sum(!negatives & predicted_negative)
-
-  if ((tn + fn) == 0) {
+  cc <- .confusion_counts(truth, scores, cutoff_prob, cutoff_strategy,
+                          positive, "NPV")
+  if ((cc$tn + cc$fn) == 0) {
     return(NA_real_)
   }
-  tn / (tn + fn)
+  cc$tn / (cc$tn + cc$fn)
 }
 
 #' F1 Score
@@ -135,24 +134,17 @@ metric_npv <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return F1 score between 0 and 1, or `NA_real_` if undefined.
-#' @export
+#' @keywords internal
 metric_f1 <- function(truth, scores = NULL, selected = NULL,
                     cutoff_prob = 0.5,
                     cutoff_strategy = c("fixed", "prevalence", "youden"),
                     positive = "Yes") {
-  truth <- ensure_binary_response(truth)
-  if (is.null(scores)) {
-    stop("`scores` must be supplied to compute F1 score.", call. = FALSE)
-  }
   cutoff_strategy <- match.arg(cutoff_strategy)
-  cutoff <- .compute_cutoff(truth, scores, cutoff_prob, cutoff_strategy, positive)
-
-  positives <- truth == positive
-  predicted <- scores >= cutoff
-
-  tp <- sum(positives & predicted)
-  fp <- sum(!positives & predicted)
-  fn <- sum(positives & !predicted)
+  cc <- .confusion_counts(truth, scores, cutoff_prob, cutoff_strategy,
+                          positive, "F1 score")
+  tp <- cc$tp
+  fp <- cc$fp
+  fn <- cc$fn
 
   precision <- if ((tp + fp) == 0) NA_real_ else tp / (tp + fp)
   recall <- if ((tp + fn) == 0) NA_real_ else tp / (tp + fn)
@@ -167,7 +159,7 @@ metric_f1 <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return Mean of sensitivity and specificity.
-#' @export
+#' @keywords internal
 metric_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
                                    cutoff_prob = 0.5,
                                    cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -211,23 +203,8 @@ metric_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
 
   if (cutoff_strategy == "youden") {
     # Optimal Youden's J point from ROC curve
-    # Requires pROC package
-    if (!requireNamespace("pROC", quietly = TRUE)) {
-      stop(
-        "The 'pROC' package is required for Youden cutoff strategy. ",
-        "Install it via install.packages('pROC') or use cutoff_strategy = 'fixed'.",
-        call. = FALSE
-      )
-    }
-
     tryCatch({
-      roc_obj <- pROC::roc(
-        response = truth,
-        predictor = scores,
-        levels = c(setdiff(levels(truth), positive), positive),
-        direction = "<",
-        quiet = TRUE
-      )
+      roc_obj <- .build_roc(truth, scores, positive)
 
       # Find optimal threshold using Youden's J
       coords <- pROC::coords(roc_obj, "best", ret = "threshold",

@@ -2,8 +2,12 @@
 % Please edit documentation in R/fitness_cache_utils.R
 \name{fitness_cache_utils}
 \alias{fitness_cache_utils}
-\title{Fitness Selection, Caching, and Fast GLM Helpers}
+\title{Fitness Caching Utilities}
 \description{
-Internal utilities shared by standard and transferable panel optimization.
+Cache primitives keyed by selected base-feature panel, the shared panel
+transformer, and population-level fitness evaluation with panel-level
+deduplication (NSGA populations contain many duplicate panels; without the
+dedup every duplicate would refit its model). Panel selection lives in
+\code{R/panel_selection.R}; the fast GLM path lives in \code{R/glm_fitting.R}.
 }
 \keyword{internal}

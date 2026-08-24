@@ -49,8 +49,15 @@ NULL
 #' @seealso [optimize_panel()], [fit_panel()], [evaluate_panel()]
 #' @examples
 #' \dontrun{
-#' # Run optimization
-#' opt <- optimize_panel(x, y, objectives = define_ruleout_objectives())
+#' # Run optimization targeting the high-sensitivity region
+#' opt <- optimize_panel(
+#'   x, y,
+#'   objectives = define_objectives(
+#'     metrics = c("pauc", "num_features"),
+#'     params = list(pauc = list(sens_floor = 0.90))
+#'   ),
+#'   constraints = list(min_metric_constraint("sensitivity", 0.90))
+#' )
 #'
 #' # Fit NP classifier for rule-out test (control FNR to achieve high sensitivity)
 #' panel <- fit_np_panel(opt, minimize_FPR = FALSE, alpha = 0.05)
@@ -79,116 +86,16 @@ fit_np_panel <- function(optimization_result,
   .check_nproc_available()
   .validate_np_params(alpha, delta, method)
 
-  if (!inherits(optimization_result, "OptimizationResult")) {
-    stop("`optimization_result` must be an OptimizationResult from optimize_panel().",
-      call. = FALSE
-    )
-  }
-
-  solutions_df <- optimization_result@solutions
-  if (nrow(solutions_df) == 0L) {
-    stop("OptimizationResult contains no solutions.", call. = FALSE)
-  }
-
-  # Determine which features to use (same pattern as fit_panel)
-  if (!is.null(features)) {
-    # User provided explicit base features
-    selected_base_features <- features
-    if (!all(features %in% optimization_result@feature_pool)) {
-      missing <- setdiff(features, optimization_result@feature_pool)
-      stop("Feature(s) not in feature pool: ", paste(missing, collapse = ", "),
-        call. = FALSE
-      )
-    }
-    selected_solution_id <- NA_integer_
-    solution_metrics <- NULL
-  } else {
-    if (is.null(solution_id)) {
-      # Auto-select: best on first objective
-      objective_cols <- setdiff(names(solutions_df), c("solution_id", "base_features", "features"))
-      if (length(objective_cols) == 0L) {
-        stop("No objective columns found in solutions.", call. = FALSE)
-      }
-      first_obj <- objective_cols[1]
-      control <- optimization_result@control
-      direction <- if (!is.null(control$objective_directions)) {
-        control$objective_directions[[first_obj]]
-      } else {
-        "maximize"
-      }
-      if (direction == "maximize") {
-        best_idx <- which.max(solutions_df[[first_obj]])
-      } else {
-        best_idx <- which.min(solutions_df[[first_obj]])
-      }
-      solution_id <- solutions_df$solution_id[best_idx]
-    }
-
-    if (!solution_id %in% solutions_df$solution_id) {
-      stop("solution_id ", solution_id, " not found. Valid IDs: ",
-        paste(solutions_df$solution_id, collapse = ", "),
-        call. = FALSE
-      )
-    }
-
-    row_idx <- which(solutions_df$solution_id == solution_id)
-    selected_base_features <- solutions_df$base_features[[row_idx]]
-    selected_solution_id <- solution_id
-
-    objective_cols <- setdiff(names(solutions_df), c("solution_id", "base_features", "features"))
-    solution_metrics <- as.numeric(solutions_df[row_idx, objective_cols])
-    names(solution_metrics) <- objective_cols
-  }
-
-  # Get training data (same pattern as fit_panel)
-  if (is.null(x)) {
-    x_mat <- optimization_result@aggregated_x
-  } else {
-    x_mat <- as.matrix(x)
-  }
-
-  if (is.null(y)) {
-    truth <- optimization_result@aggregated_y
-  } else {
-    truth <- ensure_binary_response(y)
-  }
-
-  if (is.null(cohort)) {
-    cohort_vec <- optimization_result@aggregated_cohort
-  } else {
-    cohort_vec <- factor(cohort)
-  }
-
-  # Validate data
-  if (is.null(x_mat) || is.null(truth)) {
-    stop("Training data not available. Provide x and y arguments.", call. = FALSE)
-  }
-
-  # Validate base features exist in training data
-  if (!all(selected_base_features %in% colnames(x_mat))) {
-    missing <- setdiff(selected_base_features, colnames(x_mat))
-    stop("Selected base feature(s) not found in training data: ",
-      paste(missing, collapse = ", "),
-      call. = FALSE
-    )
-  }
-
-  # Extract selected base features
-  x_base_selected <- x_mat[, selected_base_features, drop = FALSE]
-
-  # Apply feature transform (same pattern as fit_panel)
-  feature_transform <- optimization_result@control$feature_transform
-  if (is.null(feature_transform)) {
-    feature_transform <- "none"  # Backward compatibility
-  }
-
-  if (feature_transform != "none" && length(selected_base_features) >= 2L) {
-    x_selected <- .apply_feature_transform_single(x_base_selected, feature_transform)
-    selected_features <- colnames(x_selected)
-  } else {
-    x_selected <- x_base_selected
-    selected_features <- selected_base_features
-  }
+  sol <- .resolve_panel_solution(optimization_result, solution_id, features,
+                                 x, y, cohort)
+  selected_base_features <- sol$base_features
+  selected_features <- sol$features
+  selected_solution_id <- sol$solution_id
+  solution_metrics <- sol$metrics
+  x_mat <- sol$x_raw
+  x_selected <- sol$x_selected
+  truth <- sol$truth
+  cohort_vec <- sol$cohort
 
   # Prepare labels for NP classification
   label_info <- .prepare_np_labels(truth, minimize_FPR)
@@ -324,9 +231,10 @@ fit_np_panel <- function(optimization_result,
     metrics <- solution_metrics
   } else {
     # Compute basic metrics on training data
-    sens <- sum(scores >= threshold & truth == "Yes") / sum(truth == "Yes")
-    spec <- sum(scores < threshold & truth == "No") / sum(truth == "No")
-    metrics <- c(sensitivity = sens, specificity = spec)
+    metrics <- c(
+      sensitivity = metric_sensitivity(truth, scores, cutoff_prob = threshold),
+      specificity = metric_specificity(truth, scores, cutoff_prob = threshold)
+    )
   }
 
   # Build objectives data frame

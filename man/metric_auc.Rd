@@ -23,3 +23,4 @@ Computes the Area Under the ROC Curve using \code{\link[pROC:auc]{pROC::auc()}}.
 the probability that a random positive instance receives a higher score
 than a random negative instance.
 }
+\keyword{internal}

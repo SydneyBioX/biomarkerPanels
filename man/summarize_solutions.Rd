@@ -19,10 +19,9 @@ A data frame with columns:
 }
 \description{
 These helpers support downstream triage of Pareto-optimal solutions produced
-by \code{\link[=optimize_panel]{optimize_panel()}}. They implement the three post-hoc decision rules
-used in the fetal growth restriction (FGR) analysis: maximising sensitivity
-at a fixed specificity, prioritising biomarkers with high selection
-frequency, and incorporating pathway-level biological priors.
+by \code{\link[=optimize_panel]{optimize_panel()}}: inspecting solutions, computing biomarker inclusion
+frequencies across solutions, and assembling a panel from the most
+frequently selected biomarkers.
 Summarize Pareto-Optimal Solutions
 }
 \details{

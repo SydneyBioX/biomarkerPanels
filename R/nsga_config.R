@@ -155,3 +155,94 @@ NULL
   }
   suggestions
 }
+
+#' Minimum Base Features Required by Fitting Mode and Transform
+#'
+#' With pairwise transforms, n base features yield n*(n-1)/2 ratios:
+#' 2 base features give a single ratio (not enough for glmnet), while
+#' 3 give 3 ratios. Regularized fitting on untransformed features needs
+#' at least 2 columns; unregularized fitting works from 1.
+#'
+#' @param regularized Logical; whether glmnet fitting is used.
+#' @param feature_transform Feature transform name.
+#' @return Integer minimum number of base features.
+#' @keywords internal
+.min_features_required <- function(regularized, feature_transform) {
+  if (regularized &&
+      feature_transform %in% c("pairwise_ratios", "pairwise_log_ratios")) {
+    3L
+  } else if (regularized) {
+    2L
+  } else {
+    1L
+  }
+}
+
+#' Assemble NSGA Parameters and Run the Search
+#'
+#' Shared back half of [optimize_panel()] and [optimize_panel_transferable()]:
+#' builds the rmoo parameter list, adds NSGA-III reference points when needed,
+#' optionally seeds the RNG, seeds the initial population with sparse
+#' suggestions spanning panel sizes, and dispatches to [rmoo::nsga2()] or
+#' [rmoo::nsga3()].
+#'
+#' @param algorithm `"NSGA-II"` or `"NSGA-III"`.
+#' @param fitness Fitness function passed to rmoo.
+#' @param n_objectives Number of objectives.
+#' @param decision_dim Length of the decision vector.
+#' @param nsga_args Resolved NSGA control parameters (popSize, maxiter, ...).
+#' @param monitor Monitor function or `FALSE`.
+#' @param min_features,max_features Panel size bounds for the sparse
+#'   suggestions.
+#' @param seed Optional seed forwarded to the suggestion generator.
+#' @param set_seed Logical; when `TRUE`, validate `seed` and call
+#'   [set.seed()] before generating suggestions (the transferable pipeline
+#'   seeds earlier, at partitioning).
+#' @return The raw rmoo result object.
+#' @keywords internal
+.run_nsga <- function(algorithm, fitness, n_objectives, decision_dim,
+                      nsga_args, monitor, min_features, max_features,
+                      seed = NULL, set_seed = FALSE) {
+  nsga_params <- c(
+    list(
+      type = "real-valued",
+      fitness = fitness,
+      nObj = n_objectives,
+      lower = rep(0, decision_dim),
+      upper = rep(1, decision_dim),
+      monitor = monitor,
+      summary = FALSE
+    ),
+    nsga_args
+  )
+
+  # Add reference points for NSGA-III if not user-specified
+  if (algorithm == "NSGA-III" && is.null(nsga_args$n_partitions)) {
+    nsga_params$n_partitions <- .compute_nsga3_partitions(n_objectives)
+  }
+
+  if (set_seed && !is.null(seed)) {
+    if (!is.numeric(seed) || length(seed) != 1L) {
+      stop("`seed` must be a single integer value.", call. = FALSE)
+    }
+    set.seed(as.integer(seed))
+  }
+
+  # Seed the initial population with solutions spanning min to max features
+  n_suggestions <- min(20L, nsga_params$popSize %/% 4L)
+  if (n_suggestions >= 2L) {
+    nsga_params$suggestions <- .generate_sparse_suggestions(
+      n_features = decision_dim,
+      n_suggestions = n_suggestions,
+      min_features = min_features,
+      max_features = max_features,
+      seed = seed
+    )
+  }
+
+  if (algorithm == "NSGA-II") {
+    do.call(rmoo::nsga2, nsga_params)
+  } else {
+    do.call(rmoo::nsga3, nsga_params)
+  }
+}

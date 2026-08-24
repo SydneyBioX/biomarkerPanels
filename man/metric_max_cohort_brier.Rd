@@ -30,3 +30,4 @@ Maximum Brier score across cohorts.
 Computes the Brier score (mean squared error on probabilities) within each
 cohort and returns the maximum, highlighting the worst calibrated cohort.
 }
+\keyword{internal}

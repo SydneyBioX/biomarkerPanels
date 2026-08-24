@@ -111,8 +111,6 @@ NULL
   cache_fitness = TRUE,
   cache_max_entries = Inf
 ) {
-  objective_directions <- vapply(objectives, `[[`, character(1), "direction")
-  constraint_specs <- .normalize_constraints(constraints)
   n_splits <- length(splits)
   if (n_splits < 2L) {
     stop("Rotating-validation fitness requires `splits` with length >= 2.",
@@ -120,7 +118,7 @@ NULL
   }
 
   if (is.null(min_features_required)) {
-    min_features_required <- if (regularized) 2L else 1L
+    min_features_required <- .min_features_required(regularized, feature_transform)
   }
 
   # Batch counter lives in a closure environment so each call to
@@ -128,18 +126,24 @@ NULL
   batch_state <- new.env(parent = emptyenv())
   batch_state$idx <- 0L
 
-  panel_selector <- .make_panel_selector(
+  # The scaffold's finalize() is not used here: rotating validation needs a
+  # custom wrapper that advances the split per generation and caches per split.
+  scaffold <- .make_fitness_scaffold(
     feature_pool = feature_pool,
     max_features = max_features,
     min_features_required = min_features_required,
-    selection_threshold = selection_threshold
-  )
-  transform_panel <- .make_panel_transformer(
+    selection_threshold = selection_threshold,
     matrices = list(pool = pool_x),
     feature_transform = feature_transform,
+    objectives = objectives,
+    constraints = constraints,
     cache_max_entries = cache_max_entries
   )
-  objective_cache <- .new_fitness_cache(cache_max_entries)
+  panel_selector <- scaffold$selector
+  transform_panel <- scaffold$transform
+  objective_cache <- scaffold$cache
+  objective_directions <- scaffold$directions
+  constraint_specs <- scaffold$constraint_specs
   split_glm_design_terms <- if (!regularized) {
     lapply(splits, function(split) {
       .prepare_glm_design_terms(
@@ -330,8 +334,6 @@ NULL
     )
   }
 
-  .PENALTY <- 1e6
-
   evaluate_single_for_wrapper <- function(decision_vec = NULL, split,
                                           split_idx = NULL,
                                           selection = NULL) {
@@ -342,10 +344,10 @@ NULL
       selection = selection
     )
     if (length(constraint_specs) && !evaluated$feasible) {
-      return(rep(.PENALTY, length(objectives)))
+      return(rep(.FITNESS_PENALTY, length(objectives)))
     }
     .convert_metrics_to_objectives(evaluated$metrics, objective_directions,
-                                   penalty = .PENALTY)
+                                   penalty = .FITNESS_PENALTY)
   }
 
   objective_wrapper <- function(x, ...) {

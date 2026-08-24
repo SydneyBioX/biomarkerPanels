@@ -81,22 +81,6 @@ test_that("cutoff_dependent metadata identifies metrics correctly via registry",
 
 
 
-test_that("metric_easy_hard_accuracy uses difficulty from args via define_objectives wrapper", {
-  difficulty_var <- c("easy", "easy", "hard", "hard")
-  # Use params argument to pass difficulty
-  objs <- define_objectives(
-    metrics = c("easy_hard_accuracy"),
-    params = list(easy_hard_accuracy = list(difficulty = difficulty_var))
-  )
-
-  # Validate the returned objective function works with the bound arguments
-  truth <- factor(c("No", "Yes", "No", "Yes"), levels = c("No", "Yes"))
-  scores <- c(0.1, 0.9, 0.2, 0.8)
-
-  result <- objs$easy_hard_accuracy$fun(truth, scores)
-  expect_equal(result, 1.0)
-})
-
 test_that("build_objectives handles cohort metrics properly", {
   objs <- build_objectives(c("min_cohort_auc", "cohort_auc_gap", "cohort_auc_var", "max_cohort_brier"))
   expect_equal(objs$min_cohort_auc$direction, "maximize")

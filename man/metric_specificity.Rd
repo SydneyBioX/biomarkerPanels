@@ -35,3 +35,4 @@ Specificity between 0 and 1, or \code{NA_real_} if undefined.
 \description{
 Specificity (True Negative Rate)
 }
+\keyword{internal}

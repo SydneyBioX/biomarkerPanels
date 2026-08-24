@@ -22,3 +22,4 @@ Count of selected base biomarkers (genes).
 Counts the number of base features (individual genes) in a panel, not
 transformed features such as pairwise ratios.
 }
+\keyword{internal}

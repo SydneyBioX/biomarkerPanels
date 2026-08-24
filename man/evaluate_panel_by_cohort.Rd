@@ -24,7 +24,9 @@ evaluation. Names of the list become cohort identifiers.}
 \item{y}{Validation binary response factor, or a list of factors when \code{x} is
 a list.}
 
-\item{metrics}{Character vector of metric names to compute. Defaults to
+\item{metrics}{Character vector of registered metric names to compute (any
+name in \code{\link[=metric_registry]{metric_registry()}}, e.g. \code{"pauc"} or
+\code{"specificity_at_sensitivity"}). Defaults to
 \code{c("sensitivity", "specificity", "auc")}.}
 
 \item{cutoff_prob}{Classification probability threshold. Defaults to \code{0.5}.}

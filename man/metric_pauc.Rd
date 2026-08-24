@@ -38,3 +38,4 @@ values at or above a specified floor. Useful for "rule-out" diagnostic
 contexts where high sensitivity is mandatory. Uses \code{\link[pROC:auc]{pROC::auc()}} with
 \code{partial.auc.focus = "sens"}.
 }
+\keyword{internal}

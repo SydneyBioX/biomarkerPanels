@@ -147,15 +147,7 @@ optimize_panel <- function(x, y,
   }
   .validate_positive_integer(fitness_cv_folds, "fitness_cv_folds", min = 2L)
   .validate_probability(regularized_alpha, "regularized_alpha", bounds = "closed")
-  if (!identical(selection_threshold, "adaptive")) {
-    st <- suppressWarnings(as.numeric(selection_threshold))
-    if (is.na(st) || st <= 0 || st >= 1) {
-      stop(
-        "`selection_threshold` must be \"adaptive\" or a numeric value in (0, 1).",
-        call. = FALSE
-      )
-    }
-  }
+  .validate_selection_threshold(selection_threshold)
   .validate_cache_controls(cache_fitness, cache_max_entries)
 
   inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, transform = "none",
@@ -235,22 +227,10 @@ optimize_panel <- function(x, y,
     stop("`feature_pool` produced zero features.", call. = FALSE)
   }
 
-  # Minimum features required depends on transform and regularization
+  min_features_required <- .min_features_required(regularized, feature_transform)
 
-  # With pairwise transforms: n base features -> n*(n-1)/2 ratios
-  # For regularized fitting: need >= 2 transformed features
-  # 2 base features -> 1 ratio (not enough for glmnet)
-  # 3 base features -> 3 ratios (sufficient for glmnet)
-  if (regularized && feature_transform %in% c("pairwise_ratios", "pairwise_log_ratios")) {
-    min_features_for_regularized <- 3L
-  } else if (regularized) {
-    min_features_for_regularized <- 2L
-  } else {
-    min_features_for_regularized <- 1L
-  }
-
-  if (max_features < min_features_for_regularized) {
-    stop("`max_features` must be at least ", min_features_for_regularized,
+  if (max_features < min_features_required) {
+    stop("`max_features` must be at least ", min_features_required,
          " when `regularized = TRUE`",
          if (feature_transform %in% c("pairwise_ratios", "pairwise_log_ratios"))
            paste0(" with feature_transform = '", feature_transform, "'") else "",
@@ -279,6 +259,11 @@ optimize_panel <- function(x, y,
             "reducing `feature_pool` for exploration.")
   }
 
+  scoring_fn_label <- if (is.null(scoring_fn)) {
+    "default"
+  } else {
+    deparse(substitute(scoring_fn))
+  }
   if (is.null(scoring_fn)) {
     scoring_fn <- .default_scoring_fn
   }
@@ -314,27 +299,24 @@ optimize_panel <- function(x, y,
     }
   }
 
-  # Minimum base features required depends on transform and regularization
-  # min_features_for_regularized is already computed above
-  min_features_required <- min_features_for_regularized
-
   # Shared selector and transform cache used by fitness evaluation and
   # history materialization.
-  panel_selector <- .make_panel_selector(
+  scaffold <- .make_fitness_scaffold(
     feature_pool = colnames(x_pool),
     max_features = max_features,
     min_features_required = min_features_required,
-    selection_threshold = selection_threshold
+    selection_threshold = selection_threshold,
+    matrices = list(x = x_pool),
+    feature_transform = feature_transform,
+    objectives = objectives,
+    constraints = constraints,
+    cache_max_entries = cache_max_entries
   )
+  panel_selector <- scaffold$selector
+  transform_panel <- scaffold$transform
   select_base_features <- function(decision_vec) {
     panel_selector(decision_vec)$base_features
   }
-  transform_panel <- .make_panel_transformer(
-    matrices = list(x = x_pool),
-    feature_transform = feature_transform,
-    cache_max_entries = cache_max_entries
-  )
-  objective_cache <- .new_fitness_cache(cache_max_entries)
 
   cv_glm_design_terms <- NULL
   if (fitness_cv && !is.null(cv_fold_ids) && !regularized) {
@@ -438,36 +420,8 @@ optimize_panel <- function(x, y,
     )
   }
 
-  # Large finite penalty instead of Inf — NSGA-III normalization produces NaN
-  # from Inf values, causing "missing value where TRUE/FALSE needed" errors
-  .PENALTY <- 1e6
-
-  # Evaluate a single decision vector and return converted objective values
-  evaluate_single <- function(decision_vec = NULL, selection = NULL) {
-    evaluated <- evaluate_candidate(decision_vec = decision_vec,
-                                    selection = selection)
-    if (length(constraint_specs) && !evaluated$feasible) {
-      return(rep(.PENALTY, length(objectives)))
-    }
-    .convert_metrics_to_objectives(evaluated$metrics, objective_directions,
-                                   penalty = .PENALTY)
-  }
-
-  # rmoo fitness function: can receive matrix (rows=individuals) or vector (single individual)
-  # Must return matrix when receiving matrix input
-  # Note: Accept ... to handle rmoo bug that passes reference_dirs to fitness
-  objective_wrapper <- function(x, ...) {
-    .evaluate_fitness_population(
-      x = x,
-      selector = panel_selector,
-      evaluate_selection = function(selection) {
-        evaluate_single(selection = selection)
-      },
-      n_objectives = length(objectives),
-      cache = objective_cache,
-      cache_fitness = cache_fitness
-    )
-  }
+  objective_wrapper <- scaffold$finalize(evaluate_candidate,
+                                         cache_fitness = cache_fitness)$wrapper
 
   # Optional per-generation history capture. We build a closure that pushes
   # each generation's population, fitness, and front into a parent-scope env.
@@ -482,51 +436,18 @@ optimize_panel <- function(x, y,
 
   monitor_arg <- if (isTRUE(record_history)) history_monitor else FALSE
 
-  nsga_params <- c(
-    list(
-      type = "real-valued",
-      fitness = objective_wrapper,
-      nObj = length(objectives),
-      lower = rep(0, decision_dim),
-      upper = rep(1, decision_dim),
-      monitor = monitor_arg,
-      summary = FALSE
-    ),
-    nsga_args
+  nsga_result <- .run_nsga(
+    algorithm = algorithm,
+    fitness = objective_wrapper,
+    n_objectives = length(objectives),
+    decision_dim = decision_dim,
+    nsga_args = nsga_args,
+    monitor = monitor_arg,
+    min_features = min_features_required,
+    max_features = max_features,
+    seed = seed,
+    set_seed = TRUE
   )
-
-  # Add reference points for NSGA-III if not user-specified
-  if (algorithm == "NSGA-III" && is.null(nsga_args$n_partitions)) {
-    nsga_params$n_partitions <- .compute_nsga3_partitions(length(objectives))
-  }
-
-  # Set random seed for reproducibility if provided
-  if (!is.null(seed)) {
-    if (!is.numeric(seed) || length(seed) != 1L) {
-      stop("`seed` must be a single integer value.", call. = FALSE)
-    }
-    set.seed(as.integer(seed))
-  }
-
-  # Generate sparse initialization suggestions to encourage diverse panel sizes
-  # This seeds the initial population with solutions spanning min to max features
-  n_suggestions <- min(20L, nsga_params$popSize %/% 4L)
-  if (n_suggestions >= 2L) {
-    sparse_suggestions <- .generate_sparse_suggestions(
-      n_features = decision_dim,
-      n_suggestions = n_suggestions,
-      min_features = min_features_required,
-      max_features = max_features,
-      seed = seed
-    )
-    nsga_params$suggestions <- sparse_suggestions
-  }
-
-  if (algorithm == "NSGA-II") {
-    nsga_result <- do.call(rmoo::nsga2, nsga_params)
-  } else {
-    nsga_result <- do.call(rmoo::nsga3, nsga_params)
-  }
 
   # Extract the Pareto front, re-evaluate, drop infeasible/dominated solutions,
   # and assemble the wide-format solutions data frame.
@@ -542,7 +463,7 @@ optimize_panel <- function(x, y,
     base_feature_pool = feature_pool_base,
     algorithm = algorithm,
     nsga2 = nsga_args,  # Keep nsga2 name for backward compatibility
-    scoring_function = deparse(substitute(scoring_fn)),
+    scoring_function = scoring_fn_label,
     feature_transform = feature_transform,
     feature_alignment = feature_alignment,
     constraints = if (length(constraint_specs)) {

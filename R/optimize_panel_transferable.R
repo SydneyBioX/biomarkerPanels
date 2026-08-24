@@ -124,15 +124,7 @@ optimize_panel_transferable <- function(
 
   # Validate numeric parameters
   .validate_probability(regularized_alpha, "regularized_alpha", bounds = "closed")
-  if (!identical(selection_threshold, "adaptive")) {
-    st <- suppressWarnings(as.numeric(selection_threshold))
-    if (is.na(st) || st <= 0 || st >= 1) {
-      stop(
-        "`selection_threshold` must be \"adaptive\" or a numeric value in (0, 1).",
-        call. = FALSE
-      )
-    }
-  }
+  .validate_selection_threshold(selection_threshold)
   .validate_cache_controls(cache_fitness, cache_max_entries)
 
   # 1. Validate partition ratios
@@ -182,14 +174,7 @@ optimize_panel_transferable <- function(
   # Base feature pool (O(n) search space, not O(n^2))
   base_feature_pool <- colnames(train_inputs$x)
 
-  # Minimum base features required depends on transform and regularization
-  if (regularized && feature_transform %in% c("pairwise_ratios", "pairwise_log_ratios")) {
-    min_features_required <- 3L
-  } else if (regularized) {
-    min_features_required <- 2L
-  } else {
-    min_features_required <- 1L
-  }
+  min_features_required <- .min_features_required(regularized, feature_transform)
 
   # 5. Create fitness function (base-feature-first)
   if (fitness_mode == "within_cohort_rotating") {
@@ -197,15 +182,10 @@ optimize_panel_transferable <- function(
     # generation so no single split can be overfit to. Feature pool was
     # already selected on the ORIGINAL train partition only, so held-out
     # labels never reach feature selection.
-    pool_x <- rbind(train_inputs$x, val_inputs$x)
-    pool_y <- factor(
-      c(as.character(train_inputs$truth), as.character(val_inputs$truth)),
-      levels = levels(train_inputs$truth)
-    )
-    pool_cohort <- factor(
-      c(as.character(train_inputs$cohort), as.character(val_inputs$cohort)),
-      levels = unique(c(levels(train_inputs$cohort), levels(val_inputs$cohort)))
-    )
+    pooled <- .combine_partitions(train_inputs, val_inputs)
+    pool_x <- pooled$x
+    pool_y <- pooled$truth
+    pool_cohort <- pooled$cohort
     split_val_ratio <- val_ratio / (train_ratio + val_ratio)
     rotating_splits <- .generate_stratified_splits(
       y = pool_y,
@@ -233,15 +213,10 @@ optimize_panel_transferable <- function(
     )
   } else if (fitness_mode == "loco") {
     # Pool train+val per cohort; LOCO loop provides the held-out evaluation.
-    loco_x <- rbind(train_inputs$x, val_inputs$x)
-    loco_y <- factor(
-      c(as.character(train_inputs$truth), as.character(val_inputs$truth)),
-      levels = levels(train_inputs$truth)
-    )
-    loco_cohort <- factor(
-      c(as.character(train_inputs$cohort), as.character(val_inputs$cohort)),
-      levels = unique(c(levels(train_inputs$cohort), levels(val_inputs$cohort)))
-    )
+    pooled <- .combine_partitions(train_inputs, val_inputs)
+    loco_x <- pooled$x
+    loco_y <- pooled$truth
+    loco_cohort <- pooled$cohort
     if (nlevels(droplevels(loco_cohort)) < 2L) {
       stop(
         "fitness_mode = 'loco' requires >=2 cohorts but only ",
@@ -319,42 +294,18 @@ optimize_panel_transferable <- function(
 
   monitor_arg <- if (isTRUE(record_history)) history_monitor else FALSE
 
-  nsga_params <- c(
-    list(
-      type = "real-valued",
-      fitness = fitness_fn$wrapper,
-      nObj = length(objectives),
-      lower = rep(0, decision_dim),
-      upper = rep(1, decision_dim),
-      monitor = monitor_arg,
-      summary = FALSE
-    ),
-    nsga_args
-  )
-
-  if (algorithm == "NSGA-III" && is.null(nsga_args$n_partitions)) {
-    nsga_params$n_partitions <- .compute_nsga3_partitions(length(objectives))
-  }
-
-  # Seed initial population with diverse panel sizes
-  n_suggestions <- min(20L, nsga_args$popSize %/% 4L)
-  if (n_suggestions >= 2L) {
-    sparse_suggestions <- .generate_sparse_suggestions(
-      n_features = decision_dim,
-      n_suggestions = n_suggestions,
-      min_features = min_features_required,
-      max_features = max_features,
-      seed = seed
-    )
-    nsga_params$suggestions <- sparse_suggestions
-  }
-
   message("Running ", algorithm, " optimization...")
-  if (algorithm == "NSGA-II") {
-    nsga_result <- do.call(rmoo::nsga2, nsga_params)
-  } else {
-    nsga_result <- do.call(rmoo::nsga3, nsga_params)
-  }
+  nsga_result <- .run_nsga(
+    algorithm = algorithm,
+    fitness = fitness_fn$wrapper,
+    n_objectives = length(objectives),
+    decision_dim = decision_dim,
+    nsga_args = nsga_args,
+    monitor = monitor_arg,
+    min_features = min_features_required,
+    max_features = max_features,
+    seed = seed
+  )
 
   # 7. Extract Pareto front, re-evaluate, drop infeasible/dominated solutions,
   #    and assemble the wide-format solutions data frame.
@@ -363,15 +314,10 @@ optimize_panel_transferable <- function(
   )
 
   # 8. Combine train + val raw base features for fit_panel()
-  combined_x <- rbind(train_inputs$x, val_inputs$x)
-  combined_y <- factor(
-    c(as.character(train_inputs$truth), as.character(val_inputs$truth)),
-    levels = levels(train_inputs$truth)
-  )
-  combined_cohort <- factor(
-    c(as.character(train_inputs$cohort), as.character(val_inputs$cohort)),
-    levels = unique(c(levels(train_inputs$cohort), levels(val_inputs$cohort)))
-  )
+  combined <- .combine_partitions(train_inputs, val_inputs)
+  combined_x <- combined$x
+  combined_y <- combined$truth
+  combined_cohort <- combined$cohort
 
   # Build control parameters
   control <- list(
@@ -436,4 +382,27 @@ optimize_panel_transferable <- function(
       aggregated_y = combined_y,
       aggregated_cohort = combined_cohort,
       history = history_out)
+}
+
+#' Combine Train and Validation Partitions
+#'
+#' Row-binds the feature matrices and concatenates the response and cohort
+#' factors of two prepared partitions, preserving the training partition's
+#' response levels and the union of cohort levels.
+#'
+#' @param train_inputs,val_inputs Lists with `x`, `truth`, and `cohort`.
+#' @return List with combined `x`, `truth`, and `cohort`.
+#' @keywords internal
+.combine_partitions <- function(train_inputs, val_inputs) {
+  list(
+    x = rbind(train_inputs$x, val_inputs$x),
+    truth = factor(
+      c(as.character(train_inputs$truth), as.character(val_inputs$truth)),
+      levels = levels(train_inputs$truth)
+    ),
+    cohort = factor(
+      c(as.character(train_inputs$cohort), as.character(val_inputs$cohort)),
+      levels = unique(c(levels(train_inputs$cohort), levels(val_inputs$cohort)))
+    )
+  )
 }
