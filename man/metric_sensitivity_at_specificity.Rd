@@ -42,13 +42,15 @@ corresponding to the target specificity, then returns the sensitivity at
 that point. If the exact target specificity cannot be achieved, pROC
 interpolates to the nearest achievable point.
 
-Unlike \code{\link[=metric_specificity_at_sensitivity]{metric_specificity_at_sensitivity()}}, degenerate inputs (a
+Like \code{\link[=metric_specificity_at_sensitivity]{metric_specificity_at_sensitivity()}}, degenerate inputs (a
 single-class subset, or a \code{coords()} call that yields nothing usable)
 return \code{0} — the worst achievable value — rather than erroring or returning
 \code{NA_real_}. This keeps the metric safe to use directly as an NSGA
-objective, since the fitness path does not guard against \code{NA} objective
-values. Argument errors (missing \code{scores}, out-of-range
-\code{target_specificity}) still signal an error.
+objective: an error would abort the whole run, and an \code{NA} is mapped to the
+\code{1e6} infeasibility penalty, which conflates degeneracy with constraint
+violation, distorts NSGA-III normalization, and still surfaces as \code{NA} in
+post-hoc solution re-evaluation. Argument errors (missing \code{scores},
+out-of-range \code{target_specificity}) still signal an error.
 }
 \examples{
 truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
