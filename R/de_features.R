@@ -28,7 +28,7 @@ NULL
 #'   extract prior to modelling.
 #' @return Character vector of feature identifiers ordered by significance.
 #' @seealso [select_transferable_features()], [select_discriminative_features()],
-#'   [select_ruv_features()], [select_cpop_features()]
+#'   [select_ruv_features()]
 #' @export
 #'
 #' @importFrom stats model.matrix pnorm qnorm weighted.mean sd

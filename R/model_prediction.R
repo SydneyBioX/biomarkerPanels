@@ -58,7 +58,7 @@ NULL
     feature_cols <- setdiff(model_cols, c(".response", ".cohort"))
 
     # Evaluation paths pass the panel's expected feature names: validate the
-    # match and reorder to the model's expectation. CPOP-style panels train on a
+    # match and reorder to the model's expectation. Some panels train on a
     # subset of the transformed columns, so reordering picks the right columns.
     if (!is.null(expected_features)) {
       expected_names <- make.names(expected_features, unique = TRUE)

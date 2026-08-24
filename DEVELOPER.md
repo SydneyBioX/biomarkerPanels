@@ -45,8 +45,8 @@ The package is organized into several distinct modules that handle the data life
 - **Purpose:** Harmonizes incoming expression data (which may be provided as lists of matrices, data.frames, or `SummarizedExperiment` objects) across multiple cohorts. It aligns features, resolves differences in variable availability (e.g., intersecting features), and provides safe partitioning for training/held-out splits.
 
 ### 2. Feature Pre-selection
-- **Files:** `discriminative_features.R`, `ruv_features.R`, `transferable_features.R`, `denominator_features.R`, `cpop_fit.R`, `cpop_select.R`
-- **Purpose:** Large omics datasets are computationally expensive to optimize directly. Pre-selection filters the feature space using various statistical methods (e.g., Wilcoxon, RUV, CPOP) to form a highly-qualified "feature pool" that is small enough for NSGA-II/III to efficiently search.
+- **Files:** `discriminative_features.R`, `ruv_features.R`, `transferable_features.R`, `denominator_features.R`
+- **Purpose:** Large omics datasets are computationally expensive to optimize directly. Pre-selection filters the feature space using various statistical methods (e.g., Wilcoxon, RUV, ridge transferability) to form a highly-qualified "feature pool" that is small enough for NSGA-II/III to efficiently search.
 
 ### 3. Core Optimization (NSGA-II / NSGA-III)
 - **Files:** `optimize_panel.R`, `optimize_panel_transferable.R`, `objectives.R`, `metric_registry.R`, `feature_transforms.R`, `fitness_cache_utils.R`, `cv_scoring.R`

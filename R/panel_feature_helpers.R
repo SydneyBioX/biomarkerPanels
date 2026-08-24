@@ -17,7 +17,7 @@ NULL
 #' and applies the panel's feature transform on the fly. Callers are responsible
 #' for resolving `base_features` / `feature_transform` from the panel (some
 #' allow an explicit transform override) and for any downstream subsetting to a
-#' model's expected column subset (e.g. CPOP panels).
+#' model's expected column subset.
 #'
 #' @param x_raw Raw feature matrix (samples x base features) with column names.
 #' @param base_features Character vector of base feature names to select.

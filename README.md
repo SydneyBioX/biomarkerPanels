@@ -116,7 +116,6 @@ result <- optimize_panel(x, y, feature_pool = top_de, ...)
 | `select_transferable_features()` | Pre-filter features by cross-cohort ridge stability |
 | `select_discriminative_features()` | Pre-filter by within-cohort AUC, penalised for batch separation |
 | `select_ruv_features()` | Pre-filter via RUV-4 signal vs. unwanted-variation scoring |
-| `select_cpop_features()` | Pre-filter pairwise log-ratios via the CPOP algorithm |
 | `metric_registry()` | View all available objective functions |
 
 ## 📊 Available Objectives

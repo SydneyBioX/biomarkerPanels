@@ -30,6 +30,6 @@ Checks that a panel's base features are present in \code{x_raw}, subsets to them
 and applies the panel's feature transform on the fly. Callers are responsible
 for resolving \code{base_features} / \code{feature_transform} from the panel (some
 allow an explicit transform override) and for any downstream subsetting to a
-model's expected column subset (e.g. CPOP panels).
+model's expected column subset.
 }
 \keyword{internal}
