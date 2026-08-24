@@ -25,8 +25,8 @@ metric_specificity_at_sensitivity(
 specificity (default 0.90). Must be between 0 and 1.}
 }
 \value{
-Specificity at the target sensitivity, or \code{NA_real_} if computation
-fails (e.g., degenerate ROC curve with no class separation).
+Specificity at the target sensitivity, between 0 and 1. Returns \code{0}
+for degenerate inputs.
 }
 \description{
 Computes the specificity achievable when the classifier operates at a
@@ -39,6 +39,16 @@ Uses \code{\link[pROC:coords]{pROC::coords()}} to find the operating point on th
 corresponding to the target sensitivity, then returns the specificity
 at that point. If the exact target sensitivity cannot be achieved,
 pROC interpolates to the nearest achievable point.
+
+Degenerate inputs (a single-class subset, or a \code{coords()} call that yields
+nothing usable) return \code{0} — the worst achievable value — rather than
+erroring or returning \code{NA_real_}. This keeps the metric safe to use
+directly as an NSGA objective: an error would abort the whole run, and an
+\code{NA} is mapped to the \code{1e6} infeasibility penalty, which conflates
+degeneracy with constraint violation, distorts NSGA-III normalization, and
+still surfaces as \code{NA} in post-hoc solution re-evaluation. Argument errors
+(missing \code{scores}, out-of-range \code{target_sensitivity}) still signal an
+error.
 }
 \examples{
 truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))

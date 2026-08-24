@@ -186,19 +186,12 @@ test_that("metric_specificity_at_sensitivity handles edge cases", {
   spec_poor <- metric_specificity_at_sensitivity(truth, poor_scores, target_sensitivity = 0.90)
   expect_true(is.numeric(spec_poor))
 
-  # Error when no positives
+  # Degenerate inputs return 0 (worst value) so the metric is NSGA-safe
   truth_no_pos <- factor(rep("No", 10), levels = c("No", "Yes"))
-  expect_error(
-    metric_specificity_at_sensitivity(truth_no_pos, runif(10)),
-    "no positive samples"
-  )
+  expect_identical(metric_specificity_at_sensitivity(truth_no_pos, runif(10)), 0)
 
-  # Error when no negatives
   truth_no_neg <- factor(rep("Yes", 10), levels = c("No", "Yes"))
-  expect_error(
-    metric_specificity_at_sensitivity(truth_no_neg, runif(10)),
-    "no negative samples"
-  )
+  expect_identical(metric_specificity_at_sensitivity(truth_no_neg, runif(10)), 0)
 
   # Invalid target_sensitivity
   expect_error(

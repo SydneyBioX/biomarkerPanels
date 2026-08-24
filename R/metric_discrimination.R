@@ -139,11 +139,21 @@ metric_pauc <- function(truth, scores = NULL, selected = NULL,
 #' at that point. If the exact target sensitivity cannot be achieved,
 #' pROC interpolates to the nearest achievable point.
 #'
+#' Degenerate inputs (a single-class subset, or a `coords()` call that yields
+#' nothing usable) return `0` — the worst achievable value — rather than
+#' erroring or returning `NA_real_`. This keeps the metric safe to use
+#' directly as an NSGA objective: an error would abort the whole run, and an
+#' `NA` is mapped to the `1e6` infeasibility penalty, which conflates
+#' degeneracy with constraint violation, distorts NSGA-III normalization, and
+#' still surfaces as `NA` in post-hoc solution re-evaluation. Argument errors
+#' (missing `scores`, out-of-range `target_sensitivity`) still signal an
+#' error.
+#'
 #' @inheritParams metric_auc
 #' @param target_sensitivity The sensitivity threshold at which to evaluate
 #'   specificity (default 0.90). Must be between 0 and 1.
-#' @return Specificity at the target sensitivity, or `NA_real_` if computation
-#'   fails (e.g., degenerate ROC curve with no class separation).
+#' @return Specificity at the target sensitivity, between 0 and 1. Returns `0`
+#'   for degenerate inputs.
 #' @seealso [metric_pauc()] for partial AUC in the high-sensitivity region,
 #'   [metric_sensitivity()] and [metric_specificity()] for threshold-based metrics.
 #' @export
@@ -168,50 +178,29 @@ metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = N
     stop("`target_sensitivity` must be between 0 and 1.", call. = FALSE)
   }
 
-  pos_count <- sum(truth == positive)
-  neg_count <- sum(truth != positive)
-  if (pos_count == 0L) {
-    stop("Cannot compute specificity at sensitivity: no positive samples in the data.",
-         call. = FALSE)
-  }
-  if (neg_count == 0L) {
-    stop("Cannot compute specificity at sensitivity: no negative samples in the data.",
-         call. = FALSE)
+  # Degenerate cases return the worst achievable value rather than erroring
+  # (which aborts the run) or NA (which is penalised as 1e6 infeasibility).
+  if (sum(truth == positive) == 0L || sum(truth != positive) == 0L) {
+    return(0)
   }
 
   tryCatch({
     roc_obj <- .build_roc(truth, scores, positive)
 
-    # Get specificity at the target sensitivity point
-    coords_result <- pROC::coords(
+    spec_value <- pROC::coords(
       roc_obj,
       x = target_sensitivity,
       input = "sensitivity",
       ret = "specificity"
-    )
+    )$specificity
 
-    # coords returns a data.frame; extract specificity
-    spec_value <- coords_result$specificity
-
+    # coords may return several ties; take the best achievable specificity
     if (length(spec_value) == 0L) {
-      return(NA_real_)
+      return(0)
     }
-    # pROC::coords may return multiple rows; take best specificity
-    if (length(spec_value) > 1L) {
-      spec_value <- max(spec_value, na.rm = TRUE)
-    }
-    if (is.na(spec_value)) {
-      return(NA_real_)
-    }
-
-    as.numeric(spec_value)
-  }, error = function(e) {
-    stop(
-      "Specificity at sensitivity computation failed: ", conditionMessage(e),
-      "\nThis typically indicates insufficient data or class imbalance.",
-      call. = FALSE
-    )
-  })
+    spec_value <- suppressWarnings(max(spec_value, na.rm = TRUE))
+    if (!is.finite(spec_value)) 0 else as.numeric(spec_value)
+  }, error = function(e) 0)
 }
 
 #' Sensitivity at a Fixed Specificity Threshold
@@ -228,13 +217,15 @@ metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = N
 #' that point. If the exact target specificity cannot be achieved, pROC
 #' interpolates to the nearest achievable point.
 #'
-#' Unlike [metric_specificity_at_sensitivity()], degenerate inputs (a
+#' Like [metric_specificity_at_sensitivity()], degenerate inputs (a
 #' single-class subset, or a `coords()` call that yields nothing usable)
 #' return `0` — the worst achievable value — rather than erroring or returning
 #' `NA_real_`. This keeps the metric safe to use directly as an NSGA
-#' objective, since the fitness path does not guard against `NA` objective
-#' values. Argument errors (missing `scores`, out-of-range
-#' `target_specificity`) still signal an error.
+#' objective: an error would abort the whole run, and an `NA` is mapped to the
+#' `1e6` infeasibility penalty, which conflates degeneracy with constraint
+#' violation, distorts NSGA-III normalization, and still surfaces as `NA` in
+#' post-hoc solution re-evaluation. Argument errors (missing `scores`,
+#' out-of-range `target_specificity`) still signal an error.
 #'
 #' @inheritParams metric_auc
 #' @param target_specificity The specificity threshold at which to evaluate
@@ -266,8 +257,8 @@ metric_sensitivity_at_specificity <- function(truth, scores = NULL, selected = N
     stop("`target_specificity` must be between 0 and 1.", call. = FALSE)
   }
 
-  # Degenerate cases return the worst achievable value rather than NA — the NSGA
-  # fitness path does not guard against NA objective values.
+  # Degenerate cases return the worst achievable value rather than erroring
+  # (which aborts the run) or NA (which is penalised as 1e6 infeasibility).
   if (sum(truth == positive) == 0L || sum(truth != positive) == 0L) {
     return(0)
   }
