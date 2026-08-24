@@ -119,6 +119,30 @@ transfer_objectives <- define_objectives(
 )
 ```
 
+### A Rule-Out Recipe
+
+Rule-out diagnostics pin the operating point at high sensitivity and then push
+specificity as far as it will go. There is no dedicated helper for this — it is
+an ordinary `define_objectives()` call in which
+`specificity_at_sensitivity`'s `target_sensitivity` and `pauc`'s `sens_floor`
+both name the same operating point.
+
+```{r ruleout-objectives, eval=FALSE}
+ruleout_objectives <- define_objectives(
+  metrics = c("specificity_at_sensitivity", "pauc", "min_cohort_auc",
+              "num_features"),
+  params = list(
+    specificity_at_sensitivity = list(target_sensitivity = 0.90),
+    pauc = list(sens_floor = 0.90, partial_auc_correct = TRUE)
+  )
+)
+```
+
+No hard constraint is needed: because both metrics are already evaluated at the
+0.90 sensitivity floor, candidates that cannot reach it score poorly on their
+own. Add a `min_metric_constraint("sensitivity", threshold = 0.9)` only if you
+want infeasible candidates discarded outright rather than ranked last.
+
 ### Enforce Minimum Standards
 
 Some clinical settings demand a hard floor on performance before optimising
