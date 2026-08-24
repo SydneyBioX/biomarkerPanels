@@ -32,7 +32,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">biomarkerPanels</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.0.0.9000</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
       </span>
     </div>
 
@@ -165,13 +165,12 @@ available metrics with <code><a href="../reference/metric_registry.html">metric_
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="fu"><a href="../reference/metric_registry.html">metric_registry</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;  [1] "auc"                        "balanced_accuracy"         </span></span>
 <span><span class="co">#&gt;  [3] "cohort_auc_gap"             "cohort_auc_var"            </span></span>
-<span><span class="co">#&gt;  [5] "cohort_leakage"             "conditional_score_shift"   </span></span>
-<span><span class="co">#&gt;  [7] "easy_hard_accuracy"         "f1"                        </span></span>
-<span><span class="co">#&gt;  [9] "max_cohort_brier"           "min_cohort_auc"            </span></span>
-<span><span class="co">#&gt; [11] "npv"                        "num_features"              </span></span>
-<span><span class="co">#&gt; [13] "pauc"                       "precision"                 </span></span>
-<span><span class="co">#&gt; [15] "sensitivity"                "sensitivity_at_specificity"</span></span>
-<span><span class="co">#&gt; [17] "specificity"                "specificity_at_sensitivity"</span></span></code></pre></div>
+<span><span class="co">#&gt;  [5] "cohort_leakage"             "f1"                        </span></span>
+<span><span class="co">#&gt;  [7] "max_cohort_brier"           "min_cohort_auc"            </span></span>
+<span><span class="co">#&gt;  [9] "npv"                        "num_features"              </span></span>
+<span><span class="co">#&gt; [11] "pauc"                       "precision"                 </span></span>
+<span><span class="co">#&gt; [13] "sensitivity"                "sensitivity_at_specificity"</span></span>
+<span><span class="co">#&gt; [15] "specificity"                "specificity_at_sensitivity"</span></span></code></pre></div>
 <p>To emphasise clinical utility we combine sensitivity, specificity,
 and a panel size penalty. We also tighten the classification probability
 cutoff for sensitivity.</p>
@@ -262,9 +261,12 @@ extract the corresponding columns.</p>
 <div class="section level3">
 <h3 id="inspect-cohort-level-scores">Inspect Cohort-level Scores<a class="anchor" aria-label="anchor" href="#inspect-cohort-level-scores"></a>
 </h3>
-<p>The default scoring function averages selected features per sample.
-Users can provide richer models through the <code>scoring_fn</code>
-argument to incorporate cohort-specific classifiers.</p>
+<p>By default candidates are scored with a (regularized) logistic model
+fitted by cross-validation. A custom <code>scoring_fn</code> is only
+used on the in-sample scoring path, so it requires
+<code>fitness_cv = FALSE</code> and <code>regularized = FALSE</code> —
+note that this combination scores candidates on their own training data
+and is prone to overfitting.</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">logit_scoring</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x_selected</span>, <span class="va">selected_features</span>, <span class="va">truth</span>, <span class="va">cohort</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">cohort_levels</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">cohort</span><span class="op">)</span></span>
@@ -289,6 +291,8 @@ argument to incorporate cohort-specific classifiers.</p>
 <span>  max_features <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  feature_pool <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">cohorts</span><span class="op">$</span><span class="va">x_list</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">50</span><span class="op">]</span>,</span>
 <span>  scoring_fn <span class="op">=</span> <span class="va">logit_scoring</span>,</span>
+<span>  fitness_cv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  regularized <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  nsga_control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>popsize <span class="op">=</span> <span class="fl">32</span>, generations <span class="op">=</span> <span class="fl">40</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 </div>

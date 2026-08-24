@@ -22,7 +22,7 @@ at that operating point.'><!-- mathjax --><script src="https://cdnjs.cloudflare.
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">biomarkerPanels</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.0.0.9000</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
       </span>
     </div>
 
@@ -140,13 +140,12 @@ out-of-range <code>target_specificity</code>) still signal an error.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">truth</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="st">"No"</span>, <span class="fl">50</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="st">"Yes"</span>, <span class="fl">50</span><span class="op">)</span><span class="op">)</span>, levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"No"</span>, <span class="st">"Yes"</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">scores</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">50</span>, <span class="fl">0</span>, <span class="fl">0.6</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">50</span>, <span class="fl">0.4</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Sensitivity when specificity is fixed at 90%</span></span></span>
-<span class="r-in"><span><span class="fu">metric_sensitivity_at_specificity</span><span class="op">(</span><span class="va">truth</span>, <span class="va">scores</span>, target_specificity <span class="op">=</span> <span class="fl">0.90</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Sensitivity when specificity is fixed at 90% (internal function; users</span></span></span>
+<span class="r-in"><span><span class="co"># normally reach it via define_objectives(metrics = "sensitivity_at_specificity"))</span></span></span>
+<span class="r-in"><span><span class="fu">biomarkerPanels</span><span class="fu">:::</span><span class="fu">metric_sensitivity_at_specificity</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">truth</span>, <span class="va">scores</span>, target_specificity <span class="op">=</span> <span class="fl">0.90</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.82</span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Sensitivity when specificity is fixed at 95%</span></span></span>
-<span class="r-in"><span><span class="fu">metric_sensitivity_at_specificity</span><span class="op">(</span><span class="va">truth</span>, <span class="va">scores</span>, target_specificity <span class="op">=</span> <span class="fl">0.95</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.7</span>
 </code></pre></div>
     </div>
   </div>

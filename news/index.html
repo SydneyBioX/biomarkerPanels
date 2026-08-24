@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">biomarkerPanels</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.0.0.9000</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
       </span>
     </div>
 
@@ -57,6 +57,21 @@
       <small>Source: <a href="https://github.com/SydneyBioX/biomarkerPanels/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.1.0" id="biomarkerpanels-010">biomarkerPanels 0.1.0<a class="anchor" aria-label="anchor" href="#biomarkerpanels-010"></a></h2>
+<p>First versioned milestone: a behaviour-preserving cleanup of the package surface and internals.</p>
+<div class="section level3">
+<h3 id="breaking-changes-0-1-0">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-0-1-0"></a></h3>
+<ul><li>19 exports removed. Dead exports (zero callers) were deleted outright — <code>select_panel_top_sensitivity()</code>, <code>select_panel_by_pathway()</code>, <code>metric_conditional_score_shift()</code> and <code>metric_easy_hard_accuracy()</code> — and 15 registry-only <code>metric_*</code> functions are now internal: reach them through their registry names in <code><a href="../reference/define_objectives.html">define_objectives()</a></code>. <code><a href="../reference/metric_specificity_at_sensitivity.html">metric_specificity_at_sensitivity()</a></code> remains exported.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="improvements-0-1-0">Improvements<a class="anchor" aria-label="anchor" href="#improvements-0-1-0"></a></h3>
+<ul><li>
+<code><a href="../reference/metric_specificity_at_sensitivity.html">metric_specificity_at_sensitivity()</a></code> now returns 0 (the worst achievable value) on degenerate inputs instead of erroring or returning <code>NA</code>, matching <code><a href="../reference/metric_sensitivity_at_specificity.html">metric_sensitivity_at_specificity()</a></code>, so it is safe as an NSGA objective.</li>
+<li>Feature-selection front-ends share a common input-preparation path; metrics/evaluation internals deduplicated; fitness evaluation consolidated into a shared scaffold and NSGA launch path.</li>
+<li>File reorganisation for one-theme-per-file layout (see <code>dev/cleanup-decisions-2026-08.md</code> for the survey behind this release).</li>
+</ul></div>
+</div>
   </div>
 
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">

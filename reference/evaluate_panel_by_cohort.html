@@ -20,7 +20,7 @@ transferability across independent datasets."><!-- mathjax --><script src="https
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">biomarkerPanels</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.0.0.9000</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
       </span>
     </div>
 
@@ -100,7 +100,9 @@ a list.</p></dd>
 
 
 <dt id="arg-metrics">metrics<a class="anchor" aria-label="anchor" href="#arg-metrics"></a></dt>
-<dd><p>Character vector of metric names to compute. Defaults to
+<dd><p>Character vector of registered metric names to compute (any
+name in <code><a href="metric_registry.html">metric_registry()</a></code>, e.g. <code>"pauc"</code> or
+<code>"specificity_at_sensitivity"</code>). Defaults to
 <code>c("sensitivity", "specificity", "auc")</code>.</p></dd>
 
 
