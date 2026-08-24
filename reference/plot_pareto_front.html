@@ -73,6 +73,8 @@ returned ggplot object.</p>
 <span>  <span class="va">optimization_result</span>,</span>
 <span>  x <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  y <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  cohort <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  objectives <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  x_metric <span class="op">=</span> <span class="st">"sensitivity"</span>,</span>
 <span>  y_metric <span class="op">=</span> <span class="st">"specificity"</span>,</span>
 <span>  color_by <span class="op">=</span> <span class="st">"n_features"</span>,</span>
@@ -111,19 +113,32 @@ is a list). When <code>NULL</code> (default), automatically uses held-out labels
 stored by <code><a href="optimize_panel_transferable.html">optimize_panel_transferable()</a></code>.</p></dd>
 
 
+<dt id="arg-cohort">cohort<a class="anchor" aria-label="anchor" href="#arg-cohort"></a></dt>
+<dd><p>Optional cohort factor for single-matrix <code>x</code>; passed to
+<code><a href="evaluate_pareto_solutions.html">evaluate_pareto_solutions()</a></code>.</p></dd>
+
+
+<dt id="arg-objectives">objectives<a class="anchor" aria-label="anchor" href="#arg-objectives"></a></dt>
+<dd><p>Optional objective override; passed to
+<code><a href="evaluate_pareto_solutions.html">evaluate_pareto_solutions()</a></code>.</p></dd>
+
+
 <dt id="arg-x-metric">x_metric<a class="anchor" aria-label="anchor" href="#arg-x-metric"></a></dt>
-<dd><p>Character; metric name for the x-axis. Must be one of
-<code>"sensitivity"</code>, <code>"specificity"</code>, or <code>"auc"</code>. Default <code>"sensitivity"</code>.</p></dd>
+<dd><p>Character; column name for the x-axis. Any column of
+<code><a href="evaluate_pareto_solutions.html">evaluate_pareto_solutions()</a></code> output, i.e. <code>"sensitivity"</code>,
+<code>"specificity"</code>, <code>"auc"</code>, <code>"n_features"</code>, <code>"n_base_features"</code>, or an
+<code>obj_</code>-prefixed optimisation objective such as <code>"obj_auc"</code>. Default
+<code>"sensitivity"</code>.</p></dd>
 
 
 <dt id="arg-y-metric">y_metric<a class="anchor" aria-label="anchor" href="#arg-y-metric"></a></dt>
-<dd><p>Character; metric name for the y-axis. Same options as
+<dd><p>Character; column name for the y-axis. Same options as
 <code>x_metric</code>. Default <code>"specificity"</code>.</p></dd>
 
 
 <dt id="arg-color-by">color_by<a class="anchor" aria-label="anchor" href="#arg-color-by"></a></dt>
-<dd><p>One of <code>"n_features"</code>, <code>"n_base_features"</code>, <code>"auc"</code>,
-<code>"sensitivity"</code>, <code>"specificity"</code>, or <code>NULL</code> to disable. Default
+<dd><p>Column name to map to point colour (e.g. <code>"n_features"</code>,
+<code>"auc"</code>, an <code>obj_</code> column), or <code>NULL</code> to disable. Default
 <code>"n_features"</code>.</p></dd>
 
 

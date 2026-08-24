@@ -53,6 +53,7 @@
 <url><loc>/reference/dot-compute_roc_curve.html</loc></url>
 <url><loc>/reference/dot-compute_roc_curve_cpp.html</loc></url>
 <url><loc>/reference/dot-compute_weighted_variance.html</loc></url>
+<url><loc>/reference/dot-count_eval_cohorts.html</loc></url>
 <url><loc>/reference/dot-cpop_build_shell_model.html</loc></url>
 <url><loc>/reference/dot-cpop_step2.html</loc></url>
 <url><loc>/reference/dot-create_stratified_folds.html</loc></url>
@@ -94,6 +95,7 @@
 <url><loc>/reference/dot-predict_panel_model.html</loc></url>
 <url><loc>/reference/dot-prepare_cohort_inputs.html</loc></url>
 <url><loc>/reference/dot-prepare_np_labels.html</loc></url>
+<url><loc>/reference/dot-prepare_pareto_objectives.html</loc></url>
 <url><loc>/reference/dot-prepare_scoring_matrix.html</loc></url>
 <url><loc>/reference/dot-prepare_selection_inputs.html</loc></url>
 <url><loc>/reference/dot-reference_diff_cpp.html</loc></url>
@@ -101,6 +103,7 @@
 <url><loc>/reference/dot-resolve_contrast.html</loc></url>
 <url><loc>/reference/dot-resolve_feature_pool.html</loc></url>
 <url><loc>/reference/dot-resolve_lambda_vector.html</loc></url>
+<url><loc>/reference/dot-resolve_stored_objectives.html</loc></url>
 <url><loc>/reference/dot-ruv_diagnostics.html</loc></url>
 <url><loc>/reference/dot-score_discriminative_features.html</loc></url>
 <url><loc>/reference/dot-score_glm.html</loc></url>

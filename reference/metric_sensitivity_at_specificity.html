@@ -118,13 +118,15 @@ for degenerate inputs.</p>
 corresponding to the target specificity, then returns the sensitivity at
 that point. If the exact target specificity cannot be achieved, pROC
 interpolates to the nearest achievable point.</p>
-<p>Unlike <code><a href="metric_specificity_at_sensitivity.html">metric_specificity_at_sensitivity()</a></code>, degenerate inputs (a
+<p>Like <code><a href="metric_specificity_at_sensitivity.html">metric_specificity_at_sensitivity()</a></code>, degenerate inputs (a
 single-class subset, or a <code>coords()</code> call that yields nothing usable)
 return <code>0</code> — the worst achievable value — rather than erroring or returning
 <code>NA_real_</code>. This keeps the metric safe to use directly as an NSGA
-objective, since the fitness path does not guard against <code>NA</code> objective
-values. Argument errors (missing <code>scores</code>, out-of-range
-<code>target_specificity</code>) still signal an error.</p>
+objective: an error would abort the whole run, and an <code>NA</code> is mapped to the
+<code>1e6</code> infeasibility penalty, which conflates degeneracy with constraint
+violation, distorts NSGA-III normalization, and still surfaces as <code>NA</code> in
+post-hoc solution re-evaluation. Argument errors (missing <code>scores</code>,
+out-of-range <code>target_specificity</code>) still signal an error.</p>
     </div>
     <div id="see-also">
     <h2>See also</h2>

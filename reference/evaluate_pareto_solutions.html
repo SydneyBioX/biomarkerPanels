@@ -71,6 +71,8 @@ held-out validation data. This provides the metrics data frame used by
 <span>  <span class="va">optimization_result</span>,</span>
 <span>  x <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  y <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  cohort <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  objectives <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  on_error <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"warn"</span>, <span class="st">"stop"</span><span class="op">)</span>,</span>
 <span>  regularized <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  verbose <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/interactive.html" class="external-link">interactive</a></span><span class="op">(</span><span class="op">)</span></span>
@@ -98,6 +100,20 @@ is a list). When <code>NULL</code> (default), automatically uses held-out labels
 stored by <code><a href="optimize_panel_transferable.html">optimize_panel_transferable()</a></code>.</p></dd>
 
 
+<dt id="arg-cohort">cohort<a class="anchor" aria-label="anchor" href="#arg-cohort"></a></dt>
+<dd><p>Optional factor identifying cohort membership for each sample
+when <code>x</code> is a single matrix. Ignored when <code>x</code> is a list of cohorts. When
+<code>x</code>/<code>y</code> are taken from the stored held-out partition, the stored cohort
+labels are used unless overridden here.</p></dd>
+
+
+<dt id="arg-objectives">objectives<a class="anchor" aria-label="anchor" href="#arg-objectives"></a></dt>
+<dd><p>Optional named list of objective descriptors (as returned
+by <code><a href="define_objectives.html">define_objectives()</a></code>) overriding the objectives stored on
+<code>optimization_result</code>. Set to <code>NA</code> to skip objective re-scoring entirely
+and return only the descriptive columns.</p></dd>
+
+
 <dt id="arg-on-error">on_error<a class="anchor" aria-label="anchor" href="#arg-on-error"></a></dt>
 <dd><p>One of <code>"warn"</code> or <code>"stop"</code>. Controls behaviour when a
 solution fails evaluation. <code>"warn"</code> (default) skips the solution with a
@@ -116,7 +132,24 @@ warning; <code>"stop"</code> raises an error immediately.</p></dd>
     <h2>Value</h2>
     <p>A data frame with one row per successfully evaluated solution and
 columns <code>solution_id</code>, <code>n_features</code>, <code>n_base_features</code>, <code>sensitivity</code>,
-<code>specificity</code>, and <code>auc</code>.</p>
+<code>specificity</code>, <code>auc</code>, plus one <code>obj_&lt;name&gt;</code> column per optimisation
+objective. Attributes <code>objective_labels</code> and <code>objective_directions</code> map
+the <code>obj_</code> columns back to their metric labels and optimisation
+directions.</p>
+    </div>
+    <div id="details">
+    <h2>Details</h2>
+    <p>In addition to the always-present descriptive columns (<code>sensitivity</code>,
+<code>specificity</code>, <code>auc</code> at a 0.5 cutoff), each solution is re-scored on the
+objectives the optimisation actually targeted. Those are recovered from
+<code>optimization_result@control$objectives</code> (stored by <code><a href="optimize_panel.html">optimize_panel()</a></code> and
+<code><a href="optimize_panel_transferable.html">optimize_panel_transferable()</a></code>) and reported in columns prefixed <code>obj_</code>,
+so <code>obj_auc</code> or <code>obj_sensitivity_at_specificity</code> are directly comparable to
+the training-side values in <code>solutions(optimization_result)</code>.</p>
+<p>Objectives whose metric is cohort-aware (e.g. <code>cohort_auc_gap</code>,
+<code>min_cohort_auc</code>) cannot be computed when the evaluation data contains a
+single cohort; those columns are returned as <code>NA</code> with a warning. Supply
+<code>x</code> as a list of cohorts, or pass <code>cohort</code>, to make them computable.</p>
     </div>
     <div id="see-also">
     <h2>See also</h2>
