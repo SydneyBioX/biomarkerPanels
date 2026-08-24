@@ -266,7 +266,6 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
     np_delta = np_delta,
     per_cohort_metrics = per_cohort_df,
     weighted_variance = weighted_var,
-    validation_metrics = list(),
     partition_info = if (!is.null(panel@control$partition_info)) {
       panel@control$partition_info
     } else {

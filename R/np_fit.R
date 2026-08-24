@@ -283,7 +283,6 @@ fit_np_panel <- function(optimization_result,
     np_delta = delta,
     per_cohort_metrics = per_cohort,
     weighted_variance = weighted_var,
-    validation_metrics = list(),
     partition_info = list()
   )
 }

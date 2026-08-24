@@ -283,7 +283,6 @@ setMethod(
 #' @slot per_cohort_metrics Data frame with per-cohort performance metrics.
 #' @slot weighted_variance List containing sensitivity and specificity variance
 #'   (inverse sample-size weighted across cohorts).
-#' @slot validation_metrics List of validation set metrics.
 #' @slot partition_info List containing partition sizes and ratios.
 #' @export
 setClass(
@@ -295,7 +294,6 @@ setClass(
     np_delta = "numeric",
     per_cohort_metrics = "data.frame",
     weighted_variance = "list",
-    validation_metrics = "list",
     partition_info = "list"
   )
 )

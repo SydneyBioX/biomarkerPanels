@@ -23,8 +23,6 @@ generalizability.
 \item{\code{weighted_variance}}{List containing sensitivity and specificity variance
 (inverse sample-size weighted across cohorts).}
 
-\item{\code{validation_metrics}}{List of validation set metrics.}
-
 \item{\code{partition_info}}{List containing partition sizes and ratios.}
 }}
 
