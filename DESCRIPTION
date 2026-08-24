@@ -1,7 +1,7 @@
 Package: biomarkerPanels
 Type: Package
 Title: Multi-objective Optimization for Biomarker Panel Discovery
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: c(
     person(given = "Harry", family = "Robertson", role = c("aut", "cre"),
            email = "harry.robertson@sydney.edu.au")
