@@ -16,7 +16,10 @@
 
 \item{min_coefficient}{Minimum absolute coefficient required.}
 
-\item{require_sign_consistency}{Whether to filter by sign consistency.}
+\item{require_sign_consistency}{Whether to filter by sign consistency.
+Redundant with \code{sign_consistency_threshold}: \code{FALSE} behaves exactly like
+\code{sign_consistency_threshold = 0}, because \code{sign_agreement >= 0} is always
+true.}
 
 \item{sign_consistency_threshold}{Minimum fraction of cohorts agreeing on
 coefficient sign.}
