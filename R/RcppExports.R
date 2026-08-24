@@ -6,7 +6,7 @@
 #' @param se_matrix Matrix of standard errors (genes x cohorts)
 #' @param method Scoring method: "precision_weighted", "cv_t_stats", or "inverse_t_se"
 #' @return Numeric vector of scores (one per gene)
-#' @keywords internal
+#' @noRd
 .select_stable_genes_cpp <- function(abs_t, se_matrix, method) {
     .Call(`_biomarkerPanels_select_stable_genes_cpp`, abs_t, se_matrix, method)
 }
@@ -14,7 +14,7 @@
 #' @title Score transferable features (C++)
 #' @param coefficient_matrix Matrix of coefficients (features x cohorts)
 #' @return List with mean_abs, sd, min_abs, sign_agreement vectors
-#' @keywords internal
+#' @noRd
 .score_transferable_features_cpp <- function(coefficient_matrix) {
     .Call(`_biomarkerPanels_score_transferable_features_cpp`, coefficient_matrix)
 }
@@ -23,7 +23,7 @@
 #' @param t_matrix Matrix of t-statistics (genes x cohorts)
 #' @param method Combination method: "Stouffer", "Fisher", "OSP", or "maxP"
 #' @return Numeric vector of combined two-sided p-values (sorted ascending)
-#' @keywords internal
+#' @noRd
 .aggregate_de_pvalues_cpp <- function(t_matrix, method) {
     .Call(`_biomarkerPanels_aggregate_de_pvalues_cpp`, t_matrix, method)
 }
@@ -32,7 +32,7 @@
 #' @param x A numeric matrix
 #' @param col_names Character vector of column names
 #' @return A matrix of pairwise differences
-#' @keywords internal
+#' @noRd
 .pairwise_col_diff_cpp <- function(x, col_names) {
     .Call(`_biomarkerPanels_pairwise_col_diff_cpp`, x, col_names)
 }
@@ -43,7 +43,7 @@
 #' @param ref_name Name of the reference feature
 #' @param other_names Names of other columns
 #' @return A matrix of differences (other - ref)
-#' @keywords internal
+#' @noRd
 .reference_diff_cpp <- function(x, ref_col, ref_name, other_names) {
     .Call(`_biomarkerPanels_reference_diff_cpp`, x, ref_col, ref_name, other_names)
 }
@@ -52,7 +52,7 @@
 #' @param scores Numeric vector of predicted scores
 #' @param is_positive Logical vector indicating positive class membership
 #' @return DataFrame with columns: threshold, tpr, fpr
-#' @keywords internal
+#' @noRd
 .compute_roc_curve_cpp <- function(scores, is_positive) {
     .Call(`_biomarkerPanels_compute_roc_curve_cpp`, scores, is_positive)
 }

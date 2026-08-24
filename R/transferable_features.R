@@ -176,7 +176,7 @@ select_transferable_features <- function(x_list,
 #' @param lambda User-supplied lambda or `NULL` for cross-validation.
 #' @param num_cohorts Number of cohorts.
 #' @return A numeric vector of length `num_cohorts`, or `NULL`.
-#' @keywords internal
+#' @noRd
 .resolve_lambda_vector <- function(lambda, num_cohorts) {
   if (is.null(lambda)) {
     return(NULL)
@@ -203,7 +203,7 @@ select_transferable_features <- function(x_list,
 #' @param lambda The lambda value at which to extract coefficients.
 #' @param feature_names Character vector of feature names to return.
 #' @return A named numeric vector of coefficients.
-#' @keywords internal
+#' @noRd
 .extract_glmnet_coefficients <- function(model, lambda, feature_names) {
   coef_mat <- stats::coef(model, s = lambda)
   coef_vec <- as.numeric(coef_mat)[-1]
@@ -225,7 +225,7 @@ select_transferable_features <- function(x_list,
 #' @param sign_consistency_threshold Minimum fraction of cohorts agreeing on
 #'   coefficient sign.
 #' @return A data.frame with feature scores, sorted by decreasing score.
-#' @keywords internal
+#' @noRd
 .score_transferable_features <- function(coefficient_matrix,
                                          min_coefficient,
                                          require_sign_consistency,

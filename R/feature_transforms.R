@@ -125,7 +125,7 @@ feature_transform_registry <- function() {
   mget(ls(.transform_registry), envir = .transform_registry)
 }
 
-#' @keywords internal
+#' @noRd
 .get_feature_transform <- function(name) {
   if (!exists(name, envir = .transform_registry, inherits = FALSE)) {
     stop(
@@ -148,7 +148,7 @@ feature_transform_registry <- function() {
 #'
 #' @param x A numeric matrix with column names.
 #' @return The input matrix unchanged.
-#' @keywords internal
+#' @noRd
 transform_none <- function(x) {
   x
 }
@@ -167,7 +167,7 @@ transform_none <- function(x) {
 #'   log-normalized (e.g., log2 CPM, log2 RPKM, or microarray RMA values).
 #' @return Matrix of pairwise differences with (p choose 2) columns.
 #'   Column names follow the pattern "FeatureA--FeatureB".
-#' @keywords internal
+#' @noRd
 transform_pairwise_ratios <- function(x) {
   if (ncol(x) < 2L) {
     stop(
@@ -188,7 +188,7 @@ transform_pairwise_ratios <- function(x) {
 #' @param x A numeric matrix with column names. Values should be positive.
 #' @return Matrix of log-ratios with (p choose 2) columns.
 #'   Column names follow the pattern "FeatureA--FeatureB".
-#' @keywords internal
+#' @noRd
 transform_pairwise_log_ratios <- function(x) {
   if (ncol(x) < 2L) {
     stop(
@@ -238,7 +238,7 @@ transform_pairwise_log_ratios <- function(x) {
 #' result <- transform_reference_norm(x)
 #' }
 #'
-#' @keywords internal
+#' @noRd
 transform_reference_norm <- function(x) {
   ref_feature <- attr(x, "reference_feature")
   if (is.null(ref_feature)) {

@@ -4,7 +4,7 @@
 #' solutions data frame stored on an `OptimizationResult`.
 #'
 #' @name nsga_results
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Build the Pareto Solutions Data Frame from an NSGA Result
@@ -19,7 +19,7 @@ NULL
 #'
 #' Re-evaluation can shift metrics relative to the NSGA run (e.g. non-deterministic
 #' inner CV in glmnet), which can turn a rank-1 solution into a dominated one; the
-#' post-filter removes those via [.filter_dominated()].
+#' post-filter removes those via `.filter_dominated()`.
 #'
 #' @param nsga_result The object returned by `rmoo::nsga2()` / `rmoo::nsga3()`.
 #' @param evaluate Function mapping a decision vector to a solution list with
@@ -27,11 +27,11 @@ NULL
 #' @param objectives Named list of objective specs (its names order the metric
 #'   columns).
 #' @param objective_directions Named character vector of objective directions,
-#'   passed to [.filter_dominated()].
+#'   passed to `.filter_dominated()`.
 #' @param infeasible_msg Error message used when no solution is feasible.
 #' @return A `data.frame` with `solution_id`, `base_features`/`features` list
 #'   columns, and one column per objective.
-#' @keywords internal
+#' @noRd
 .build_pareto_solutions_df <- function(nsga_result, evaluate, objectives,
                                        objective_directions,
                                        infeasible_msg = "No solutions satisfied the supplied constraints.") {
@@ -84,7 +84,7 @@ NULL
 #' @param metric_matrix Numeric matrix (rows = solutions, cols = objectives).
 #' @param directions Named character vector with "maximize" or "minimize" per objective.
 #' @return Integer vector of row indices that are non-dominated.
-#' @keywords internal
+#' @noRd
 .filter_dominated <- function(metric_matrix, directions) {
   n <- nrow(metric_matrix)
   if (n <= 1L) return(seq_len(n))

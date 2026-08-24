@@ -7,7 +7,7 @@
 #' `R/panel_selection.R`; the fast GLM path lives in `R/glm_fitting.R`.
 #'
 #' @name fitness_cache_utils
-#' @keywords internal
+#' @noRd
 NULL
 
 .panel_key <- function(base_features, context = NULL) {

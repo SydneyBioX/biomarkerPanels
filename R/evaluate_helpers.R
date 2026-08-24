@@ -2,10 +2,10 @@
 #'
 #' Internal helpers used by [evaluate_panel()] to build confusion matrices and
 #' compute ROC curves (via the C++ backend). Stored-model prediction lives in
-#' [.predict_panel_model()] (`R/model_prediction.R`).
+#' `.predict_panel_model()` (`R/model_prediction.R`).
 #'
 #' @name evaluate_helpers
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Compute Confusion Matrix
@@ -15,7 +15,7 @@ NULL
 #' @param cutoff_prob Classification cutoff.
 #' @param positive Label for positive class.
 #' @return A 2x2 confusion matrix with cutoff, positive, and negative attributes.
-#' @keywords internal
+#' @noRd
 .compute_confusion_matrix <- function(truth, scores, cutoff_prob, positive) {
   truth <- ensure_binary_response(truth, positive = positive)
   levels_truth <- levels(truth)
@@ -51,7 +51,7 @@ NULL
 #' @param positive The label for the positive class.
 #' @return A data.frame with columns `threshold`, `tpr`, `fpr`, `sensitivity`,
 #'   and `specificity`.
-#' @keywords internal
+#' @noRd
 .compute_roc_curve <- function(truth, scores, positive) {
   truth <- ensure_binary_response(truth, positive = positive)
   levels_truth <- levels(truth)

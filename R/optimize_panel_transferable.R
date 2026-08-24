@@ -376,7 +376,7 @@ optimize_panel_transferable <- function(
 #'
 #' @param train_inputs,val_inputs Lists with `x`, `truth`, and `cohort`.
 #' @return List with combined `x`, `truth`, and `cohort`.
-#' @keywords internal
+#' @noRd
 .combine_partitions <- function(train_inputs, val_inputs) {
   list(
     x = rbind(train_inputs$x, val_inputs$x),

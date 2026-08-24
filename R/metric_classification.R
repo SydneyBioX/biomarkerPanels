@@ -10,7 +10,7 @@ NULL
 #' Confusion Counts at a Classification Cutoff
 #'
 #' Shared preamble for the cutoff-dependent metrics: coerces `truth`, resolves
-#' the cutoff via [.compute_cutoff()], and tabulates the confusion matrix
+#' the cutoff via `.compute_cutoff()`, and tabulates the confusion matrix
 #' using the package convention `predicted positive == scores >= cutoff`.
 #'
 #' @param truth Binary outcome; coerced with [ensure_binary_response()].
@@ -21,7 +21,7 @@ NULL
 #' @param positive Label treated as the positive ("event") class.
 #' @param metric_name Metric name used in the missing-scores error message.
 #' @return List with counts `tp`, `fp`, `tn`, and `fn`.
-#' @keywords internal
+#' @noRd
 .confusion_counts <- function(truth, scores, cutoff_prob, cutoff_strategy,
                               positive, metric_name) {
   truth <- ensure_binary_response(truth)
@@ -52,7 +52,7 @@ NULL
 #'   `"youden"` (optimal Youden's J). Default is `"fixed"`.
 #' @param positive Label treated as the positive ("event") class.
 #' @return Sensitivity between 0 and 1, or `NA_real_` if undefined.
-#' @keywords internal
+#' @noRd
 metric_sensitivity <- function(truth, scores = NULL, selected = NULL,
                              cutoff_prob = 0.5,
                              cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -70,7 +70,7 @@ metric_sensitivity <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return Specificity between 0 and 1, or `NA_real_` if undefined.
-#' @keywords internal
+#' @noRd
 metric_specificity <- function(truth, scores = NULL, selected = NULL,
                              cutoff_prob = 0.5,
                              cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -91,7 +91,7 @@ metric_specificity <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return Precision between 0 and 1, or `NA_real_` if undefined.
-#' @keywords internal
+#' @noRd
 metric_precision <- function(truth, scores = NULL, selected = NULL,
                            cutoff_prob = 0.5,
                            cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -113,7 +113,7 @@ metric_precision <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return NPV between 0 and 1, or `NA_real_` if undefined.
-#' @keywords internal
+#' @noRd
 metric_npv <- function(truth, scores = NULL, selected = NULL,
                      cutoff_prob = 0.5,
                      cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -134,7 +134,7 @@ metric_npv <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return F1 score between 0 and 1, or `NA_real_` if undefined.
-#' @keywords internal
+#' @noRd
 metric_f1 <- function(truth, scores = NULL, selected = NULL,
                     cutoff_prob = 0.5,
                     cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -159,7 +159,7 @@ metric_f1 <- function(truth, scores = NULL, selected = NULL,
 #'
 #' @inheritParams metric_sensitivity
 #' @return Mean of sensitivity and specificity.
-#' @keywords internal
+#' @noRd
 metric_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
                                    cutoff_prob = 0.5,
                                    cutoff_strategy = c("fixed", "prevalence", "youden"),
@@ -190,7 +190,7 @@ metric_balanced_accuracy <- function(truth, scores = NULL, selected = NULL,
 #' @param cutoff_strategy Strategy for computing cutoff.
 #' @param positive Label for positive class.
 #' @return Numeric cutoff value.
-#' @keywords internal
+#' @noRd
 .compute_cutoff <- function(truth, scores, cutoff_prob, cutoff_strategy, positive) {
   if (cutoff_strategy == "fixed") {
     return(cutoff_prob)

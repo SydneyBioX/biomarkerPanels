@@ -181,7 +181,7 @@ evaluate_pareto_solutions <- function(optimization_result,
 #' @param objectives User override: `NULL` to use the stored objectives, `NA`
 #'   to skip objective re-scoring, or a named list of objective descriptors.
 #' @return A (possibly empty) named list of objective descriptors.
-#' @keywords internal
+#' @noRd
 .resolve_stored_objectives <- function(optimization_result, objectives = NULL) {
   if (length(objectives) == 1L && !is.list(objectives) && is.na(objectives)) {
     return(list())
@@ -228,7 +228,7 @@ evaluate_pareto_solutions <- function(optimization_result,
 #' @param x Evaluation data (matrix-like or list of cohorts).
 #' @param cohort Optional cohort vector for single-matrix input.
 #' @return Integer count of distinct cohorts.
-#' @keywords internal
+#' @noRd
 .count_eval_cohorts <- function(x, cohort = NULL) {
   if (is.list(x) && !is.data.frame(x)) {
     return(length(x))
@@ -250,7 +250,7 @@ evaluate_pareto_solutions <- function(optimization_result,
 #' @param objectives Named list of objective descriptors.
 #' @param n_cohorts Number of cohorts present in the evaluation data.
 #' @return The objective list with wrapped `fun` elements.
-#' @keywords internal
+#' @noRd
 .prepare_pareto_objectives <- function(objectives, n_cohorts) {
   if (!length(objectives)) {
     return(objectives)

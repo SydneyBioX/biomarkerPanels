@@ -7,7 +7,7 @@
 #' drift apart in how they score glmnet, glm, and Neyman-Pearson models.
 #'
 #' @name model_prediction
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Predict from a Stored Panel Model
@@ -27,7 +27,7 @@ NULL
 #'   and reorders columns to the model's expectation. When `NULL` (the fitness
 #'   paths, where names match by construction) the check is skipped.
 #' @return Numeric vector of predicted probabilities, length `nrow(x_selected)`.
-#' @keywords internal
+#' @noRd
 .predict_panel_model <- function(model, x_selected, cohort = NULL,
                                  expected_features = NULL) {
   if (inherits(model, "cv.glmnet")) {
@@ -100,7 +100,7 @@ NULL
 #' @param model An npc object from nproc::npc().
 #' @param x_selected Matrix of selected features for prediction.
 #' @return Numeric vector of predicted probabilities on the original scale.
-#' @keywords internal
+#' @noRd
 .predict_np_model <- function(model, x_selected) {
   .check_nproc_available()
 

@@ -126,7 +126,7 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
 #' @param name Parameter name for error messages.
 #' @param min Minimum allowed value (default `1L`).
 #' @return An integer value.
-#' @keywords internal
+#' @noRd
 .validate_positive_integer <- function(x, name, min = 1L) {
   if (!is.numeric(x) || length(x) != 1L || is.na(x) || x < min) {
     msg <- if (min <= 1L) {
@@ -151,7 +151,7 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
 #' @param bounds Either `"open"` (0 and 1 excluded) or `"closed"` (0 and 1
 #'   allowed).
 #' @return The value coerced with [as.numeric()].
-#' @keywords internal
+#' @noRd
 .validate_probability <- function(x, name, bounds = c("open", "closed")) {
   bounds <- match.arg(bounds)
   ok <- is.numeric(x) && length(x) == 1L && !is.na(x)
@@ -171,7 +171,7 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
 #' @param x The value to validate.
 #' @param name Parameter name for error messages.
 #' @return The value coerced with [as.numeric()].
-#' @keywords internal
+#' @noRd
 .validate_numeric_scalar <- function(x, name) {
   if (!is.numeric(x) || length(x) != 1L) {
     stop("`", name, "` must be a numeric scalar.", call. = FALSE)
@@ -185,7 +185,7 @@ ensure_binary_response <- function(y, positive = NULL, negative = NULL) {
 #'
 #' @param selection_threshold The value to validate.
 #' @return The input, invisibly.
-#' @keywords internal
+#' @noRd
 .validate_selection_threshold <- function(selection_threshold) {
   if (!identical(selection_threshold, "adaptive")) {
     st <- suppressWarnings(as.numeric(selection_threshold))

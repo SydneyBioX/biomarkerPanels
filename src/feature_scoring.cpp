@@ -9,7 +9,7 @@ using namespace Rcpp;
 //' @param se_matrix Matrix of standard errors (genes x cohorts)
 //' @param method Scoring method: "precision_weighted", "cv_t_stats", or "inverse_t_se"
 //' @return Numeric vector of scores (one per gene)
-//' @keywords internal
+//' @noRd
 // [[Rcpp::export(.select_stable_genes_cpp)]]
 NumericVector select_stable_genes_cpp(NumericMatrix abs_t,
                                        NumericMatrix se_matrix,
@@ -120,7 +120,7 @@ NumericVector select_stable_genes_cpp(NumericMatrix abs_t,
 //' @title Score transferable features (C++)
 //' @param coefficient_matrix Matrix of coefficients (features x cohorts)
 //' @return List with mean_abs, sd, min_abs, sign_agreement vectors
-//' @keywords internal
+//' @noRd
 // [[Rcpp::export(.score_transferable_features_cpp)]]
 List score_transferable_features_cpp(NumericMatrix coefficient_matrix) {
   int n_features = coefficient_matrix.nrow();
@@ -252,7 +252,7 @@ std::vector<double> rank_vector(const std::vector<double>& vals) {
 //' @param t_matrix Matrix of t-statistics (genes x cohorts)
 //' @param method Combination method: "Stouffer", "Fisher", "OSP", or "maxP"
 //' @return Numeric vector of combined two-sided p-values (sorted ascending)
-//' @keywords internal
+//' @noRd
 // [[Rcpp::export(.aggregate_de_pvalues_cpp)]]
 NumericVector aggregate_de_pvalues_cpp(NumericMatrix t_matrix, std::string method) {
   int n_genes = t_matrix.nrow();

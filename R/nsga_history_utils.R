@@ -6,7 +6,7 @@
 #' [optimize_panel_transferable()]; these factories remove that duplication.
 #'
 #' @name nsga_history_utils
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Create an Empty History Buffer
@@ -15,7 +15,7 @@ NULL
 #' snapshots without copying on each push.
 #'
 #' @return An environment with an empty `gens` list.
-#' @keywords internal
+#' @noRd
 .make_history_buffer <- function() {
   buffer <- new.env(parent = emptyenv())
   buffer$gens <- list()
@@ -27,16 +27,16 @@ NULL
 #' Builds the `monitor` closure passed to `rmoo::nsga2()`/`nsga3()`. Each
 #' generation it pushes the population, sign-corrected fitness, and front rank
 #' into `buffer`. Decision-weight vectors are stored raw; base features are
-#' reconstructed later in [.materialize_history()] to keep per-iteration
+#' reconstructed later in `.materialize_history()` to keep per-iteration
 #' overhead low.
 #'
-#' @param buffer A history buffer from [.make_history_buffer()].
+#' @param buffer A history buffer from `.make_history_buffer()`.
 #' @param objective_directions Character vector of per-objective directions
 #'   (`"maximize"`/`"minimize"`); maximized columns are sign-flipped back to
 #'   their natural scale.
 #' @param objective_names Column names to assign to the fitness matrix.
 #' @return A function with signature `function(object, ...)`.
-#' @keywords internal
+#' @noRd
 .make_history_monitor <- function(buffer, objective_directions, objective_names) {
   function(object, ...) {
     iter <- object@iter
@@ -70,7 +70,7 @@ NULL
 #'   selected base features (the same selection logic the optimizer used).
 #' @return A data frame with one row per individual per generation, or an empty
 #'   list when no history was captured.
-#' @keywords internal
+#' @noRd
 .materialize_history <- function(buffer, select_base_features) {
   if (!length(buffer$gens)) {
     return(list())

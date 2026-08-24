@@ -30,7 +30,7 @@ NULL
 #' @param selection_threshold `"adaptive"` or a numeric gate in (0, 1).
 #' @return List with `wrapper` (vectorized NSGA fitness) and `evaluate`
 #'   (single-candidate evaluator returning full diagnostics).
-#' @keywords internal
+#' @noRd
 .make_loco_fitness <- function(
   x, y, cohort,
   feature_pool, max_features, objectives, constraints,

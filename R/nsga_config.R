@@ -4,7 +4,7 @@
 #' generating initial populations, and normalizing constraints.
 #'
 #' @name nsga_config
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Normalize Constraints to Standard Format
@@ -13,7 +13,7 @@ NULL
 #'
 #' @param constraints List of constraint functions or descriptors.
 #' @return List of standardized constraint objects with fun and label.
-#' @keywords internal
+#' @noRd
 .normalize_constraints <- function(constraints) {
   if (!length(constraints)) {
     return(list())
@@ -58,7 +58,7 @@ NULL
 #' @param n_features Number of features in the decision space.
 #' @param algorithm Algorithm to use: `"NSGA-III"` or `"NSGA-II"`.
 #' @return Named list of NSGA parameters.
-#' @keywords internal
+#' @noRd
 .get_adaptive_nsga_defaults <- function(n_features, algorithm = "NSGA-III") {
   # Base parameters that don't change with problem size
   # Note: rmoo uses SBX crossover (nc=20) and polynomial mutation (nm=0.2) by default
@@ -104,7 +104,7 @@ NULL
 #'
 #' @param n_objectives Number of objectives in the optimization problem.
 #' @return Integer number of partitions.
-#' @keywords internal
+#' @noRd
 .compute_nsga3_partitions <- function(n_objectives) {
   # Rule of thumb: partitions scale inversely with objectives
   # For 2-3 objectives: 12 partitions
@@ -132,7 +132,7 @@ NULL
 #' @param seed Optional integer seed for reproducibility.
 #' @return Matrix with `n_suggestions` rows and `n_features` columns, where
 #'   each row is a weight vector with varying numbers of high/low values.
-#' @keywords internal
+#' @noRd
 .generate_sparse_suggestions <- function(n_features,
                                          n_suggestions = 20L,
                                          min_features = 2L,
@@ -166,7 +166,7 @@ NULL
 #' @param regularized Logical; whether glmnet fitting is used.
 #' @param feature_transform Feature transform name.
 #' @return Integer minimum number of base features.
-#' @keywords internal
+#' @noRd
 .min_features_required <- function(regularized, feature_transform) {
   if (regularized &&
       feature_transform %in% c("pairwise_ratios", "pairwise_log_ratios")) {
@@ -199,7 +199,7 @@ NULL
 #'   [set.seed()] before generating suggestions (the transferable pipeline
 #'   seeds earlier, at partitioning).
 #' @return The raw rmoo result object.
-#' @keywords internal
+#' @noRd
 .run_nsga <- function(algorithm, fitness, n_objectives, decision_dim,
                       nsga_args, monitor, min_features, max_features,
                       seed = NULL, set_seed = FALSE) {

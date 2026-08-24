@@ -5,7 +5,7 @@ using namespace Rcpp;
 //' @param x A numeric matrix
 //' @param col_names Character vector of column names
 //' @return A matrix of pairwise differences
-//' @keywords internal
+//' @noRd
 // [[Rcpp::export(.pairwise_col_diff_cpp)]]
  NumericMatrix pairwise_col_diff_cpp(NumericMatrix x, CharacterVector col_names) {
    int n = x.nrow();
@@ -47,7 +47,7 @@ using namespace Rcpp;
 //' @param ref_name Name of the reference feature
 //' @param other_names Names of other columns
 //' @return A matrix of differences (other - ref)
-//' @keywords internal
+//' @noRd
 // [[Rcpp::export(.reference_diff_cpp)]]
 NumericMatrix reference_diff_cpp(NumericMatrix x, NumericVector ref_col,
                                  String ref_name, CharacterVector other_names) {

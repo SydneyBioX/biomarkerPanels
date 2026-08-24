@@ -8,7 +8,7 @@
 #' exact transformed columns).
 #'
 #' @name panel_feature_helpers
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Validate and Transform Selected Base Features
@@ -26,7 +26,7 @@ NULL
 #'   (e.g. `"validation data"`, `"held-out data"`).
 #' @return List with `x_selected` (transformed matrix) and `selected`
 #'   (transformed feature names).
-#' @keywords internal
+#' @noRd
 .prepare_scoring_matrix <- function(x_raw, base_features, feature_transform,
                                     context = "data") {
   if (!all(base_features %in% colnames(x_raw))) {

@@ -29,7 +29,7 @@ NULL
 #' @param min_features_required Minimum number of base features.
 #' @param selection_threshold Either `"adaptive"` or a fixed numeric threshold.
 #' @return List with `wrapper` (fitness for rmoo) and `evaluate` (full eval).
-#' @keywords internal
+#' @noRd
 .make_validation_fitness <- function(
   train_x, train_y, train_cohort,
   val_x, val_y, val_cohort,

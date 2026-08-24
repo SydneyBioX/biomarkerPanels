@@ -14,7 +14,7 @@
 #' resolved split down to every candidate evaluation.
 #'
 #' @name fitness_rotating_validation
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Generate K Stratified Train/Validation Splits
@@ -32,7 +32,7 @@ NULL
 #' @param seed Optional integer seed.
 #' @return List of length `n_splits`; each element is a list with integer
 #'   vectors `train` and `val` indexing rows of the pool.
-#' @keywords internal
+#' @noRd
 .generate_stratified_splits <- function(y, cohort, n_splits, val_ratio,
                                         seed = NULL) {
   .validate_positive_integer(n_splits, "n_splits", min = 2L)
@@ -85,7 +85,7 @@ NULL
 #' @param pool_y Pooled response factor.
 #' @param pool_cohort Pooled cohort factor.
 #' @param splits List of `(train, val)` index pairs from
-#'   [.generate_stratified_splits()].
+#'   `.generate_stratified_splits()`.
 #' @param feature_pool Character vector of base feature names.
 #' @param max_features Maximum base features per candidate.
 #' @param objectives Objective list from [define_objectives()].
@@ -97,7 +97,7 @@ NULL
 #' @param selection_threshold `"adaptive"` or a numeric gate in (0, 1).
 #' @return List with `wrapper` (vectorised NSGA fitness) and `evaluate`
 #'   (single-candidate evaluator averaged over all splits).
-#' @keywords internal
+#' @noRd
 .make_rotating_validation_fitness <- function(
   pool_x, pool_y, pool_cohort,
   splits,

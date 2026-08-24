@@ -12,7 +12,7 @@
 #' argument they do not need.
 #'
 #' @name fitness_eval
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Evaluate Hard Constraints for a Candidate
@@ -31,7 +31,7 @@ NULL
 #' @param x Optional (transformed) scoring matrix.
 #' @return A list with `results` (named logical vector) and `feasible` (scalar
 #'   logical).
-#' @keywords internal
+#' @noRd
 .evaluate_constraints <- function(constraint_specs, truth, scores, selected,
                                   cohort = NULL, x = NULL) {
   results <- if (length(constraint_specs)) {
@@ -65,7 +65,7 @@ NULL
 #' @inheritParams .evaluate_constraints
 #' @param objectives Named list of objective specs, each with a `$fun` metric.
 #' @return A named numeric vector of metric values, one per objective.
-#' @keywords internal
+#' @noRd
 .evaluate_objectives <- function(objectives, truth, scores, selected,
                                  cohort = NULL, x = NULL) {
   vapply(objectives, function(obj) {
@@ -105,7 +105,7 @@ NULL
 #'   `constraint_specs`, and `finalize(evaluate_candidate)`,
 #'   which wraps a scoring body into the `list(wrapper, evaluate)` contract the
 #'   optimizers consume.
-#' @keywords internal
+#' @noRd
 .make_fitness_scaffold <- function(feature_pool, max_features,
                                    min_features_required,
                                    selection_threshold,

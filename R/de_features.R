@@ -76,7 +76,7 @@ select_de_features <- function(x_list,
 #' @param assay For `SummarizedExperiment` inputs, the assay name or index.
 #' @return A list with `t_matrix`, `se_matrix`, `feature_names`, and
 #'   `cohort_names`.
-#' @keywords internal
+#' @noRd
 .compute_limma_statistics <- function(x_list,
                                       y_list,
                                       contrast = NULL,
@@ -176,7 +176,7 @@ select_de_features <- function(x_list,
 #' @param combination_method One of `"OSP"`, `"Stouffer"`, `"Fisher"`, or
 #'   `"maxP"`.
 #' @return A named numeric vector of two-sided p-values, sorted ascending.
-#' @keywords internal
+#' @noRd
 .aggregate_de_pvalues <- function(t_matrix, combination_method) {
   if (length(t_matrix) == 0L) {
     return(numeric())
@@ -212,7 +212,7 @@ select_de_features <- function(x_list,
 #' @param total_cohorts Total number of cohorts.
 #' @param level_names Factor levels from the response.
 #' @return A contrast string for [limma::makeContrasts()].
-#' @keywords internal
+#' @noRd
 .resolve_contrast <- function(contrast, cohort_index, total_cohorts, level_names) {
   if (length(level_names) < 2L) {
     stop("`y_list` must contain exactly two levels.", call. = FALSE)

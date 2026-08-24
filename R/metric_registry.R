@@ -20,7 +20,7 @@ NULL
 #' @param cutoff_dependent Logical; whether the metric requires a probability
 #'   cutoff for classification.
 #' @return Invisible NULL; called for side effect of registering the metric.
-#' @keywords internal
+#' @noRd
 .register_default_metric <- function(name, fun, direction, label,
                                       cutoff_dependent = FALSE) {
   assign(name, list(
