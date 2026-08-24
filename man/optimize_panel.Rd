@@ -14,7 +14,6 @@ optimize_panel(
   feature_transform = "pairwise_ratios",
   feature_alignment = c("intersection", "majority", "impute_median"),
   constraints = list(),
-  scoring_fn = NULL,
   algorithm = c("NSGA-III", "NSGA-II"),
   nsga_control = list(),
   assay = NULL,
@@ -73,10 +72,6 @@ Missing values are imputed with cohort medians.}
 \item{constraints}{Optional list of constraint descriptors (e.g.,
 from \code{\link[=min_metric_constraint]{min_metric_constraint()}}) that must evaluate to \code{TRUE} for a candidate
 solution to be considered feasible.}
-
-\item{scoring_fn}{Function producing per-sample scores from the selected
-features. Signature:
-\verb{function(x_selected, selected_features, truth, cohort = NULL, ...)}.}
 
 \item{algorithm}{Multi-objective optimization algorithm. \code{"NSGA-III"}
 (default) uses reference-point-based selection and gives better Pareto

@@ -46,9 +46,6 @@
 #' @param constraints Optional list of constraint descriptors (e.g.,
 #'   from [min_metric_constraint()]) that must evaluate to `TRUE` for a candidate
 #'   solution to be considered feasible.
-#' @param scoring_fn Function producing per-sample scores from the selected
-#'   features. Signature:
-#'   `function(x_selected, selected_features, truth, cohort = NULL, ...)`.
 #' @param algorithm Multi-objective optimization algorithm. `"NSGA-III"`
 #'   (default) uses reference-point-based selection and gives better Pareto
 #'   front diversity for many-objective problems (3+ objectives). `"NSGA-II"`
@@ -112,7 +109,6 @@ optimize_panel <- function(x, y,
                            feature_transform = "pairwise_ratios",
                            feature_alignment = c("intersection", "majority", "impute_median"),
                            constraints = list(),
-                           scoring_fn = NULL,
                            algorithm = c("NSGA-III", "NSGA-II"),
                            nsga_control = list(),
                            assay = NULL,
@@ -259,19 +255,6 @@ optimize_panel <- function(x, y,
             "reducing `feature_pool` for exploration.")
   }
 
-  scoring_fn_label <- if (is.null(scoring_fn)) {
-    "default"
-  } else {
-    deparse(substitute(scoring_fn))
-  }
-  if (is.null(scoring_fn)) {
-    scoring_fn <- .default_scoring_fn
-  }
-
-  if (!is.function(scoring_fn)) {
-    stop("`scoring_fn` must be a function.", call. = FALSE)
-  }
-
   objective_directions <- vapply(objectives, `[[`, character(1), "direction")
   names(objective_directions) <- names(objectives)
 
@@ -355,38 +338,25 @@ optimize_panel <- function(x, y,
       )
     } else {
       # In-sample scoring (for backward compatibility or small datasets)
-      if (regularized || identical(scoring_fn, .default_scoring_fn)) {
-        scores <- if (!regularized) {
-          .fit_predict_binomial_glm(
-            x_train = x_selected,
-            truth = truth,
-            x_new = x_selected,
-            cohort_train = cohort,
-            cohort_new = cohort,
-            predict_cohort = "observed",
-            design_terms = in_sample_glm_design_terms
-          )
-        } else {
-          .default_scoring_fn(
-            x_selected = x_selected,
-            selected_features = selected_features,
-            truth = truth,
-            cohort = cohort,
-            regularized = regularized,
-            alpha = regularized_alpha
-          )
-        }
+      scores <- if (!regularized) {
+        .fit_predict_binomial_glm(
+          x_train = x_selected,
+          truth = truth,
+          x_new = x_selected,
+          cohort_train = cohort,
+          cohort_new = cohort,
+          predict_cohort = "observed",
+          design_terms = in_sample_glm_design_terms
+        )
       } else {
-        # Custom scoring function provided by user (only used when regularized = FALSE)
-        score_args <- list(
+        .default_scoring_fn(
           x_selected = x_selected,
           selected_features = selected_features,
-          truth = truth
+          truth = truth,
+          cohort = cohort,
+          regularized = regularized,
+          alpha = regularized_alpha
         )
-        if (!is.null(cohort)) {
-          score_args$cohort <- cohort
-        }
-        scores <- do.call(scoring_fn, score_args)
       }
     }
 
@@ -463,7 +433,6 @@ optimize_panel <- function(x, y,
     base_feature_pool = feature_pool_base,
     algorithm = algorithm,
     nsga2 = nsga_args,  # Keep nsga2 name for backward compatibility
-    scoring_function = scoring_fn_label,
     feature_transform = feature_transform,
     feature_alignment = feature_alignment,
     constraints = if (length(constraint_specs)) {
