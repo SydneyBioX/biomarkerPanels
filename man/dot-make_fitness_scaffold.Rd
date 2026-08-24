@@ -26,7 +26,7 @@
 \item{selection_threshold}{Either \code{"adaptive"} or a fixed numeric threshold.}
 
 \item{matrices}{Named list of raw base-feature matrices handed to
-\code{\link[=.make_panel_transformer]{.make_panel_transformer()}}.}
+\code{.make_panel_transformer()}.}
 
 \item{feature_transform}{Name of the feature transform to apply.}
 

@@ -97,7 +97,7 @@ NULL
 #' @param min_features_required Minimum number of base features.
 #' @param selection_threshold Either `"adaptive"` or a fixed numeric threshold.
 #' @param matrices Named list of raw base-feature matrices handed to
-#'   [.make_panel_transformer()].
+#'   `.make_panel_transformer()`.
 #' @param feature_transform Name of the feature transform to apply.
 #' @param objectives Objective list from [define_objectives()].
 #' @param constraints Constraint list.

@@ -20,7 +20,7 @@ The value coerced with \code{\link[=as.numeric]{as.numeric()}}.
 \description{
 Checks that a parameter is a single non-missing numeric value inside the unit
 interval. Use \code{bounds = "open"} for a probability-like value in (0, 1) and
-\code{bounds = "closed"} for a value in \link{0, 1} where the endpoints are allowed
+\code{bounds = "closed"} for a value in [0, 1] where the endpoints are allowed
 (e.g. an elastic-net mixing parameter or a proportion).
 }
 \keyword{internal}
