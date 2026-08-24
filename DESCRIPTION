@@ -59,7 +59,6 @@ Collate:
     'data.R'
     'data_partitioning.R'
     'de_features.R'
-    'deprecated.R'
     'discriminative_features.R'
     'dual_stream_ratios.R'
     'evaluate_cohorts.R'
