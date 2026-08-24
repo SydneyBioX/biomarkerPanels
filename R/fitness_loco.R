@@ -28,8 +28,6 @@ NULL
 #' @param feature_transform Name of the feature transform to apply on-the-fly.
 #' @param min_features_required Minimum base features per candidate.
 #' @param selection_threshold `"adaptive"` or a numeric gate in (0, 1).
-#' @param cache_fitness Logical; cache duplicate selected panels during fitness.
-#' @param cache_max_entries Maximum entries retained in the fitness cache.
 #' @return List with `wrapper` (vectorized NSGA fitness) and `evaluate`
 #'   (single-candidate evaluator returning full diagnostics).
 #' @keywords internal
@@ -39,9 +37,7 @@ NULL
   regularized, alpha,
   feature_transform = "none",
   min_features_required = NULL,
-  selection_threshold = "adaptive",
-  cache_fitness = TRUE,
-  cache_max_entries = Inf
+  selection_threshold = "adaptive"
 ) {
   if (is.null(min_features_required)) {
     min_features_required <- .min_features_required(regularized, feature_transform)
@@ -65,8 +61,7 @@ NULL
     matrices = list(x = x),
     feature_transform = feature_transform,
     objectives = objectives,
-    constraints = constraints,
-    cache_max_entries = cache_max_entries
+    constraints = constraints
   )
   panel_selector <- scaffold$selector
   transform_panel <- scaffold$transform
@@ -182,5 +177,5 @@ NULL
     )
   }
 
-  scaffold$finalize(evaluate_candidate, cache_fitness = cache_fitness)
+  scaffold$finalize(evaluate_candidate)
 }

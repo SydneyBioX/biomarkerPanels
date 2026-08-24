@@ -95,8 +95,6 @@ NULL
 #' @param feature_transform Name of the feature transform to apply.
 #' @param min_features_required Minimum base features per candidate.
 #' @param selection_threshold `"adaptive"` or a numeric gate in (0, 1).
-#' @param cache_fitness Logical; cache duplicate selected panels during fitness.
-#' @param cache_max_entries Maximum entries retained in the fitness cache.
 #' @return List with `wrapper` (vectorised NSGA fitness) and `evaluate`
 #'   (single-candidate evaluator averaged over all splits).
 #' @keywords internal
@@ -107,9 +105,7 @@ NULL
   regularized, alpha,
   feature_transform = "none",
   min_features_required = NULL,
-  selection_threshold = "adaptive",
-  cache_fitness = TRUE,
-  cache_max_entries = Inf
+  selection_threshold = "adaptive"
 ) {
   n_splits <- length(splits)
   if (n_splits < 2L) {
@@ -136,8 +132,7 @@ NULL
     matrices = list(pool = pool_x),
     feature_transform = feature_transform,
     objectives = objectives,
-    constraints = constraints,
-    cache_max_entries = cache_max_entries
+    constraints = constraints
   )
   panel_selector <- scaffold$selector
   transform_panel <- scaffold$transform
@@ -369,7 +364,6 @@ NULL
       },
       n_objectives = length(objectives),
       cache = objective_cache,
-      cache_fitness = cache_fitness,
       context = paste0("split", split_idx)
     )
   }

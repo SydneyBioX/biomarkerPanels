@@ -28,8 +28,6 @@ NULL
 #' @param feature_transform Name of the feature transform to apply.
 #' @param min_features_required Minimum number of base features.
 #' @param selection_threshold Either `"adaptive"` or a fixed numeric threshold.
-#' @param cache_fitness Logical; cache duplicate selected panels during fitness.
-#' @param cache_max_entries Maximum entries retained in the fitness cache.
 #' @return List with `wrapper` (fitness for rmoo) and `evaluate` (full eval).
 #' @keywords internal
 .make_validation_fitness <- function(
@@ -39,9 +37,7 @@ NULL
   regularized, alpha,
   feature_transform = "none",
   min_features_required = NULL,
-  selection_threshold = "adaptive",
-  cache_fitness = TRUE,
-  cache_max_entries = Inf
+  selection_threshold = "adaptive"
 ) {
   if (is.null(min_features_required)) {
     min_features_required <- .min_features_required(regularized, feature_transform)
@@ -55,8 +51,7 @@ NULL
     matrices = list(train = train_x, val = val_x),
     feature_transform = feature_transform,
     objectives = objectives,
-    constraints = constraints,
-    cache_max_entries = cache_max_entries
+    constraints = constraints
   )
   panel_selector <- scaffold$selector
   transform_panel <- scaffold$transform
@@ -141,5 +136,5 @@ NULL
     )
   }
 
-  scaffold$finalize(evaluate_candidate, cache_fitness = cache_fitness)
+  scaffold$finalize(evaluate_candidate)
 }

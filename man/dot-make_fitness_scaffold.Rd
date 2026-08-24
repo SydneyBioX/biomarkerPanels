@@ -12,8 +12,7 @@
   matrices,
   feature_transform,
   objectives,
-  constraints,
-  cache_max_entries = Inf
+  constraints
 )
 }
 \arguments{
@@ -33,12 +32,10 @@
 \item{objectives}{Objective list from \code{\link[=define_objectives]{define_objectives()}}.}
 
 \item{constraints}{Constraint list.}
-
-\item{cache_max_entries}{Maximum entries retained per cache.}
 }
 \value{
 List with \code{selector}, \code{transform}, \code{cache}, \code{directions},
-\code{constraint_specs}, and \code{finalize(evaluate_candidate, cache_fitness)},
+\code{constraint_specs}, and \code{finalize(evaluate_candidate)},
 which wraps a scoring body into the \code{list(wrapper, evaluate)} contract the
 optimizers consume.
 }

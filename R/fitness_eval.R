@@ -101,9 +101,8 @@ NULL
 #' @param feature_transform Name of the feature transform to apply.
 #' @param objectives Objective list from [define_objectives()].
 #' @param constraints Constraint list.
-#' @param cache_max_entries Maximum entries retained per cache.
 #' @return List with `selector`, `transform`, `cache`, `directions`,
-#'   `constraint_specs`, and `finalize(evaluate_candidate, cache_fitness)`,
+#'   `constraint_specs`, and `finalize(evaluate_candidate)`,
 #'   which wraps a scoring body into the `list(wrapper, evaluate)` contract the
 #'   optimizers consume.
 #' @keywords internal
@@ -111,8 +110,7 @@ NULL
                                    min_features_required,
                                    selection_threshold,
                                    matrices, feature_transform,
-                                   objectives, constraints,
-                                   cache_max_entries = Inf) {
+                                   objectives, constraints) {
   objective_directions <- vapply(objectives, `[[`, character(1), "direction")
   constraint_specs <- .normalize_constraints(constraints)
 
@@ -124,12 +122,11 @@ NULL
   )
   transform_panel <- .make_panel_transformer(
     matrices = matrices,
-    feature_transform = feature_transform,
-    cache_max_entries = cache_max_entries
+    feature_transform = feature_transform
   )
-  objective_cache <- .new_fitness_cache(cache_max_entries)
+  objective_cache <- .new_fitness_cache()
 
-  finalize <- function(evaluate_candidate, cache_fitness = TRUE) {
+  finalize <- function(evaluate_candidate) {
     evaluate_single <- function(decision_vec = NULL, selection = NULL) {
       evaluated <- evaluate_candidate(decision_vec = decision_vec,
                                       selection = selection)
@@ -150,8 +147,7 @@ NULL
           evaluate_single(selection = selection)
         },
         n_objectives = length(objectives),
-        cache = objective_cache,
-        cache_fitness = cache_fitness
+        cache = objective_cache
       )
     }
 

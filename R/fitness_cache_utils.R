@@ -10,19 +10,6 @@
 #' @keywords internal
 NULL
 
-.validate_cache_controls <- function(cache_fitness, cache_max_entries) {
-  if (!is.logical(cache_fitness) || length(cache_fitness) != 1L ||
-      is.na(cache_fitness)) {
-    stop("`cache_fitness` must be TRUE or FALSE.", call. = FALSE)
-  }
-  if (!is.numeric(cache_max_entries) || length(cache_max_entries) != 1L ||
-      is.na(cache_max_entries) || cache_max_entries < 0) {
-    stop("`cache_max_entries` must be a non-negative number or Inf.",
-         call. = FALSE)
-  }
-  invisible(NULL)
-}
-
 .panel_key <- function(base_features, context = NULL) {
   if (!length(base_features)) {
     key <- "<empty>"
@@ -38,12 +25,9 @@ NULL
   }
 }
 
-.new_fitness_cache <- function(max_entries = Inf) {
-  .validate_cache_controls(TRUE, max_entries)
+.new_fitness_cache <- function() {
   cache <- new.env(parent = emptyenv())
   cache$data <- new.env(parent = emptyenv())
-  cache$keys <- character()
-  cache$max_entries <- as.numeric(max_entries)
   cache
 }
 
@@ -58,33 +42,22 @@ NULL
 }
 
 .cache_set <- function(cache, key, value) {
-  if (is.null(cache) || cache$max_entries <= 0) {
+  if (is.null(cache)) {
     return(invisible(value))
-  }
-  if (!exists(key, envir = cache$data, inherits = FALSE)) {
-    if (is.finite(cache$max_entries)) {
-      while (length(cache$keys) >= cache$max_entries && length(cache$keys) > 0L) {
-        old_key <- cache$keys[[1L]]
-        rm(list = old_key, envir = cache$data)
-        cache$keys <- cache$keys[-1L]
-      }
-    }
-    cache$keys <- c(cache$keys, key)
   }
   assign(key, value, envir = cache$data)
   invisible(value)
 }
 
 
-.make_panel_transformer <- function(matrices, feature_transform,
-                                    cache_max_entries = Inf) {
+.make_panel_transformer <- function(matrices, feature_transform) {
   if (is.matrix(matrices) || is.data.frame(matrices)) {
     matrices <- list(x = matrices)
   }
   matrices <- lapply(matrices, function(mat) {
     if (is.matrix(mat)) mat else as.matrix(mat)
   })
-  cache <- .new_fitness_cache(cache_max_entries)
+  cache <- .new_fitness_cache()
   force(feature_transform)
 
   # Check for reference_feature attribute on any matrix
@@ -151,30 +124,17 @@ NULL
 
 .evaluate_fitness_population <- function(x, selector, evaluate_selection,
                                          n_objectives, cache = NULL,
-                                         cache_fitness = TRUE,
                                          context = NULL) {
-  eval_one <- function(decision_vec) {
-    selection <- selector(decision_vec)
+  if (is.null(dim(x))) {
+    selection <- selector(x)
     key <- .panel_key(selection$base_features, context = context)
-    if (isTRUE(cache_fitness)) {
-      cached <- .cache_get(cache, key)
-      if (!is.null(cached)) {
-        return(cached)
-      }
+    cached <- .cache_get(cache, key)
+    if (!is.null(cached)) {
+      return(cached)
     }
     value <- evaluate_selection(selection)
-    if (isTRUE(cache_fitness)) {
-      .cache_set(cache, key, value)
-    }
-    value
-  }
-
-  if (is.null(dim(x))) {
-    return(eval_one(x))
-  }
-
-  if (!isTRUE(cache_fitness)) {
-    return(t(apply(x, 1L, eval_one)))
+    .cache_set(cache, key, value)
+    return(value)
   }
 
   selections <- lapply(seq_len(nrow(x)), function(i) selector(x[i, ]))

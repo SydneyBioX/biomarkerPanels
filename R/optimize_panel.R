@@ -89,12 +89,6 @@
 #'   improve accuracy. Adaptive selection finds natural breakpoints in the
 #'   weight distribution, enabling the `num_features` objective to drive panel
 #'   size diversity.
-#' @param cache_fitness Logical; if `TRUE` (default), cache candidate fitness
-#'   by selected base-feature panel within each evaluation context. Set
-#'   `FALSE` for intentionally stochastic custom objectives or scoring
-#'   functions.
-#' @param cache_max_entries Maximum number of selected-panel entries retained
-#'   per fitness cache. Defaults to `Inf`.
 #' @return An `OptimizationResult` containing the Pareto-optimal solutions.
 #'   Use [summarize_solutions()] to inspect solutions and [fit_panel()] to
 #'   fit a model on a selected solution.
@@ -118,8 +112,6 @@ optimize_panel <- function(x, y,
                            regularized = TRUE,
                            regularized_alpha = 0.5,
                            selection_threshold = "adaptive",
-                           cache_fitness = TRUE,
-                           cache_max_entries = Inf,
                            record_history = FALSE) {
   algorithm <- match.arg(algorithm)
   feature_alignment <- match.arg(feature_alignment)
@@ -144,7 +136,6 @@ optimize_panel <- function(x, y,
   .validate_positive_integer(fitness_cv_folds, "fitness_cv_folds", min = 2L)
   .validate_probability(regularized_alpha, "regularized_alpha", bounds = "closed")
   .validate_selection_threshold(selection_threshold)
-  .validate_cache_controls(cache_fitness, cache_max_entries)
 
   inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, transform = "none",
                                        feature_alignment = feature_alignment)
@@ -292,8 +283,7 @@ optimize_panel <- function(x, y,
     matrices = list(x = x_pool),
     feature_transform = feature_transform,
     objectives = objectives,
-    constraints = constraints,
-    cache_max_entries = cache_max_entries
+    constraints = constraints
   )
   panel_selector <- scaffold$selector
   transform_panel <- scaffold$transform
@@ -390,8 +380,7 @@ optimize_panel <- function(x, y,
     )
   }
 
-  objective_wrapper <- scaffold$finalize(evaluate_candidate,
-                                         cache_fitness = cache_fitness)$wrapper
+  objective_wrapper <- scaffold$finalize(evaluate_candidate)$wrapper
 
   # Optional per-generation history capture. We build a closure that pushes
   # each generation's population, fitness, and front into a parent-scope env.
@@ -447,8 +436,6 @@ optimize_panel <- function(x, y,
     # Store seed for reproducibility documentation
     seed = seed,
     selection_threshold = selection_threshold,
-    cache_fitness = cache_fitness,
-    cache_max_entries = cache_max_entries,
     regularized = regularized,
     regularized_alpha = if (regularized) regularized_alpha else NULL,
     objective_directions = objective_directions,
