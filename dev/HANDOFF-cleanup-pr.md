@@ -221,3 +221,19 @@ references).
 Still to do: user pushes `worktree-codebase-cleanup` (`main` is already
 pushed) and opens the PR in the browser. Phase 2 remains gated on that PR
 merging.
+
+---
+
+## STATUS UPDATE 2026-08-25 (phase 2 executed)
+
+All 11 decisions are done on branch `phase2-decisions` (14 commits, tip = the
+0.2.0 bump). Verification at tip: full suite FAIL 0 | WARN 59 | SKIP 2 |
+PASS 1132; `R CMD check --no-tests` 0 errors / 1 warning (qpdf, environmental)
+/ 0 notes. man/ 212 -> 74 pages after the @noRd sweep. External repos:
+`summer-students-26/Summer-Biomarker-2026` committed on `taine` (734237f);
+`biomarkerPanels-analysis` migrations left uncommitted in the working tree
+(user WIP was staged there) with recovery patch
+`dev-shim-migration-2026-08-24.patch`. Shared NFS lib installed at 0.2.0.
+Still to do: user pushes `phase2-decisions` + teaching-repo `taine`, opens the
+PR. Optional follow-up: ~18 untagged file-overview man topics are arguably
+internal (future @noRd pass).
