@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">biomarkerPanels</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0.9000</span>
       </span>
     </div>
 
@@ -57,6 +57,13 @@
       <small>Source: <a href="https://github.com/SydneyBioX/biomarkerPanels/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="page-header" data-toc-text="0.2.0.9000" id="biomarkerpanels-0209000">biomarkerPanels 0.2.0.9000<a class="anchor" aria-label="anchor" href="#biomarkerpanels-0209000"></a></h2>
+<div class="section level3">
+<h3 id="bug-fixes-0-2-0-9000">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-2-0-9000"></a></h3>
+<ul><li>A <code>data.frame</code> passed as <code>x</code> to <code><a href="../reference/evaluate_panel.html">evaluate_panel()</a></code>, <code>evaluate_pareto_front()</code> or the cohort helpers was mistaken for a multi-cohort list (<code><a href="https://rdrr.io/r/base/list.html" class="external-link">is.list()</a></code> is <code>TRUE</code> for data.frames), failing with “When <code>x</code> is a list, <code>y</code> must also be a list.” All cohort-list dispatch now goes through <code>.is_cohort_list()</code>, which excludes data.frames and SummarizedExperiments; <code><a href="../reference/optimize_panel_transferable.html">optimize_panel_transferable()</a></code> likewise rejects a bare data.frame instead of splitting its columns into cohorts.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.2.0" id="biomarkerpanels-020">biomarkerPanels 0.2.0<a class="anchor" aria-label="anchor" href="#biomarkerpanels-020"></a></h2>
 <p>Executes the 11 resolved cleanup decisions (<code>dev/cleanup-decisions-2026-08-RESOLVED.md</code>). Unlike 0.1.0, several of these are deliberate behaviour changes.</p>
