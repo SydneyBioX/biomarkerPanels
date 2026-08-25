@@ -165,7 +165,7 @@ compute_diversity <- function(solutions,
 #' modules. Returns a named integer vector (feature -> module id) or `NULL` if
 #' fewer than two usable features remain.
 #'
-#' @keywords internal
+#' @noRd
 .coexpr_modules <- function(mat, cohort, n_modules, linkage, cor_method) {
   centered <- .center_within_cohort(mat, cohort)
 
@@ -206,7 +206,7 @@ compute_diversity <- function(solutions,
 #' @param cohort Cohort membership for the rows of `mat`, or `NULL`.
 #' @return `mat` with each feature centered within its cohort. A no-op for a
 #'   single cohort (correlation is invariant to centering).
-#' @keywords internal
+#' @noRd
 .center_within_cohort <- function(mat, cohort) {
   if (is.null(cohort)) {
     return(mat)
@@ -232,7 +232,7 @@ compute_diversity <- function(solutions,
 #' @param modules Named integer vector mapping feature -> module id.
 #' @return Number of distinct modules spanned divided by panel size, in
 #'   `(0, 1]`; `NA_real_` if no feature maps to a module or the panel is empty.
-#' @keywords internal
+#' @noRd
 .coexpr_diversity <- function(base_features, modules) {
   if (is.null(base_features) || length(base_features) == 0L) {
     return(NA_real_)

@@ -137,7 +137,7 @@ analyze_feature_stability <- function(result,
 #' @param opt An `OptimizationResult`.
 #' @param feature_type One of `"features"` or `"base_features"`.
 #' @return Named list of character vectors (one per solution).
-#' @keywords internal
+#' @noRd
 .extract_optimization_features <- function(opt, feature_type = "features") {
   sol_df <- opt@solutions
   if (!nrow(sol_df)) return(list())

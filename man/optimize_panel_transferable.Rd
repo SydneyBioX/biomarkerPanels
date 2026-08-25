@@ -28,8 +28,6 @@ optimize_panel_transferable(
   n_top_features = 50L,
   fitness_mode = c("within_cohort_val", "within_cohort_rotating", "loco"),
   n_val_splits = 10L,
-  cache_fitness = TRUE,
-  cache_max_entries = Inf,
   record_history = FALSE
 )
 }
@@ -106,13 +104,6 @@ actually optimizes for. Requires \verb{>=2} cohorts.}
 
 \item{n_val_splits}{Number of rotating train/val splits to pre-compute
 when \code{fitness_mode = "within_cohort_rotating"} (default 10).}
-
-\item{cache_fitness}{Logical; if \code{TRUE} (default), cache candidate fitness
-by selected base-feature panel within each validation context. Set
-\code{FALSE} for intentionally stochastic custom objectives.}
-
-\item{cache_max_entries}{Maximum number of selected-panel entries retained
-per fitness cache. Defaults to \code{Inf}.}
 
 \item{record_history}{Logical; if \code{TRUE}, capture the population, fitness,
 and NSGA rank at every generation and attach the result to the returned

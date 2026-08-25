@@ -129,7 +129,7 @@ evaluate_panel <- function(panel, x, y,
     stop("Panel has no selected features.", call. = FALSE)
   }
 
-  # Verify feature names match model expectations. CPOP-style panels store a
+  # Verify feature names match model expectations. Some panels store a
   # subset of all possible pair features; in that case subset the transformed
   # matrix down to the expected columns rather than warning.
   expected_features <- panel@features

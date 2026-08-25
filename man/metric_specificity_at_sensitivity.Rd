@@ -61,6 +61,8 @@ metric_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.90)
 metric_specificity_at_sensitivity(truth, scores, target_sensitivity = 0.95)
 }
 \seealso{
-\code{\link[=metric_pauc]{metric_pauc()}} for partial AUC in the high-sensitivity region,
-\code{\link[=metric_sensitivity]{metric_sensitivity()}} and \code{\link[=metric_specificity]{metric_specificity()}} for threshold-based metrics.
+\code{metric_pauc()} for partial AUC in the high-sensitivity region,
+\code{metric_sensitivity()} and \code{metric_specificity()} for threshold-based
+metrics. All three are internal; reach them by registry name via
+\code{\link[=define_objectives]{define_objectives()}}.
 }

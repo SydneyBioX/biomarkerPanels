@@ -152,19 +152,3 @@ test_that("input validation rejects malformed arguments", {
     "biology_penalty_quantile"
   )
 })
-
-test_that("select_denominator_features is deprecated but still works", {
-  fx <- make_batch_fixture()
-
-  expect_warning(
-    old <- select_denominator_features(
-      fx$x, fx$cohort, fx$y, n_denominators = 5L, n_pcs = 10L
-    ),
-    "deprecated"
-  )
-
-  # Old name keeps its argument order and exposes the result under both the
-  # legacy and current element names.
-  expect_identical(old$denominators, select_batch(fx)$features)
-  expect_identical(old$features, old$denominators)
-})

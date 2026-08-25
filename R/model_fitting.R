@@ -5,7 +5,7 @@
 #' BiomarkerPanelResult object for use in evaluation.
 #'
 #' @name model_fitting
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Fit Final Model for Storage
@@ -16,7 +16,7 @@ NULL
 #' @param truth Binary response factor.
 #' @param cohort Optional cohort factor.
 #' @return GLM model object, or NULL on failure.
-#' @keywords internal
+#' @noRd
 .fit_final_model <- function(x_selected, truth, cohort = NULL) {
   if (is.null(x_selected) || ncol(x_selected) == 0L) {
     return(NULL)
@@ -55,7 +55,7 @@ NULL
 #' @param cohort Optional cohort factor.
 #' @param cv_folds Number of CV folds.
 #' @return GLM model with averaged coefficients, or NULL on failure.
-#' @keywords internal
+#' @noRd
 .fit_final_model_cv <- function(x_selected, truth, cohort = NULL, cv_folds = 5L) {
   if (is.null(x_selected) || ncol(x_selected) == 0L) {
     return(NULL)
@@ -168,14 +168,13 @@ NULL
 #' @param cohort Optional cohort factor.
 #' @param alpha Elastic net mixing parameter.
 #' @return cv.glmnet model object, or NULL on failure.
-#' @keywords internal
+#' @noRd
 .fit_final_model_regularized <- function(x_selected, truth, cohort = NULL,
                                           alpha = 0.5) {
   if (is.null(x_selected) || ncol(x_selected) == 0L) {
     return(NULL)
   }
 
-  n <- nrow(x_selected)
   x_mat <- as.matrix(x_selected)
   y_vec <- as.integer(truth) - 1L
 
@@ -195,16 +194,7 @@ NULL
   }
 
   tryCatch({
-    nfolds <- min(10L, max(3L, floor(n / 5L)))
-
-    fit <- glmnet::cv.glmnet(
-      x = x_mat,
-      y = y_vec,
-      family = "binomial",
-      alpha = alpha,
-      nfolds = nfolds,
-      type.measure = "deviance"
-    )
+    fit <- .fit_binomial_glmnet(x_mat, y_vec, alpha)
 
     # Store additional metadata for prediction
     fit$biomarkerPanels_meta <- list(
@@ -383,7 +373,7 @@ fit_panel <- function(optimization_result,
 #' @return List with `base_features`, `features` (transformed names),
 #'   `solution_id` (`NA` for explicit features), `metrics` (named numeric or
 #'   `NULL`), `x_raw`, `x_selected` (transform applied), `truth`, and `cohort`.
-#' @keywords internal
+#' @noRd
 .resolve_panel_solution <- function(optimization_result,
                                     solution_id = NULL,
                                     features = NULL,

@@ -46,9 +46,6 @@
 #' @param constraints Optional list of constraint descriptors (e.g.,
 #'   from [min_metric_constraint()]) that must evaluate to `TRUE` for a candidate
 #'   solution to be considered feasible.
-#' @param scoring_fn Function producing per-sample scores from the selected
-#'   features. Signature:
-#'   `function(x_selected, selected_features, truth, cohort = NULL, ...)`.
 #' @param algorithm Multi-objective optimization algorithm. `"NSGA-III"`
 #'   (default) uses reference-point-based selection and gives better Pareto
 #'   front diversity for many-objective problems (3+ objectives). `"NSGA-II"`
@@ -92,12 +89,6 @@
 #'   improve accuracy. Adaptive selection finds natural breakpoints in the
 #'   weight distribution, enabling the `num_features` objective to drive panel
 #'   size diversity.
-#' @param cache_fitness Logical; if `TRUE` (default), cache candidate fitness
-#'   by selected base-feature panel within each evaluation context. Set
-#'   `FALSE` for intentionally stochastic custom objectives or scoring
-#'   functions.
-#' @param cache_max_entries Maximum number of selected-panel entries retained
-#'   per fitness cache. Defaults to `Inf`.
 #' @return An `OptimizationResult` containing the Pareto-optimal solutions.
 #'   Use [summarize_solutions()] to inspect solutions and [fit_panel()] to
 #'   fit a model on a selected solution.
@@ -112,7 +103,6 @@ optimize_panel <- function(x, y,
                            feature_transform = "pairwise_ratios",
                            feature_alignment = c("intersection", "majority", "impute_median"),
                            constraints = list(),
-                           scoring_fn = NULL,
                            algorithm = c("NSGA-III", "NSGA-II"),
                            nsga_control = list(),
                            assay = NULL,
@@ -122,8 +112,6 @@ optimize_panel <- function(x, y,
                            regularized = TRUE,
                            regularized_alpha = 0.5,
                            selection_threshold = "adaptive",
-                           cache_fitness = TRUE,
-                           cache_max_entries = Inf,
                            record_history = FALSE) {
   algorithm <- match.arg(algorithm)
   feature_alignment <- match.arg(feature_alignment)
@@ -148,7 +136,6 @@ optimize_panel <- function(x, y,
   .validate_positive_integer(fitness_cv_folds, "fitness_cv_folds", min = 2L)
   .validate_probability(regularized_alpha, "regularized_alpha", bounds = "closed")
   .validate_selection_threshold(selection_threshold)
-  .validate_cache_controls(cache_fitness, cache_max_entries)
 
   inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, transform = "none",
                                        feature_alignment = feature_alignment)
@@ -259,19 +246,6 @@ optimize_panel <- function(x, y,
             "reducing `feature_pool` for exploration.")
   }
 
-  scoring_fn_label <- if (is.null(scoring_fn)) {
-    "default"
-  } else {
-    deparse(substitute(scoring_fn))
-  }
-  if (is.null(scoring_fn)) {
-    scoring_fn <- .default_scoring_fn
-  }
-
-  if (!is.function(scoring_fn)) {
-    stop("`scoring_fn` must be a function.", call. = FALSE)
-  }
-
   objective_directions <- vapply(objectives, `[[`, character(1), "direction")
   names(objective_directions) <- names(objectives)
 
@@ -309,8 +283,7 @@ optimize_panel <- function(x, y,
     matrices = list(x = x_pool),
     feature_transform = feature_transform,
     objectives = objectives,
-    constraints = constraints,
-    cache_max_entries = cache_max_entries
+    constraints = constraints
   )
   panel_selector <- scaffold$selector
   transform_panel <- scaffold$transform
@@ -355,38 +328,25 @@ optimize_panel <- function(x, y,
       )
     } else {
       # In-sample scoring (for backward compatibility or small datasets)
-      if (regularized || identical(scoring_fn, .default_scoring_fn)) {
-        scores <- if (!regularized) {
-          .fit_predict_binomial_glm(
-            x_train = x_selected,
-            truth = truth,
-            x_new = x_selected,
-            cohort_train = cohort,
-            cohort_new = cohort,
-            predict_cohort = "observed",
-            design_terms = in_sample_glm_design_terms
-          )
-        } else {
-          .default_scoring_fn(
-            x_selected = x_selected,
-            selected_features = selected_features,
-            truth = truth,
-            cohort = cohort,
-            regularized = regularized,
-            alpha = regularized_alpha
-          )
-        }
+      scores <- if (!regularized) {
+        .fit_predict_binomial_glm(
+          x_train = x_selected,
+          truth = truth,
+          x_new = x_selected,
+          cohort_train = cohort,
+          cohort_new = cohort,
+          predict_cohort = "observed",
+          design_terms = in_sample_glm_design_terms
+        )
       } else {
-        # Custom scoring function provided by user (only used when regularized = FALSE)
-        score_args <- list(
+        .default_scoring_fn(
           x_selected = x_selected,
           selected_features = selected_features,
-          truth = truth
+          truth = truth,
+          cohort = cohort,
+          regularized = regularized,
+          alpha = regularized_alpha
         )
-        if (!is.null(cohort)) {
-          score_args$cohort <- cohort
-        }
-        scores <- do.call(scoring_fn, score_args)
       }
     }
 
@@ -420,8 +380,7 @@ optimize_panel <- function(x, y,
     )
   }
 
-  objective_wrapper <- scaffold$finalize(evaluate_candidate,
-                                         cache_fitness = cache_fitness)$wrapper
+  objective_wrapper <- scaffold$finalize(evaluate_candidate)$wrapper
 
   # Optional per-generation history capture. We build a closure that pushes
   # each generation's population, fitness, and front into a parent-scope env.
@@ -463,7 +422,6 @@ optimize_panel <- function(x, y,
     base_feature_pool = feature_pool_base,
     algorithm = algorithm,
     nsga2 = nsga_args,  # Keep nsga2 name for backward compatibility
-    scoring_function = scoring_fn_label,
     feature_transform = feature_transform,
     feature_alignment = feature_alignment,
     constraints = if (length(constraint_specs)) {
@@ -478,8 +436,6 @@ optimize_panel <- function(x, y,
     # Store seed for reproducibility documentation
     seed = seed,
     selection_threshold = selection_threshold,
-    cache_fitness = cache_fitness,
-    cache_max_entries = cache_max_entries,
     regularized = regularized,
     regularized_alpha = if (regularized) regularized_alpha else NULL,
     objective_directions = objective_directions,

@@ -20,3 +20,8 @@
 ^DEVELOPER\.md$
 ^inst/benchmarks$
 ^\.claude$
+^AGENTS\.md$
+^CLAUDE\.md$
+^codex-improvement\.md$
+^helper-docs$
+^refs$

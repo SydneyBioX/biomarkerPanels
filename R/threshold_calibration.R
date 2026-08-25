@@ -4,7 +4,7 @@
 #' per-cohort performance metrics for transferability evaluation.
 #'
 #' @name threshold_calibration
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Select Neyman-Pearson Classification Threshold
@@ -17,7 +17,7 @@ NULL
 #' @param alpha Target Type I error rate (default 0.15).
 #' @param delta Tolerance parameter (default 0.05).
 #' @return List with threshold value and metadata.
-#' @keywords internal
+#' @noRd
 .select_np_threshold <- function(scores, truth, alpha = 0.15, delta = 0.05) {
   if (!requireNamespace("nproc", quietly = TRUE)) {
     stop(
@@ -112,7 +112,7 @@ NULL
 #' @param cohort Factor indicating cohort membership.
 #' @param threshold Classification threshold.
 #' @return Data frame with columns: cohort, n, n_yes, n_no, sensitivity, specificity.
-#' @keywords internal
+#' @noRd
 .compute_per_cohort_metrics <- function(scores, truth, cohort, threshold) {
   cohort_levels <- levels(cohort)
   results <- lapply(cohort_levels, function(coh) {
@@ -148,7 +148,7 @@ NULL
 #'
 #' @param per_cohort_metrics Data frame from .compute_per_cohort_metrics().
 #' @return List with sensitivity and specificity variance values.
-#' @keywords internal
+#' @noRd
 .compute_weighted_variance <- function(per_cohort_metrics) {
   n_cohorts <- nrow(per_cohort_metrics)
 
@@ -266,7 +266,6 @@ calibrate_panel <- function(panel, x_heldout, y_heldout,
     np_delta = np_delta,
     per_cohort_metrics = per_cohort_df,
     weighted_variance = weighted_var,
-    validation_metrics = list(),
     partition_info = if (!is.null(panel@control$partition_info)) {
       panel@control$partition_info
     } else {

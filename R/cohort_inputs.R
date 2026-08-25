@@ -5,7 +5,7 @@
 #' response standardization.
 #'
 #' @name cohort_inputs
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Default Cohort Names
@@ -16,7 +16,7 @@ NULL
 #'
 #' @param x A list (or vector) of cohorts.
 #' @return A character vector of names, one per element of `x`.
-#' @keywords internal
+#' @noRd
 .default_cohort_names <- function(x) {
   nm <- names(x)
   if (is.null(nm) || any(!nzchar(nm))) {
@@ -33,7 +33,7 @@ NULL
 #'
 #' @param mat A matrix-like object.
 #' @return `mat` with non-`NULL` column names.
-#' @keywords internal
+#' @noRd
 .ensure_feature_colnames <- function(mat) {
   if (is.null(colnames(mat))) {
     colnames(mat) <- sprintf("feature_%04d", seq_len(ncol(mat)))
@@ -55,7 +55,7 @@ NULL
 #' @param feature_alignment Alignment strategy for multi-cohort data.
 #' @return List with x (combined matrix), truth (factor), cohort (factor),
 #'   cohort_names, and cohort_counts.
-#' @keywords internal
+#' @noRd
 .prepare_cohort_inputs <- function(x, y, assay = NULL,
                                    transform = "none",
                                    feature_subset = NULL,
@@ -233,7 +233,7 @@ NULL
 #' @param x Input object.
 #' @param assay For SummarizedExperiment, assay name or index.
 #' @return Numeric matrix.
-#' @keywords internal
+#' @noRd
 .extract_feature_matrix <- function(x, assay = NULL) {
   if (inherits(x, "SummarizedExperiment")) {
     assays <- SummarizedExperiment::assayNames(x)
@@ -272,7 +272,7 @@ NULL
 #' @param feature_sets List of per-cohort feature name vectors.
 #' @param cohort_names Character vector of cohort identifiers.
 #' @return Never returns; always signals an error.
-#' @keywords internal
+#' @noRd
 .stop_no_shared_features <- function(feature_sets, cohort_names) {
   counts <- vapply(feature_sets, length, integer(1))
   stop(
@@ -293,9 +293,9 @@ NULL
 #' matrices / data frames / `SummarizedExperiment`s, standardises responses,
 #' checks sample-count agreement, and aligns features across cohorts.
 #'
-#' This is deliberately separate from [.prepare_cohort_inputs()], which serves
+#' This is deliberately separate from `.prepare_cohort_inputs()`, which serves
 #' the optimisation path and additionally handles feature transforms,
-#' `feature_subset`, and the richer [.align_features()] strategies.
+#' `feature_subset`, and the richer `.align_features()` strategies.
 #'
 #' @param x_list A matrix, `SummarizedExperiment`, or list of such objects.
 #' @param y_list A binary response aligned with `x_list`.
@@ -312,7 +312,7 @@ NULL
 #' @return A list with `matrices`, `responses`, `cohort_names`, and
 #'   `feature_names`. Under `align = "union"` the matrices are *not* subset to
 #'   `feature_names`.
-#' @keywords internal
+#' @noRd
 .prepare_selection_inputs <- function(x_list,
                                       y_list,
                                       assay = NULL,
@@ -408,7 +408,7 @@ NULL
 #'
 #' @param x An object or list of objects.
 #' @return A list.
-#' @keywords internal
+#' @noRd
 .as_cohort_list <- function(x) { # nocov start
   if (is.null(x)) {
     stop("Input cannot be NULL.", call. = FALSE)

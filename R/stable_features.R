@@ -81,7 +81,7 @@ select_features_for_ratios <- function(x_list,
 #'   `"inverse_t_se"`.
 #' @param top_n Number of top stable features to return.
 #' @return A character vector of feature names.
-#' @keywords internal
+#' @noRd
 .select_stable_genes <- function(t_matrix, se_matrix, method, top_n) {
   if (length(t_matrix) == 0L || nrow(t_matrix) == 0L) {
     return(character())

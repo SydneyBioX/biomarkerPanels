@@ -8,7 +8,7 @@
 #' exact transformed columns).
 #'
 #' @name panel_feature_helpers
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Validate and Transform Selected Base Features
@@ -17,7 +17,7 @@ NULL
 #' and applies the panel's feature transform on the fly. Callers are responsible
 #' for resolving `base_features` / `feature_transform` from the panel (some
 #' allow an explicit transform override) and for any downstream subsetting to a
-#' model's expected column subset (e.g. CPOP panels).
+#' model's expected column subset.
 #'
 #' @param x_raw Raw feature matrix (samples x base features) with column names.
 #' @param base_features Character vector of base feature names to select.
@@ -26,7 +26,7 @@ NULL
 #'   (e.g. `"validation data"`, `"held-out data"`).
 #' @return List with `x_selected` (transformed matrix) and `selected`
 #'   (transformed feature names).
-#' @keywords internal
+#' @noRd
 .prepare_scoring_matrix <- function(x_raw, base_features, feature_transform,
                                     context = "data") {
   if (!all(base_features %in% colnames(x_raw))) {

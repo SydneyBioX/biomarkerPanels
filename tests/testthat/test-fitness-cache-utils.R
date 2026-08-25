@@ -104,7 +104,33 @@ test_that("fast binomial glm predictions match glm for no-cohort and cohort case
   )
 }
 
-test_that("validation fitness cache preserves objective values", {
+test_that("fitness cache primitives round-trip panel keys", {
+  cache <- .new_fitness_cache()
+  key <- .panel_key(c("g2", "g1"))
+
+  # Miss on an empty cache, and a NULL cache is a safe no-op.
+  expect_null(.cache_get(cache, key))
+  expect_null(.cache_get(NULL, key))
+  expect_equal(.cache_set(NULL, key, 1), 1)
+
+  .cache_set(cache, key, c(1, 2))
+  expect_equal(.cache_get(cache, key), c(1, 2))
+
+  # Same panel, same key; a different panel is a distinct entry.
+  expect_identical(.panel_key(c("g2", "g1")), key)
+  expect_null(.cache_get(cache, .panel_key(c("g1", "g2"))))
+
+  # Context namespaces the key.
+  ctx_key <- .panel_key(c("g2", "g1"), context = "split1")
+  expect_false(identical(ctx_key, key))
+  expect_null(.cache_get(cache, ctx_key))
+
+  # Re-setting an existing key overwrites in place.
+  .cache_set(cache, key, c(3, 4))
+  expect_equal(.cache_get(cache, key), c(3, 4))
+})
+
+test_that("validation fitness assigns identical objectives to duplicate panels", {
   dat <- .make_cache_test_data()
   objectives <- define_objectives(metrics = c("sensitivity", "specificity"))
   pop <- rbind(
@@ -113,7 +139,7 @@ test_that("validation fitness cache preserves objective values", {
     c(0.1, 0.2, 0.95, 0.85, 0.3)
   )
 
-  cached <- .make_validation_fitness(
+  fit <- .make_validation_fitness(
     train_x = dat$train_x,
     train_y = dat$train_y,
     train_cohort = dat$train_cohort,
@@ -128,29 +154,12 @@ test_that("validation fitness cache preserves objective values", {
     alpha = 0.5,
     feature_transform = "none",
     min_features_required = 1L,
-    selection_threshold = 0.5,
-    cache_fitness = TRUE
-  )
-  uncached <- .make_validation_fitness(
-    train_x = dat$train_x,
-    train_y = dat$train_y,
-    train_cohort = dat$train_cohort,
-    val_x = dat$val_x,
-    val_y = dat$val_y,
-    val_cohort = dat$val_cohort,
-    feature_pool = colnames(dat$train_x),
-    max_features = 2L,
-    objectives = objectives,
-    constraints = list(),
-    regularized = FALSE,
-    alpha = 0.5,
-    feature_transform = "none",
-    min_features_required = 1L,
-    selection_threshold = 0.5,
-    cache_fitness = FALSE
+    selection_threshold = 0.5
   )
 
-  expect_equal(cached$wrapper(pop), uncached$wrapper(pop), tolerance = 1e-10)
+  values <- fit$wrapper(pop)
+  expect_true(all(is.finite(values)))
+  expect_equal(values[1, ], values[2, ], tolerance = 1e-10)
 })
 
 test_that("duplicate selected panels are evaluated once when cache is enabled", {
@@ -187,33 +196,10 @@ test_that("duplicate selected panels are evaluated once when cache is enabled", 
     alpha = 0.5,
     feature_transform = "none",
     min_features_required = 1L,
-    selection_threshold = 0.5,
-    cache_fitness = TRUE
+    selection_threshold = 0.5
   )
   cached$wrapper(pop)
   expect_equal(counter$n, 1L)
-
-  counter$n <- 0L
-  uncached <- .make_validation_fitness(
-    train_x = dat$train_x,
-    train_y = dat$train_y,
-    train_cohort = dat$train_cohort,
-    val_x = dat$val_x,
-    val_y = dat$val_y,
-    val_cohort = dat$val_cohort,
-    feature_pool = colnames(dat$train_x),
-    max_features = 2L,
-    objectives = counted_objective,
-    constraints = list(),
-    regularized = FALSE,
-    alpha = 0.5,
-    feature_transform = "none",
-    min_features_required = 1L,
-    selection_threshold = 0.5,
-    cache_fitness = FALSE
-  )
-  uncached$wrapper(pop)
-  expect_equal(counter$n, 2L)
 })
 
 test_that("validation fitness cache handles unregularized pairwise ratios", {
@@ -225,7 +211,7 @@ test_that("validation fitness cache handles unregularized pairwise ratios", {
     c(0.1, 0.2, 0.95, 0.85, 0.8)
   )
 
-  cached <- .make_validation_fitness(
+  fit <- .make_validation_fitness(
     train_x = dat$train_x,
     train_y = dat$train_y,
     train_cohort = dat$train_cohort,
@@ -240,30 +226,14 @@ test_that("validation fitness cache handles unregularized pairwise ratios", {
     alpha = 0.5,
     feature_transform = "pairwise_ratios",
     min_features_required = 2L,
-    selection_threshold = 0.5,
-    cache_fitness = TRUE
-  )
-  uncached <- .make_validation_fitness(
-    train_x = dat$train_x,
-    train_y = dat$train_y,
-    train_cohort = dat$train_cohort,
-    val_x = dat$val_x,
-    val_y = dat$val_y,
-    val_cohort = dat$val_cohort,
-    feature_pool = colnames(dat$train_x),
-    max_features = 3L,
-    objectives = objectives,
-    constraints = list(),
-    regularized = FALSE,
-    alpha = 0.5,
-    feature_transform = "pairwise_ratios",
-    min_features_required = 2L,
-    selection_threshold = 0.5,
-    cache_fitness = FALSE
+    selection_threshold = 0.5
   )
 
-  expect_equal(cached$wrapper(pop), uncached$wrapper(pop), tolerance = 1e-10)
-  expect_true(all(is.finite(cached$wrapper(pop))))
+  values <- fit$wrapper(pop)
+  expect_true(all(is.finite(values)))
+  expect_equal(values[1, ], values[2, ], tolerance = 1e-10)
+  # Repeat evaluation is served from the cache and must be identical.
+  expect_equal(fit$wrapper(pop), values, tolerance = 1e-10)
 })
 
 test_that("rotating validation cache keys are split-specific and batch-consistent", {
@@ -303,8 +273,7 @@ test_that("rotating validation cache keys are split-specific and batch-consisten
     alpha = 0.5,
     feature_transform = "none",
     min_features_required = 1L,
-    selection_threshold = 0.5,
-    cache_fitness = TRUE
+    selection_threshold = 0.5
   )
 
   pop <- rbind(

@@ -4,7 +4,7 @@
 #' and held-out sets while maintaining stratified class balance.
 #'
 #' @name data_partitioning
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Validate Partition Ratios for Train/Validation/Held-out Split
@@ -15,7 +15,7 @@ NULL
 #' @param train_ratio Proportion of data for training (must be >= 0.5).
 #' @param val_ratio Proportion of data for validation (must be >= 0.1).
 #' @return Invisibly returns TRUE if valid; otherwise throws an error.
-#' @keywords internal
+#' @noRd
 .validate_partition_ratios <- function(train_ratio, val_ratio) {
   .validate_probability(train_ratio, "train_ratio", bounds = "closed")
   .validate_probability(val_ratio, "val_ratio", bounds = "closed")
@@ -58,7 +58,7 @@ NULL
 #'     \item{cohort_names}{Character vector of cohort names}
 #'     \item{partition_info}{Data frame with partition sizes per cohort}
 #'   }
-#' @keywords internal
+#' @noRd
 .stratified_partition_cohorts <- function(x_list, y_list, train_ratio, val_ratio) {
   if (!is.list(x_list) || !is.list(y_list)) {
     stop("`x_list` and `y_list` must be lists.", call. = FALSE)

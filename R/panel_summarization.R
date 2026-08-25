@@ -67,7 +67,7 @@ summarize_solutions <- function(optimization_result) {
 #' @return A list where each element corresponds to a Pareto solution and
 #'   contains the unique biomarker identifiers selected in that solution. The
 #'   list is named by `solution_id`.
-#' @keywords internal
+#' @noRd
 .extract_solution_features <- function(panel_result) {
   stopifnot(inherits(panel_result, "BiomarkerPanelResult"))
   objectives <- panel_result@objectives

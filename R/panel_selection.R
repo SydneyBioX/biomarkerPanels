@@ -6,7 +6,7 @@
 #' strategy thresholds weights directly.
 #'
 #' @name panel_selection
-#' @keywords internal
+#' @noRd
 NULL
 
 .select_panel_indices <- function(decision_vec, feature_pool, max_features,

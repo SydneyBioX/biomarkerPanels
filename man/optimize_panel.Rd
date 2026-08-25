@@ -14,7 +14,6 @@ optimize_panel(
   feature_transform = "pairwise_ratios",
   feature_alignment = c("intersection", "majority", "impute_median"),
   constraints = list(),
-  scoring_fn = NULL,
   algorithm = c("NSGA-III", "NSGA-II"),
   nsga_control = list(),
   assay = NULL,
@@ -24,8 +23,6 @@ optimize_panel(
   regularized = TRUE,
   regularized_alpha = 0.5,
   selection_threshold = "adaptive",
-  cache_fitness = TRUE,
-  cache_max_entries = Inf,
   record_history = FALSE
 )
 }
@@ -74,10 +71,6 @@ Missing values are imputed with cohort medians.}
 from \code{\link[=min_metric_constraint]{min_metric_constraint()}}) that must evaluate to \code{TRUE} for a candidate
 solution to be considered feasible.}
 
-\item{scoring_fn}{Function producing per-sample scores from the selected
-features. Signature:
-\verb{function(x_selected, selected_features, truth, cohort = NULL, ...)}.}
-
 \item{algorithm}{Multi-objective optimization algorithm. \code{"NSGA-III"}
 (default) uses reference-point-based selection and gives better Pareto
 front diversity for many-objective problems (3+ objectives). \code{"NSGA-II"}
@@ -122,14 +115,6 @@ that allows variable panel sizes in the Pareto front. Fixed thresholds
 improve accuracy. Adaptive selection finds natural breakpoints in the
 weight distribution, enabling the \code{num_features} objective to drive panel
 size diversity.}
-
-\item{cache_fitness}{Logical; if \code{TRUE} (default), cache candidate fitness
-by selected base-feature panel within each evaluation context. Set
-\code{FALSE} for intentionally stochastic custom objectives or scoring
-functions.}
-
-\item{cache_max_entries}{Maximum number of selected-panel entries retained
-per fitness cache. Defaults to \code{Inf}.}
 
 \item{record_history}{Logical; if \code{TRUE}, capture the population, fitness,
 and NSGA rank at every generation and attach the result to the returned

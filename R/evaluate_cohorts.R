@@ -110,7 +110,7 @@ evaluate_panel_by_cohort <- function(panel,
       context = sprintf("cohort '%s'", cohort_names[i])
     )$x_selected
 
-    # CPOP-style panels store a subset of all possible pair features; subset
+    # Some panels store a subset of all possible pair features; subset
     # the transformed matrix to match the model's expected columns.
     if (feature_transform != "none" && length(base_features) >= 2L &&
         length(features) && all(features %in% colnames(x_selected))) {

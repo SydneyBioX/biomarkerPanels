@@ -7,7 +7,7 @@
 #' uses each sample's own cohort.
 #'
 #' @name glm_fitting
-#' @keywords internal
+#' @noRd
 NULL
 
 .cohort_dummy_matrix <- function(cohort, levels) {

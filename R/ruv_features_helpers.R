@@ -14,7 +14,7 @@ NULL
 # ==============================================================================
 
 #' Check ruv Package Availability
-#' @keywords internal
+#' @noRd
 .check_ruv_available <- function() {
   if (!requireNamespace("ruv", quietly = TRUE)) {
     stop(
@@ -28,7 +28,7 @@ NULL
 
 #' Pool Cohort Data into Single Matrix
 #'
-#' Combines per-cohort matrices and responses from [.prepare_selection_inputs()]
+#' Combines per-cohort matrices and responses from `.prepare_selection_inputs()`
 #' into a single pooled dataset suitable for RUV-4.
 #'
 #' @param matrices List of per-cohort feature matrices (samples x features).
@@ -36,7 +36,7 @@ NULL
 #' @param cohort_names Character vector of cohort identifiers.
 #' @return List with `Y` (pooled matrix), `X_outcome` (design matrix),
 #'   `cohort` (factor), `feature_names`.
-#' @keywords internal
+#' @noRd
 .pool_cohort_data <- function(matrices, responses, cohort_names) {
   Y <- do.call(rbind, matrices)
   outcome <- unlist(responses, use.names = FALSE)
@@ -64,7 +64,7 @@ NULL
 #' @param X_outcome Design matrix for outcome (samples x 1).
 #' @param neg_control_quantile Quantile threshold for empirical selection.
 #' @return Logical vector of length `ncol(Y)`.
-#' @keywords internal
+#' @noRd
 .pooled_pvalue_controls <- function(Y, X_outcome, neg_control_quantile) {
   expr <- t(Y) # genes x samples for limma
   design <- stats::model.matrix(~X_outcome[, 1])
@@ -88,7 +88,7 @@ NULL
 #' @param neg_control_genes User-supplied gene names (for `method = "list"`).
 #' @param neg_control_quantile Quantile threshold for empirical selection.
 #' @return Logical vector of length `ncol(Y)`.
-#' @keywords internal
+#' @noRd
 .select_negative_controls <- function(Y, X_outcome, feature_names, method,
                                       neg_control_genes, neg_control_quantile) {
   if (method == "list") {
@@ -125,7 +125,7 @@ NULL
 #' @param Y_ctl Control gene submatrix (samples x control genes).
 #' @param n_samples Total number of samples.
 #' @return Integer k >= 1.
-#' @keywords internal
+#' @noRd
 .auto_select_k <- function(Y_ctl, n_samples) {
   if (ncol(Y_ctl) < 2L) {
     return(1L)
@@ -143,7 +143,7 @@ NULL
 #' @param n_ctl Number of control genes.
 #' @param n_samples Number of samples.
 #' @return Capped integer k.
-#' @keywords internal
+#' @noRd
 .cap_k <- function(k, n_ctl, n_samples) {
   max_k <- min(n_ctl - 1L, floor(n_samples / 5))
   if (k > max_k) {
@@ -164,7 +164,7 @@ NULL
 #' @param k Number of unwanted factors.
 #' @param ebayes Whether to apply empirical Bayes variance adjustment.
 #' @return RUV-4 fit object.
-#' @keywords internal
+#' @noRd
 .fit_ruv4 <- function(Y, X_outcome, ctl, k, ebayes) {
   fit <- ruv::RUV4(Y = Y, X = X_outcome, ctl = ctl, k = k)
   if (ebayes) {
@@ -198,7 +198,7 @@ NULL
 #' @param neg_control_quantile Quantile threshold.
 #' @param max_iterations Maximum iterations.
 #' @return List with `fit` and `ctl`.
-#' @keywords internal
+#' @noRd
 .iterate_ruv_controls <- function(Y, X_outcome, ctl, k, ebayes,
                                   neg_control_quantile, max_iterations) {
   fit <- .fit_ruv4(Y, X_outcome, ctl, k, ebayes)
@@ -225,7 +225,7 @@ NULL
 #' @param epsilon Small constant for ratio denominator.
 #' @param feature_names Character vector of gene names.
 #' @return Data frame sorted by decreasing score.
-#' @keywords internal
+#' @noRd
 .score_ruv_features <- function(fit, scoring, epsilon, feature_names) {
   t_stat <- fit$t
   if (is.matrix(t_stat)) {
@@ -274,7 +274,7 @@ NULL
 #' @param feature_names Character vector of gene names, ordered as the columns
 #'   of the pooled expression matrix passed to RUV-4.
 #' @return List of diagnostic values.
-#' @keywords internal
+#' @noRd
 .ruv_diagnostics <- function(fit, cohort, feature_names) {
   k <- ncol(fit$W)
   W <- fit$W

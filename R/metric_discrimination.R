@@ -20,7 +20,7 @@ NULL
 #' @param scores Numeric scores or probabilities.
 #' @param positive Label treated as the positive ("event") class.
 #' @return A `pROC::roc` object.
-#' @keywords internal
+#' @noRd
 .build_roc <- function(truth, scores, positive = "Yes") {
   if (!requireNamespace("pROC", quietly = TRUE)) {
     stop("The 'pROC' package is required for ROC-based metrics. ",
@@ -46,7 +46,7 @@ NULL
 #' @param selected Ignored; kept for signature compatibility.
 #' @param positive Label treated as the positive ("event") class.
 #' @return AUC between 0 and 1, or `NA_real_` if computation fails.
-#' @keywords internal
+#' @noRd
 metric_auc <- function(truth, scores = NULL, selected = NULL,
                      positive = "Yes") {
   truth <- ensure_binary_response(truth)
@@ -91,7 +91,7 @@ metric_auc <- function(truth, scores = NULL, selected = NULL,
 #' @param partial_auc_correct Logical; apply McClish correction to normalize
 #'   partial AUC to 0-1 scale (default TRUE).
 #' @return Partial AUC value, or `NA_real_` if computation fails.
-#' @keywords internal
+#' @noRd
 metric_pauc <- function(truth, scores = NULL, selected = NULL,
                       positive = "Yes", sens_floor = 0.90,
                       partial_auc_correct = TRUE) {
@@ -149,13 +149,18 @@ metric_pauc <- function(truth, scores = NULL, selected = NULL,
 #' (missing `scores`, out-of-range `target_sensitivity`) still signal an
 #' error.
 #'
-#' @inheritParams metric_auc
+#' @param truth Binary outcome; coerced with [ensure_binary_response()].
+#' @param scores Numeric scores or probabilities.
+#' @param selected Ignored; kept for signature compatibility.
+#' @param positive Label treated as the positive ("event") class.
 #' @param target_sensitivity The sensitivity threshold at which to evaluate
 #'   specificity (default 0.90). Must be between 0 and 1.
 #' @return Specificity at the target sensitivity, between 0 and 1. Returns `0`
 #'   for degenerate inputs.
-#' @seealso [metric_pauc()] for partial AUC in the high-sensitivity region,
-#'   [metric_sensitivity()] and [metric_specificity()] for threshold-based metrics.
+#' @seealso `metric_pauc()` for partial AUC in the high-sensitivity region,
+#'   `metric_sensitivity()` and `metric_specificity()` for threshold-based
+#'   metrics. All three are internal; reach them by registry name via
+#'   [define_objectives()].
 #' @export
 #' @examples
 #' truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
@@ -233,9 +238,9 @@ metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = N
 #' @return Sensitivity at the target specificity, between 0 and 1. Returns `0`
 #'   for degenerate inputs.
 #' @seealso [metric_specificity_at_sensitivity()] for the transpose,
-#'   [metric_pauc()] for partial AUC in the high-sensitivity region,
-#'   [metric_sensitivity()] and [metric_specificity()] for threshold-based metrics.
-#' @keywords internal
+#'   `metric_pauc()` for partial AUC in the high-sensitivity region,
+#'   `metric_sensitivity()` and `metric_specificity()` for threshold-based metrics.
+#' @noRd
 #' @examples
 #' truth <- factor(c(rep("No", 50), rep("Yes", 50)), levels = c("No", "Yes"))
 #' scores <- c(runif(50, 0, 0.6), runif(50, 0.4, 1))
@@ -292,7 +297,7 @@ metric_sensitivity_at_specificity <- function(truth, scores = NULL, selected = N
 #' @param selected Vector of selected base features (character, numeric, or logical).
 #' @param ... Additional arguments (ignored).
 #' @return Count of selected base biomarkers (genes).
-#' @keywords internal
+#' @noRd
 metric_num_features <- function(truth = NULL, scores = NULL, selected = NULL, ...) {
   if (is.null(selected)) {
     return(0)

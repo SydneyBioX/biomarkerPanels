@@ -4,7 +4,7 @@
 #' support via the nproc package.
 #'
 #' @name np_utils
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Check nproc Package Availability
@@ -12,7 +12,7 @@ NULL
 #' Validates that the nproc package is installed and available.
 #'
 #' @return Invisible TRUE if available.
-#' @keywords internal
+#' @noRd
 .check_nproc_available <- function() {
   if (!requireNamespace("nproc", quietly = TRUE)) {
     stop(
@@ -37,7 +37,7 @@ NULL
 #'   - `y_nproc`: Integer vector (0/1) for nproc
 #'   - `labels_flipped`: Logical indicating if labels were flipped
 #'   - `original_positive`: The original positive class label
-#' @keywords internal
+#' @noRd
 .prepare_np_labels <- function(truth, minimize_FPR = TRUE) {
   truth <- ensure_binary_response(truth)
 
@@ -67,7 +67,7 @@ NULL
 #' @param predictions Numeric vector of predicted probabilities from nproc.
 #' @param labels_flipped Logical indicating if labels were flipped.
 #' @return Numeric vector of predictions on the original scale.
-#' @keywords internal
+#' @noRd
 .invert_np_predictions <- function(predictions, labels_flipped) {
   if (labels_flipped) {
     1 - predictions
@@ -84,7 +84,7 @@ NULL
 #' @param delta Tolerance parameter (must be in (0, 1)).
 #' @param method nproc method name.
 #' @return Invisible TRUE if all parameters valid.
-#' @keywords internal
+#' @noRd
 .validate_np_params <- function(alpha, delta, method) {
   .validate_probability(alpha, "alpha", bounds = "open")
   .validate_probability(delta, "delta", bounds = "open")

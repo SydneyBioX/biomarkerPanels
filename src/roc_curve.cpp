@@ -7,7 +7,7 @@ using namespace Rcpp;
 //' @param scores Numeric vector of predicted scores
 //' @param is_positive Logical vector indicating positive class membership
 //' @return DataFrame with columns: threshold, tpr, fpr
-//' @keywords internal
+//' @noRd
 // [[Rcpp::export(.compute_roc_curve_cpp)]]
 DataFrame compute_roc_curve_cpp(NumericVector scores, LogicalVector is_positive) {
   int n = scores.size();

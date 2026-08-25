@@ -5,8 +5,37 @@
 #' predictions for fitness evaluation.
 #'
 #' @name cv_scoring
-#' @keywords internal
+#' @noRd
 NULL
+
+#' Fit a Cross-Validated Binomial Elastic Net
+#'
+#' Shared `cv.glmnet()` wrapper used by every inner-CV fit in the package
+#' (fold scoring, in-sample regularized scoring, and the stored final model).
+#' Keeping the call in one place holds the family, loss, and fold rule
+#' identical across those sites: `nfolds` is `min(5, max(3, floor(n / 5)))`,
+#' so small panels never drop below 3 folds and large ones never exceed 5.
+#'
+#' Errors propagate; callers needing a softer failure wrap the call in their
+#' own `tryCatch()`.
+#'
+#' @param x Numeric design matrix (samples x predictors), with cohort dummies
+#'   already appended if the caller uses them.
+#' @param y Integer 0/1 response aligned with the rows of `x`.
+#' @param alpha Elastic net mixing parameter (0 = ridge, 1 = lasso).
+#' @return A fitted `cv.glmnet` object.
+#' @noRd
+.fit_binomial_glmnet <- function(x, y, alpha) {
+  nfolds <- min(5L, max(3L, floor(nrow(x) / 5L)))
+  glmnet::cv.glmnet(
+    x = x,
+    y = y,
+    family = "binomial",
+    alpha = alpha,
+    nfolds = nfolds,
+    type.measure = "deviance"
+  )
+}
 
 #' Create Stratified Folds for Cross-Validation
 #'
@@ -15,7 +44,7 @@ NULL
 #' @param y Factor response variable.
 #' @param k Number of folds.
 #' @return Integer vector of fold assignments (1 to k).
-#' @keywords internal
+#' @noRd
 .create_stratified_folds <- function(y, k) {
 
   n <- length(y)
@@ -47,7 +76,7 @@ NULL
 #' @param glm_design_terms Optional precomputed GLM design terms for each fold
 #'   when `regularized = FALSE`.
 #' @return Numeric vector of out-of-fold predicted probabilities.
-#' @keywords internal
+#' @noRd
 .compute_cv_scores <- function(x_selected, truth, fold_ids, cohort = NULL,
                                regularized = FALSE, alpha = 0,
                                glm_design_terms = NULL) {
@@ -113,7 +142,7 @@ NULL
 #' @param fold Fold number (for error messages).
 #' @param design_terms Optional precomputed GLM design terms for this fold.
 #' @return Numeric vector of predictions for test fold.
-#' @keywords internal
+#' @noRd
 .fit_cv_fold_glm <- function(x_train, y_train, x_test, cohort,
                              train_idx, test_idx, fold,
                              design_terms = NULL) {
@@ -149,7 +178,7 @@ NULL
 #' @param fold Fold number (for error messages).
 #' @param alpha Elastic net mixing parameter.
 #' @return Numeric vector of predictions for test fold.
-#' @keywords internal
+#' @noRd
 .fit_cv_fold_regularized <- function(x_train, y_train, x_test, cohort,
                                      train_idx, test_idx, fold, alpha) {
   tryCatch({
@@ -173,18 +202,7 @@ NULL
       }
     }
 
-    # Determine inner CV folds
-    n_train <- nrow(x_train_mat)
-    inner_nfolds <- min(5L, max(3L, floor(n_train / 5L)))
-
-    fit <- glmnet::cv.glmnet(
-      x = x_train_mat,
-      y = y_train_vec,
-      family = "binomial",
-      alpha = alpha,
-      nfolds = inner_nfolds,
-      type.measure = "deviance"
-    )
+    fit <- .fit_binomial_glmnet(x_train_mat, y_train_vec, alpha)
 
     y_pred <- stats::predict(fit, newx = x_test_mat, s = "lambda.min",
                              type = "response")[, 1]
@@ -215,7 +233,7 @@ NULL
 #'   (0 = ridge, 1 = lasso, 0.5 = elastic net). Default is 0.5.
 #' @param ... Additional arguments (ignored).
 #' @return Numeric vector of predicted probabilities.
-#' @keywords internal
+#' @noRd
 .default_scoring_fn <- function(x_selected, selected_features, truth,
                                 cohort = NULL, regularized = FALSE,
                                 alpha = 0.5, ...) {
@@ -252,7 +270,7 @@ NULL
 #' @param cohort Optional cohort indicator.
 #' @param n Number of samples.
 #' @return Numeric vector of predicted probabilities.
-#' @keywords internal
+#' @noRd
 .score_glm <- function(x_selected, truth, cohort, n) {
   tryCatch({
     predictions <- .fit_predict_binomial_glm(
@@ -286,7 +304,7 @@ NULL
 #' @param alpha Elastic net mixing parameter.
 #' @param n Number of samples.
 #' @return Numeric vector of predicted probabilities.
-#' @keywords internal
+#' @noRd
 .score_regularized <- function(x_selected, truth, cohort, alpha, n) {
   tryCatch({
     x_mat <- as.matrix(x_selected)
@@ -301,16 +319,7 @@ NULL
       }
     }
 
-    nfolds <- min(5L, max(3L, floor(n / 5L)))
-
-    fit <- glmnet::cv.glmnet(
-      x = x_mat,
-      y = y_vec,
-      family = "binomial",
-      alpha = alpha,
-      nfolds = nfolds,
-      type.measure = "deviance"
-    )
+    fit <- .fit_binomial_glmnet(x_mat, y_vec, alpha)
 
     predictions <- stats::predict(fit, newx = x_mat, s = "lambda.min",
                                    type = "response")[, 1]

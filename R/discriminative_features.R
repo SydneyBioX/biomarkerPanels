@@ -131,7 +131,7 @@ select_discriminative_features <- function(x_list,
 #' @param x Numeric matrix (samples x features).
 #' @param y Integer vector of 0/1 labels.
 #' @return Named numeric vector of AUC values (length = ncol(x)).
-#' @keywords internal
+#' @noRd
 .compute_rank_auc <- function(x, y) {
   pos <- which(y == 1L)
   neg <- which(y == 0L)
@@ -161,7 +161,7 @@ select_discriminative_features <- function(x_list,
 #' @param cohort_labels Integer vector of cohort assignments.
 #' @return Numeric vector of cohort discrimination scores per feature, scaled
 #'   to \code{[0.5, 1]} where 0.5 = no cohort separation.
-#' @keywords internal
+#' @noRd
 .compute_cohort_discrimination <- function(x_pooled, cohort_labels) {
   cohorts <- sort(unique(cohort_labels))
   n_cohorts <- length(cohorts)
@@ -197,7 +197,7 @@ select_discriminative_features <- function(x_list,
 #' @param lambda_sd Penalty weight for AUC variability.
 #' @param min_auc Minimum mean AUC threshold.
 #' @return Data frame sorted by decreasing score, filtered to `mean_auc > min_auc`.
-#' @keywords internal
+#' @noRd
 .score_discriminative_features <- function(auc_matrix,
                                            cohort_disc,
                                            lambda_cohort,

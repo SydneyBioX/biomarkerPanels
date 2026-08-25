@@ -25,7 +25,9 @@ NULL
 #' @param min_coefficient Minimum absolute coefficient required (applied to the
 #'   cohort-wise minimum magnitude) before a feature is considered transferable.
 #' @param require_sign_consistency If `TRUE`, only retain features whose ridge
-#'   coefficients meet the `sign_consistency_threshold` across cohorts.
+#'   coefficients meet the `sign_consistency_threshold` across cohorts. Note
+#'   that `FALSE` is equivalent to `sign_consistency_threshold = 0`: sign
+#'   agreement is a non-negative fraction, so a zero threshold never filters.
 #' @param sign_consistency_threshold Minimum fraction of cohorts that must agree
 #'   on coefficient sign direction (default 1.0 requires 100% agreement). Set to
 #'   values like 0.75 to allow partial sign consistency.
@@ -33,8 +35,6 @@ NULL
 #'   standardisation prior to fitting. Defaults to `TRUE`.
 #' @param assay For `SummarizedExperiment` inputs, the assay name or index to
 #'   extract prior to modelling.
-#' @param cv_control Optional named list of additional arguments forwarded to
-#'   [glmnet::cv.glmnet()] when `lambda` is `NULL`.
 #' @return A list containing the selected feature identifiers, per-feature
 #'   scoring metadata, coefficient matrix, and the lambda value used for each
 #'   cohort.
@@ -54,8 +54,7 @@ select_transferable_features <- function(x_list,
                                          require_sign_consistency = TRUE,
                                          sign_consistency_threshold = 1.0,
                                          standardize = TRUE,
-                                         assay = NULL,
-                                         cv_control = list()) {
+                                         assay = NULL) {
   n_features <- .validate_positive_integer(n_features, "n_features")
   lambda_choice <- match.arg(lambda_choice)
   if (!is.numeric(min_coefficient) || length(min_coefficient) != 1L) {
@@ -83,15 +82,13 @@ select_transferable_features <- function(x_list,
     y_vec <- responses[[i]]
 
     if (is.null(lambda_vec)) {
-      cv_args <- utils::modifyList(list(
+      cv_fit <- glmnet::cv.glmnet(
         x = x_mat,
         y = y_vec,
         alpha = 0,
         family = "binomial",
         standardize = standardize
-      ), cv_control)
-
-      cv_fit <- do.call(glmnet::cv.glmnet, cv_args)
+      )
       chosen_lambda <- if (lambda_choice == "lambda_min") {
         cv_fit$lambda.min
       } else {
@@ -179,7 +176,7 @@ select_transferable_features <- function(x_list,
 #' @param lambda User-supplied lambda or `NULL` for cross-validation.
 #' @param num_cohorts Number of cohorts.
 #' @return A numeric vector of length `num_cohorts`, or `NULL`.
-#' @keywords internal
+#' @noRd
 .resolve_lambda_vector <- function(lambda, num_cohorts) {
   if (is.null(lambda)) {
     return(NULL)
@@ -206,7 +203,7 @@ select_transferable_features <- function(x_list,
 #' @param lambda The lambda value at which to extract coefficients.
 #' @param feature_names Character vector of feature names to return.
 #' @return A named numeric vector of coefficients.
-#' @keywords internal
+#' @noRd
 .extract_glmnet_coefficients <- function(model, lambda, feature_names) {
   coef_mat <- stats::coef(model, s = lambda)
   coef_vec <- as.numeric(coef_mat)[-1]
@@ -222,10 +219,13 @@ select_transferable_features <- function(x_list,
 #' @param coefficient_matrix A matrix of ridge coefficients (features x cohorts).
 #' @param min_coefficient Minimum absolute coefficient required.
 #' @param require_sign_consistency Whether to filter by sign consistency.
+#'   Redundant with `sign_consistency_threshold`: `FALSE` behaves exactly like
+#'   `sign_consistency_threshold = 0`, because `sign_agreement >= 0` is always
+#'   true.
 #' @param sign_consistency_threshold Minimum fraction of cohorts agreeing on
 #'   coefficient sign.
 #' @return A data.frame with feature scores, sorted by decreasing score.
-#' @keywords internal
+#' @noRd
 .score_transferable_features <- function(coefficient_matrix,
                                          min_coefficient,
                                          require_sign_consistency,
@@ -249,6 +249,9 @@ select_transferable_features <- function(x_list,
   score <- mean_abs / (sd_coeff + 1e-6)
 
   keep <- is.finite(score) & !is.na(score) & (min_abs >= min_coefficient)
+  # Redundant with the threshold: `require_sign_consistency = FALSE` gives the
+  # same result as `sign_consistency_threshold = 0`, since sign_agreement is a
+  # non-negative fraction and so always clears a zero threshold.
   if (require_sign_consistency) {
     keep <- keep & sign_consistent
   }

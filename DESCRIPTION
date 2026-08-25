@@ -1,7 +1,7 @@
 Package: biomarkerPanels
 Type: Package
 Title: Multi-objective Optimization for Biomarker Panel Discovery
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: c(
     person(given = "Harry", family = "Robertson", role = c("aut", "cre"),
            email = "harry.robertson@sydney.edu.au")
@@ -55,15 +55,10 @@ Collate:
     'batch_associated_features.R'
     'biomarkerPanels-package.R'
     'cohort_inputs.R'
-    'cpop_fit.R'
-    'cpop_select.R'
-    'cpop_step2.R'
-    'cpop_utils.R'
     'cv_scoring.R'
     'data.R'
     'data_partitioning.R'
     'de_features.R'
-    'deprecated.R'
     'discriminative_features.R'
     'dual_stream_ratios.R'
     'evaluate_cohorts.R'

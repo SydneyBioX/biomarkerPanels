@@ -14,8 +14,7 @@ select_transferable_features(
   require_sign_consistency = TRUE,
   sign_consistency_threshold = 1,
   standardize = TRUE,
-  assay = NULL,
-  cv_control = list()
+  assay = NULL
 )
 }
 \arguments{
@@ -38,7 +37,9 @@ point for coefficient extraction.}
 cohort-wise minimum magnitude) before a feature is considered transferable.}
 
 \item{require_sign_consistency}{If \code{TRUE}, only retain features whose ridge
-coefficients meet the \code{sign_consistency_threshold} across cohorts.}
+coefficients meet the \code{sign_consistency_threshold} across cohorts. Note
+that \code{FALSE} is equivalent to \code{sign_consistency_threshold = 0}: sign
+agreement is a non-negative fraction, so a zero threshold never filters.}
 
 \item{sign_consistency_threshold}{Minimum fraction of cohorts that must agree
 on coefficient sign direction (default 1.0 requires 100\% agreement). Set to
@@ -49,9 +50,6 @@ standardisation prior to fitting. Defaults to \code{TRUE}.}
 
 \item{assay}{For \code{SummarizedExperiment} inputs, the assay name or index to
 extract prior to modelling.}
-
-\item{cv_control}{Optional named list of additional arguments forwarded to
-\code{\link[glmnet:cv.glmnet]{glmnet::cv.glmnet()}} when \code{lambda} is \code{NULL}.}
 }
 \value{
 A list containing the selected feature identifiers, per-feature

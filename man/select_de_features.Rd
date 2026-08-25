@@ -44,5 +44,5 @@ construction workflows.
 }
 \seealso{
 \code{\link[=select_transferable_features]{select_transferable_features()}}, \code{\link[=select_discriminative_features]{select_discriminative_features()}},
-\code{\link[=select_ruv_features]{select_ruv_features()}}, \code{\link[=select_cpop_features]{select_cpop_features()}}
+\code{\link[=select_ruv_features]{select_ruv_features()}}
 }

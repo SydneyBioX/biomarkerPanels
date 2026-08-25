@@ -23,7 +23,7 @@ NULL
 #' @param single_cohort_fallback Value to return for single cohort with gap
 #'   aggregation (default NULL uses base metric result).
 #' @return A cohort-aware metric function.
-#' @keywords internal
+#' @noRd
 .make_cohort_aware_metric <- function(base_metric, aggregator, metric_name,
                                      single_cohort_fallback = NULL) {
   function(truth, scores = NULL, selected = NULL,
@@ -81,7 +81,7 @@ NULL
 #' @param values Numeric vector of per-cohort metric values.
 #' @param na.rm Logical; whether to remove NA values before computation.
 #' @return The difference between max and min values.
-#' @keywords internal
+#' @noRd
 .gap_aggregator <- function(values, na.rm = TRUE) {
   max(values, na.rm = na.rm) - min(values, na.rm = na.rm)
 }
@@ -94,7 +94,7 @@ NULL
 #' @param values Numeric vector of per-cohort metric values.
 #' @param na.rm Logical; whether to remove NA values before computation.
 #' @return Variance of the values, or 0 for single-cohort input.
-#' @keywords internal
+#' @noRd
 .variance_aggregator <- function(values, na.rm = TRUE) {
   if (na.rm) values <- values[!is.na(values)]
   if (length(values) <= 1L) return(0)
@@ -112,12 +112,12 @@ NULL
 #' @param selected Ignored; kept for signature compatibility.
 #' @param positive Label treated as the positive ("event") class.
 #' @param cohort Factor indicating cohort membership.
-#' @param ... Additional arguments forwarded to [metric_auc()].
+#' @param ... Additional arguments forwarded to `metric_auc()`.
 #' @return AUC of the weakest cohort.
 #' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
 #'   of each class. Consider using `metric_auc` as the primary objective and
 #'   this metric for monitoring.
-#' @keywords internal
+#' @noRd
 metric_min_cohort_auc <- .make_cohort_aware_metric(
   base_metric = metric_auc,
   aggregator = min,
@@ -133,7 +133,7 @@ metric_min_cohort_auc <- .make_cohort_aware_metric(
 #' @return AUC range across cohorts.
 #' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
 #'   of each class.
-#' @keywords internal
+#' @noRd
 metric_cohort_auc_gap <- .make_cohort_aware_metric(
   base_metric = metric_auc,
   aggregator = .gap_aggregator,
@@ -151,7 +151,7 @@ metric_cohort_auc_gap <- .make_cohort_aware_metric(
 #' @return Variance of per-cohort AUC values.
 #' @note Per-cohort AUC is noisy when cohorts contain fewer than ~20 samples
 #'   of each class.
-#' @keywords internal
+#' @noRd
 metric_cohort_auc_var <- .make_cohort_aware_metric(
   base_metric = metric_auc,
   aggregator = .variance_aggregator,
@@ -166,7 +166,7 @@ metric_cohort_auc_var <- .make_cohort_aware_metric(
 #'
 #' @inheritParams metric_min_cohort_auc
 #' @return Maximum Brier score across cohorts.
-#' @keywords internal
+#' @noRd
 metric_max_cohort_brier <- function(truth, scores = NULL, selected = NULL,
                                   positive = "Yes", cohort = NULL) {
   truth <- ensure_binary_response(truth)
@@ -212,7 +212,7 @@ metric_max_cohort_brier <- function(truth, scores = NULL, selected = NULL,
 #' @param ... Additional arguments (ignored).
 #' @return Maximum adjusted R-squared across classes, clamped to \code{[0, 1]}.
 #'   Returns 0 when \code{cohort} is \code{NULL} or contains a single level.
-#' @keywords internal
+#' @noRd
 metric_cohort_leakage <- function(truth, scores = NULL, selected = NULL,
                                   positive = "Yes", cohort = NULL, ...) {
   truth <- ensure_binary_response(truth)

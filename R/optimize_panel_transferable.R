@@ -61,11 +61,6 @@
 #'   actually optimizes for. Requires `>=2` cohorts.
 #' @param n_val_splits Number of rotating train/val splits to pre-compute
 #'   when `fitness_mode = "within_cohort_rotating"` (default 10).
-#' @param cache_fitness Logical; if `TRUE` (default), cache candidate fitness
-#'   by selected base-feature panel within each validation context. Set
-#'   `FALSE` for intentionally stochastic custom objectives.
-#' @param cache_max_entries Maximum number of selected-panel entries retained
-#'   per fitness cache. Defaults to `Inf`.
 #' @param record_history Logical; if `TRUE`, capture the population, fitness,
 #'   and NSGA rank at every generation and attach the result to the returned
 #'   `OptimizationResult`. Retrieve via [nsga_history()]. Default `FALSE`.
@@ -103,8 +98,6 @@ optimize_panel_transferable <- function(
   n_top_features = 50L,
   fitness_mode = c("within_cohort_val", "within_cohort_rotating", "loco"),
   n_val_splits = 10L,
-  cache_fitness = TRUE,
-  cache_max_entries = Inf,
   record_history = FALSE
 ) {
   algorithm <- match.arg(algorithm)
@@ -125,7 +118,6 @@ optimize_panel_transferable <- function(
   # Validate numeric parameters
   .validate_probability(regularized_alpha, "regularized_alpha", bounds = "closed")
   .validate_selection_threshold(selection_threshold)
-  .validate_cache_controls(cache_fitness, cache_max_entries)
 
   # 1. Validate partition ratios
   .validate_partition_ratios(train_ratio, val_ratio)
@@ -207,9 +199,7 @@ optimize_panel_transferable <- function(
       alpha = regularized_alpha,
       feature_transform = feature_transform,
       min_features_required = min_features_required,
-      selection_threshold = selection_threshold,
-      cache_fitness = cache_fitness,
-      cache_max_entries = cache_max_entries
+      selection_threshold = selection_threshold
     )
   } else if (fitness_mode == "loco") {
     # Pool train+val per cohort; LOCO loop provides the held-out evaluation.
@@ -237,9 +227,7 @@ optimize_panel_transferable <- function(
       alpha = regularized_alpha,
       feature_transform = feature_transform,
       min_features_required = min_features_required,
-      selection_threshold = selection_threshold,
-      cache_fitness = cache_fitness,
-      cache_max_entries = cache_max_entries
+      selection_threshold = selection_threshold
     )
   } else {
     fitness_fn <- .make_validation_fitness(
@@ -257,9 +245,7 @@ optimize_panel_transferable <- function(
       alpha = regularized_alpha,
       feature_transform = feature_transform,
       min_features_required = min_features_required,
-      selection_threshold = selection_threshold,
-      cache_fitness = cache_fitness,
-      cache_max_entries = cache_max_entries
+      selection_threshold = selection_threshold
     )
   }
 
@@ -331,8 +317,6 @@ optimize_panel_transferable <- function(
     response_levels = levels(train_inputs$truth),
     seed = seed,
     selection_threshold = selection_threshold,
-    cache_fitness = cache_fitness,
-    cache_max_entries = cache_max_entries,
     regularized = regularized,
     regularized_alpha = if (regularized) regularized_alpha else NULL,
     fitness_mode = fitness_mode,
@@ -392,7 +376,7 @@ optimize_panel_transferable <- function(
 #'
 #' @param train_inputs,val_inputs Lists with `x`, `truth`, and `cohort`.
 #' @return List with combined `x`, `truth`, and `cohort`.
-#' @keywords internal
+#' @noRd
 .combine_partitions <- function(train_inputs, val_inputs) {
   list(
     x = rbind(train_inputs$x, val_inputs$x),

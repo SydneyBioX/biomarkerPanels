@@ -4,7 +4,7 @@
 #' feature transformations.
 #'
 #' @name feature_alignment
-#' @keywords internal
+#' @noRd
 NULL
 
 #' Resolve Feature Pool to Feature Names
@@ -15,7 +15,7 @@ NULL
 #' @param pool Feature identifiers (names or indices).
 #' @param feature_names Available feature names.
 #' @return Character vector of validated feature names.
-#' @keywords internal
+#' @noRd
 .resolve_feature_pool <- function(pool, feature_names) {
   if (is.numeric(pool)) {
     pool <- feature_names[pool]
@@ -43,7 +43,7 @@ NULL
 #' @param matrices List of feature matrices.
 #' @param transform Name of the feature transform.
 #' @return List of transformed matrices.
-#' @keywords internal
+#' @noRd
 .apply_feature_transform <- function(matrices, transform) {
   if (!length(matrices)) {
     return(matrices)
@@ -60,7 +60,7 @@ NULL
 #' @param x A numeric matrix with column names.
 #' @param transform_name Name of the feature transform.
 #' @return Transformed matrix.
-#' @keywords internal
+#' @noRd
 .apply_feature_transform_single <- function(x, transform_name) {
   if (transform_name == "none" || ncol(x) < 2L) {
     return(x)
@@ -78,7 +78,7 @@ NULL
 #' @param feature_sets List of feature name vectors (one per cohort).
 #' @param strategy Alignment strategy: "intersection", "majority", or "impute_median".
 #' @return List with `matrices` (aligned) and `features` (ordered feature names).
-#' @keywords internal
+#' @noRd
 .align_features <- function(matrices, feature_sets, strategy = "intersection") {
   n_cohorts <- length(matrices)
 
