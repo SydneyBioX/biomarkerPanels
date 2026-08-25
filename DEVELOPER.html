@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="index.html">biomarkerPanels</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0</span>
       </span>
     </div>
 
@@ -105,10 +105,10 @@
 <div class="section level3">
 <h3 id="id_2-feature-pre-selection">2. Feature Pre-selection<a class="anchor" aria-label="anchor" href="#id_2-feature-pre-selection"></a></h3>
 <ul><li>
-<strong>Files:</strong> <code>discriminative_features.R</code>, <code>ruv_features.R</code>, <code>transferable_features.R</code>, <code>denominator_features.R</code>, <code>cpop_fit.R</code>, <code>cpop_select.R</code>
+<strong>Files:</strong> <code>discriminative_features.R</code>, <code>ruv_features.R</code>, <code>transferable_features.R</code>, <code>batch_associated_features.R</code>
 </li>
 <li>
-<strong>Purpose:</strong> Large omics datasets are computationally expensive to optimize directly. Pre-selection filters the feature space using various statistical methods (e.g., Wilcoxon, RUV, CPOP) to form a highly-qualified “feature pool” that is small enough for NSGA-II/III to efficiently search.</li>
+<strong>Purpose:</strong> Large omics datasets are computationally expensive to optimize directly. Pre-selection filters the feature space using various statistical methods (e.g., Wilcoxon, RUV, ridge transferability) to form a highly-qualified “feature pool” that is small enough for NSGA-II/III to efficiently search.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="id_3-core-optimization-nsga-ii--nsga-iii">3. Core Optimization (NSGA-II / NSGA-III)<a class="anchor" aria-label="anchor" href="#id_3-core-optimization-nsga-ii--nsga-iii"></a></h3>

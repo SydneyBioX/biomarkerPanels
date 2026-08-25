@@ -25,7 +25,7 @@ evaluate_panel() for held-out validation."><!-- mathjax --><script src="https://
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">biomarkerPanels</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0</span>
       </span>
     </div>
 
@@ -89,7 +89,6 @@ lists of such objects. Optimisation should be run on training data only—use
 <span>  feature_transform <span class="op">=</span> <span class="st">"pairwise_ratios"</span>,</span>
 <span>  feature_alignment <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"intersection"</span>, <span class="st">"majority"</span>, <span class="st">"impute_median"</span><span class="op">)</span>,</span>
 <span>  constraints <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  scoring_fn <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  algorithm <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"NSGA-III"</span>, <span class="st">"NSGA-II"</span><span class="op">)</span>,</span>
 <span>  nsga_control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  assay <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -99,8 +98,6 @@ lists of such objects. Optimisation should be run on training data only—use
 <span>  regularized <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  regularized_alpha <span class="op">=</span> <span class="fl">0.5</span>,</span>
 <span>  selection_threshold <span class="op">=</span> <span class="st">"adaptive"</span>,</span>
-<span>  cache_fitness <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  cache_max_entries <span class="op">=</span> <span class="cn">Inf</span>,</span>
 <span>  record_history <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -174,12 +171,6 @@ from <code><a href="min_metric_constraint.html">min_metric_constraint()</a></cod
 solution to be considered feasible.</p></dd>
 
 
-<dt id="arg-scoring-fn">scoring_fn<a class="anchor" aria-label="anchor" href="#arg-scoring-fn"></a></dt>
-<dd><p>Function producing per-sample scores from the selected
-features. Signature:
-<code>function(x_selected, selected_features, truth, cohort = NULL, ...)</code>.</p></dd>
-
-
 <dt id="arg-algorithm">algorithm<a class="anchor" aria-label="anchor" href="#arg-algorithm"></a></dt>
 <dd><p>Multi-objective optimization algorithm. <code>"NSGA-III"</code>
 (default) uses reference-point-based selection and gives better Pareto
@@ -241,18 +232,6 @@ that allows variable panel sizes in the Pareto front. Fixed thresholds
 improve accuracy. Adaptive selection finds natural breakpoints in the
 weight distribution, enabling the <code>num_features</code> objective to drive panel
 size diversity.</p></dd>
-
-
-<dt id="arg-cache-fitness">cache_fitness<a class="anchor" aria-label="anchor" href="#arg-cache-fitness"></a></dt>
-<dd><p>Logical; if <code>TRUE</code> (default), cache candidate fitness
-by selected base-feature panel within each evaluation context. Set
-<code>FALSE</code> for intentionally stochastic custom objectives or scoring
-functions.</p></dd>
-
-
-<dt id="arg-cache-max-entries">cache_max_entries<a class="anchor" aria-label="anchor" href="#arg-cache-max-entries"></a></dt>
-<dd><p>Maximum number of selected-panel entries retained
-per fitness cache. Defaults to <code>Inf</code>.</p></dd>
 
 
 <dt id="arg-record-history">record_history<a class="anchor" aria-label="anchor" href="#arg-record-history"></a></dt>

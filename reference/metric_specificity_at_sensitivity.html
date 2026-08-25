@@ -20,7 +20,7 @@ know the best achievable specificity at that operating point."><!-- mathjax --><
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">biomarkerPanels</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0</span>
       </span>
     </div>
 
@@ -126,8 +126,10 @@ error.</p>
     </div>
     <div id="see-also">
     <h2>See also</h2>
-    <div class="dont-index"><p><code><a href="metric_pauc.html">metric_pauc()</a></code> for partial AUC in the high-sensitivity region,
-<code><a href="metric_sensitivity.html">metric_sensitivity()</a></code> and <code><a href="metric_specificity.html">metric_specificity()</a></code> for threshold-based metrics.</p></div>
+    <div class="dont-index"><p><code>metric_pauc()</code> for partial AUC in the high-sensitivity region,
+<code>metric_sensitivity()</code> and <code>metric_specificity()</code> for threshold-based
+metrics. All three are internal; reach them by registry name via
+<code><a href="define_objectives.html">define_objectives()</a></code>.</p></div>
     </div>
 
     <div id="ref-examples">
@@ -137,11 +139,11 @@ error.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Specificity when sensitivity is fixed at 90%</span></span></span>
 <span class="r-in"><span><span class="fu">metric_specificity_at_sensitivity</span><span class="op">(</span><span class="va">truth</span>, <span class="va">scores</span>, target_sensitivity <span class="op">=</span> <span class="fl">0.90</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.74</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.86</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Specificity when sensitivity is fixed at 95%</span></span></span>
 <span class="r-in"><span><span class="fu">metric_specificity_at_sensitivity</span><span class="op">(</span><span class="va">truth</span>, <span class="va">scores</span>, target_sensitivity <span class="op">=</span> <span class="fl">0.95</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.64</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0.7</span>
 </code></pre></div>
     </div>
   </div>

@@ -21,7 +21,7 @@ calibrate_panel())."><!-- mathjax --><script src="https://cdnjs.cloudflare.com/a
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">biomarkerPanels</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0</span>
       </span>
     </div>
 
@@ -95,8 +95,6 @@ held-out (stored for downstream NP threshold calibration via
 <span>  n_top_features <span class="op">=</span> <span class="fl">50L</span>,</span>
 <span>  fitness_mode <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"within_cohort_val"</span>, <span class="st">"within_cohort_rotating"</span>, <span class="st">"loco"</span><span class="op">)</span>,</span>
 <span>  n_val_splits <span class="op">=</span> <span class="fl">10L</span>,</span>
-<span>  cache_fitness <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  cache_max_entries <span class="op">=</span> <span class="cn">Inf</span>,</span>
 <span>  record_history <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -220,17 +218,6 @@ actually optimizes for. Requires <code>&gt;=2</code> cohorts.</p></dd>
 <dt id="arg-n-val-splits">n_val_splits<a class="anchor" aria-label="anchor" href="#arg-n-val-splits"></a></dt>
 <dd><p>Number of rotating train/val splits to pre-compute
 when <code>fitness_mode = "within_cohort_rotating"</code> (default 10).</p></dd>
-
-
-<dt id="arg-cache-fitness">cache_fitness<a class="anchor" aria-label="anchor" href="#arg-cache-fitness"></a></dt>
-<dd><p>Logical; if <code>TRUE</code> (default), cache candidate fitness
-by selected base-feature panel within each validation context. Set
-<code>FALSE</code> for intentionally stochastic custom objectives.</p></dd>
-
-
-<dt id="arg-cache-max-entries">cache_max_entries<a class="anchor" aria-label="anchor" href="#arg-cache-max-entries"></a></dt>
-<dd><p>Maximum number of selected-panel entries retained
-per fitness cache. Defaults to <code>Inf</code>.</p></dd>
 
 
 <dt id="arg-record-history">record_history<a class="anchor" aria-label="anchor" href="#arg-record-history"></a></dt>

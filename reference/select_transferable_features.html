@@ -19,7 +19,7 @@ cohorts. This emphasises biomarkers that deliver transferable signal."><!-- math
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">biomarkerPanels</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.1.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">0.2.0</span>
       </span>
     </div>
 
@@ -77,8 +77,7 @@ cohorts. This emphasises biomarkers that deliver transferable signal.</p>
 <span>  require_sign_consistency <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  sign_consistency_threshold <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  standardize <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  assay <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  cv_control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  assay <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -118,7 +117,9 @@ cohort-wise minimum magnitude) before a feature is considered transferable.</p><
 
 <dt id="arg-require-sign-consistency">require_sign_consistency<a class="anchor" aria-label="anchor" href="#arg-require-sign-consistency"></a></dt>
 <dd><p>If <code>TRUE</code>, only retain features whose ridge
-coefficients meet the <code>sign_consistency_threshold</code> across cohorts.</p></dd>
+coefficients meet the <code>sign_consistency_threshold</code> across cohorts. Note
+that <code>FALSE</code> is equivalent to <code>sign_consistency_threshold = 0</code>: sign
+agreement is a non-negative fraction, so a zero threshold never filters.</p></dd>
 
 
 <dt id="arg-sign-consistency-threshold">sign_consistency_threshold<a class="anchor" aria-label="anchor" href="#arg-sign-consistency-threshold"></a></dt>
@@ -135,11 +136,6 @@ standardisation prior to fitting. Defaults to <code>TRUE</code>.</p></dd>
 <dt id="arg-assay">assay<a class="anchor" aria-label="anchor" href="#arg-assay"></a></dt>
 <dd><p>For <code>SummarizedExperiment</code> inputs, the assay name or index to
 extract prior to modelling.</p></dd>
-
-
-<dt id="arg-cv-control">cv_control<a class="anchor" aria-label="anchor" href="#arg-cv-control"></a></dt>
-<dd><p>Optional named list of additional arguments forwarded to
-<code><a href="https://glmnet.stanford.edu/reference/cv.glmnet.html" class="external-link">glmnet::cv.glmnet()</a></code> when <code>lambda</code> is <code>NULL</code>.</p></dd>
 
 </dl></div>
     <div id="value">
