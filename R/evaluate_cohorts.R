@@ -81,7 +81,7 @@ evaluate_panel_by_cohort <- function(panel,
 
   # Normalize single-cohort input to list format
 
-  if (!is.list(x) || inherits(x, "SummarizedExperiment")) {
+  if (!.is_cohort_list(x)) {
     x <- list(x)
     y <- list(y)
   }

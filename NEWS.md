@@ -1,3 +1,15 @@
+# biomarkerPanels 0.2.0.9000
+
+## Bug fixes
+
+* A `data.frame` passed as `x` to `evaluate_panel()`, `evaluate_pareto_front()`
+  or the cohort helpers was mistaken for a multi-cohort list (`is.list()` is
+  `TRUE` for data.frames), failing with "When `x` is a list, `y` must also be
+  a list." All cohort-list dispatch now goes through `.is_cohort_list()`, which
+  excludes data.frames and SummarizedExperiments; `optimize_panel_transferable()`
+  likewise rejects a bare data.frame instead of splitting its columns into
+  cohorts.
+
 # biomarkerPanels 0.2.0
 
 Executes the 11 resolved cleanup decisions

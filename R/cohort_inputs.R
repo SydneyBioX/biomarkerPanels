@@ -25,6 +25,20 @@ NULL
   nm
 }
 
+#' Is an Input a List of Cohorts?
+#'
+#' `is.list()` is `TRUE` for data.frames, so a bare data.frame would otherwise
+#' be mistaken for a multi-cohort list (and its columns treated as cohorts).
+#' A cohort list is a plain list that is neither a data.frame nor a
+#' SummarizedExperiment.
+#'
+#' @param x Any object.
+#' @return Logical scalar.
+#' @noRd
+.is_cohort_list <- function(x) {
+  is.list(x) && !is.data.frame(x) && !inherits(x, "SummarizedExperiment")
+}
+
 #' Ensure a Feature Matrix Has Column Names
 #'
 #' Assigns generated `feature_0001`, `feature_0002`, ... column names when a
@@ -62,7 +76,7 @@ NULL
                                    feature_alignment = "intersection") {
 
   # Handle list input (matrices, data.frames, or SummarizedExperiments)
-  if (is.list(x) && !inherits(x, "SummarizedExperiment")) {
+  if (.is_cohort_list(x)) {
     if (!is.list(y)) {
       stop("When `x` is a list, `y` must also be a list.", call. = FALSE)
     }
@@ -414,7 +428,7 @@ NULL
     stop("Input cannot be NULL.", call. = FALSE)
   }
 
-  if (is.list(x)) {
+  if (.is_cohort_list(x)) {
     return(x)
   }
   list(x)

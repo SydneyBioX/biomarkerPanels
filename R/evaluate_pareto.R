@@ -78,7 +78,7 @@ evaluate_pareto_solutions <- function(optimization_result,
            "optimize_panel_transferable().", call. = FALSE)
     }
   }
-  if (is.list(x) && !is.null(cohort)) {
+  if (.is_cohort_list(x) && !is.null(cohort)) {
     warning("`cohort` is ignored when `x` is supplied as a list of cohorts.",
             call. = FALSE)
     cohort <- NULL

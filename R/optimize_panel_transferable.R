@@ -108,8 +108,8 @@ optimize_panel_transferable <- function(
   }
 
   # Validate inputs
-  if (!is.list(x) || length(x) < 1L) {
-    stop("`x` must be a list of cohort matrices.", call. = FALSE)
+  if (!.is_cohort_list(x) || length(x) < 1L) {
+    stop("`x` must be a list of cohort matrices (one element per cohort).", call. = FALSE)
   }
   if (!is.list(y) || length(y) != length(x)) {
     stop("`y` must be a list of response vectors matching `x`.", call. = FALSE)

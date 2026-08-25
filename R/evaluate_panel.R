@@ -92,7 +92,7 @@ evaluate_panel <- function(panel, x, y,
   }
 
   # Prepare validation data - get RAW features (no transform yet)
-  if (is.list(x)) {
+  if (.is_cohort_list(x)) {
     if (!is.null(cohort)) {
       warning("`cohort` argument is ignored when `x` is supplied as a list of cohorts.",
               call. = FALSE)
