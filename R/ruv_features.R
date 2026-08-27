@@ -92,7 +92,14 @@ select_ruv_features <- function(x_list,
                                 ebayes = TRUE,
                                 return_corrected = FALSE,
                                 assay = NULL) {
-  .check_ruv_available()
+  if (!requireNamespace("ruv", quietly = TRUE)) {
+    stop(
+      "Package 'ruv' is required for RUV-4 feature selection but not installed.\n",
+      "Install it via: install.packages('ruv')",
+      call. = FALSE
+    )
+  }
+
   n_features <- .validate_positive_integer(n_features, "n_features")
   neg_control_method <- match.arg(neg_control_method)
   scoring <- match.arg(scoring)
@@ -100,15 +107,12 @@ select_ruv_features <- function(x_list,
   if (!is.null(k)) {
     k <- .validate_positive_integer(k, "k")
   }
-  .validate_probability(neg_control_quantile, "neg_control_quantile",
-                        bounds = "closed")
+  .validate_probability(neg_control_quantile, "neg_control_quantile", bounds = "closed")
   if (!is.numeric(epsilon) || length(epsilon) != 1L || epsilon <= 0) {
     stop("`epsilon` must be a positive numeric scalar.", call. = FALSE)
   }
   if (neg_control_method == "list" && is.null(neg_control_genes)) {
-    stop('`neg_control_genes` must be provided when neg_control_method = "list".',
-      call. = FALSE
-    )
+    stop('`neg_control_genes` must be provided when neg_control_method = "list".', call. = FALSE)
   }
 
   prepared <- .prepare_selection_inputs(x_list, y_list, assay = assay)

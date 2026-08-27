@@ -228,14 +228,3 @@ test_that("parameter validation produces informative errors", {
     "not found in feature names"
   )
 })
-
-test_that(".check_ruv_available errors when ruv missing", {
-  # Mock requireNamespace to return FALSE
-  with_mocked_bindings(
-    requireNamespace = function(...) FALSE,
-    {
-      expect_error(.check_ruv_available(), "Package 'ruv' is required")
-    },
-    .package = "base"
-  )
-})

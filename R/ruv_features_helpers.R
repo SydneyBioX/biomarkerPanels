@@ -13,19 +13,6 @@ NULL
 # Internal helpers
 # ==============================================================================
 
-#' Check ruv Package Availability
-#' @noRd
-.check_ruv_available <- function() {
-  if (!requireNamespace("ruv", quietly = TRUE)) {
-    stop(
-      "Package 'ruv' is required for RUV-4 feature selection but not installed.\n",
-      "Install it via: install.packages('ruv')",
-      call. = FALSE
-    )
-  }
-  invisible(TRUE)
-}
-
 #' Pool Cohort Data into Single Matrix
 #'
 #' Combines per-cohort matrices and responses from `.prepare_selection_inputs()`
