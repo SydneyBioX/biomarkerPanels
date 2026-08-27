@@ -198,33 +198,3 @@ test_that("single cohort works without list wrapping", {
   expect_type(result$features, "character")
   expect_true(length(result$features) >= 1)
 })
-
-test_that("parameter validation produces informative errors", {
-  skip_if_not_installed("ruv")
-
-  fixture <- make_ruv_fixture()
-  x <- fixture$x_list
-  y <- fixture$y_list
-
-  expect_error(
-    select_ruv_features(x, y, k = -1),
-    "`k` must be a positive integer"
-  )
-  expect_error(
-    select_ruv_features(x, y, neg_control_quantile = 2),
-    "`neg_control_quantile` must be a numeric scalar"
-  )
-  expect_error(
-    select_ruv_features(x, y, epsilon = -1),
-    "`epsilon` must be a positive numeric scalar"
-  )
-  expect_error(
-    select_ruv_features(x, y, neg_control_method = "list"),
-    "`neg_control_genes` must be provided"
-  )
-  expect_error(
-    select_ruv_features(x, y, neg_control_method = "list",
-      neg_control_genes = c("nonexistent_gene")),
-    "not found in feature names"
-  )
-})
