@@ -36,5 +36,5 @@ computing per-cohort metrics and weighted variance for transferability
 assessment. Returns a \code{TransferablePanelResult} extending the input panel.
 }
 \seealso{
-\code{\link[=fit_panel]{fit_panel()}}, \code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}, \code{\link[=evaluate_panel]{evaluate_panel()}}
+\code{\link[=fit_panel]{fit_panel()}}, \code{\link[=optimize_panel]{optimize_panel()}}, \code{\link[=evaluate_panel]{evaluate_panel()}}
 }

@@ -91,12 +91,13 @@ with built-ins registered inline). Until then \code{method} accepts a single val
 }
 \examples{
 \dontrun{
-opt <- optimize_panel_transferable(
+opt <- optimize_panel(
   x = list(Cohort1 = x1, Cohort2 = x2),
   y = list(Cohort1 = y1, Cohort2 = y2),
   objectives = define_objectives(metrics = c("auc", "cohort_auc_gap")),
   feature_pool = ruv_features, max_features = 5,
-  feature_transform = "pairwise_ratios", algorithm = "NSGA-III"
+  feature_transform = "pairwise_ratios", algorithm = "NSGA-III",
+  fitness_mode = "within_cohort_val", train_ratio = 0.7, val_ratio = 0.2
 )
 solutions <- summarize_solutions(opt)
 solutions <- compute_diversity(solutions, opt)

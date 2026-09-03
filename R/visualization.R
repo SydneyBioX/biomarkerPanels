@@ -189,11 +189,11 @@ plot_pareto_evolution <- function(optimization_result,
 #' @param optimization_result An `OptimizationResult` from [optimize_panel()].
 #' @param x Held-out validation data: a matrix, data.frame,
 #'   `SummarizedExperiment`, or list of such objects. When `NULL` (default),
-#'   automatically uses held-out data stored by
-#'   [optimize_panel_transferable()].
+#'   automatically uses held-out data stored on `optimization_result` by
+#'   [optimize_panel()] (present when `train_ratio + val_ratio < 1`).
 #' @param y Held-out validation labels: a factor (or list of factors when `x`
 #'   is a list). When `NULL` (default), automatically uses held-out labels
-#'   stored by [optimize_panel_transferable()].
+#'   stored the same way.
 #' @param cohort Optional cohort factor for single-matrix `x`; passed to
 #'   [evaluate_pareto_solutions()].
 #' @param objectives Optional objective override; passed to

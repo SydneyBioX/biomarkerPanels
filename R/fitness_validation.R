@@ -1,8 +1,8 @@
 #' Validation-Based NSGA Fitness
 #'
 #' Factory for the train-on-training / evaluate-on-validation fitness used by
-#' [optimize_panel_transferable()]. Split out of that file to keep the main
-#' orchestration function readable.
+#' [optimize_panel()] when `fitness_mode = "within_cohort_val"`. Split out to
+#' keep the main orchestration function readable.
 #'
 #' @name fitness_validation
 NULL

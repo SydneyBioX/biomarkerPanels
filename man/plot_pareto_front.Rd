@@ -31,12 +31,12 @@ plot_pareto_front(
 
 \item{x}{Held-out validation data: a matrix, data.frame,
 \code{SummarizedExperiment}, or list of such objects. When \code{NULL} (default),
-automatically uses held-out data stored by
-\code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}.}
+automatically uses held-out data stored on \code{optimization_result} by
+\code{\link[=optimize_panel]{optimize_panel()}} (present when \code{train_ratio + val_ratio < 1}).}
 
 \item{y}{Held-out validation labels: a factor (or list of factors when \code{x}
 is a list). When \code{NULL} (default), automatically uses held-out labels
-stored by \code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}.}
+stored the same way.}
 
 \item{cohort}{Optional cohort factor for single-matrix \code{x}; passed to
 \code{\link[=evaluate_pareto_solutions]{evaluate_pareto_solutions()}}.}

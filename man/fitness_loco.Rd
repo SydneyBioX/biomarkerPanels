@@ -5,6 +5,6 @@
 \title{Leave-One-Cohort-Out NSGA Fitness}
 \description{
 Factory for the leave-one-cohort-out (LOCO) fitness used by
-\code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}. Split out of that file to keep the main
+\code{\link[=optimize_panel]{optimize_panel()}} when \code{fitness_mode = "loco"}. Split out to keep the main
 orchestration function readable.
 }

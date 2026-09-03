@@ -7,8 +7,8 @@
 #' In addition to the always-present descriptive columns (`sensitivity`,
 #' `specificity`, `auc` at a 0.5 cutoff), each solution is re-scored on the
 #' objectives the optimisation actually targeted. Those are recovered from
-#' `optimization_result@control$objectives` (stored by [optimize_panel()] and
-#' [optimize_panel_transferable()]) and reported in columns prefixed `obj_`,
+#' `optimization_result@control$objectives` (stored by [optimize_panel()])
+#' and reported in columns prefixed `obj_`,
 #' so `obj_auc` or `obj_sensitivity_at_specificity` are directly comparable to
 #' the training-side values in `solutions(optimization_result)`.
 #'
@@ -20,11 +20,11 @@
 #' @param optimization_result An `OptimizationResult` from [optimize_panel()].
 #' @param x Held-out validation data: a matrix, data.frame,
 #'   `SummarizedExperiment`, or list of such objects. When `NULL` (default),
-#'   automatically uses held-out data stored by
-#'   [optimize_panel_transferable()].
+#'   automatically uses held-out data stored on `optimization_result` by
+#'   [optimize_panel()] (present when `train_ratio + val_ratio < 1`).
 #' @param y Held-out validation labels: a factor (or list of factors when `x`
 #'   is a list). When `NULL` (default), automatically uses held-out labels
-#'   stored by [optimize_panel_transferable()].
+#'   stored the same way.
 #' @param cohort Optional factor identifying cohort membership for each sample
 #'   when `x` is a single matrix. Ignored when `x` is a list of cohorts. When
 #'   `x`/`y` are taken from the stored held-out partition, the stored cohort
@@ -45,8 +45,8 @@
 #'   the `obj_` columns back to their metric labels and optimisation
 #'   directions.
 #' @export
-#' @seealso [optimize_panel()], [optimize_panel_transferable()], [fit_panel()],
-#'   [evaluate_panel()], [plot_pareto_front()]
+#' @seealso [optimize_panel()], [fit_panel()], [evaluate_panel()],
+#'   [plot_pareto_front()]
 #' @examples
 #' \dontrun{
 #' opt <- optimize_panel(x_train, y_train, objectives = define_objectives())
@@ -74,8 +74,8 @@ evaluate_pareto_solutions <- function(optimization_result,
       if (is.null(cohort)) cohort <- ctrl$heldout_cohort
       if (verbose) message("Using held-out data stored in OptimizationResult.")
     } else {
-      stop("Provide held-out `x` and `y`, or use a result from ",
-           "optimize_panel_transferable().", call. = FALSE)
+      stop("Provide held-out `x` and `y`, or run optimize_panel() with a ",
+           "held-out share (train_ratio + val_ratio < 1).", call. = FALSE)
     }
   }
   if (.is_cohort_list(x) && !is.null(cohort)) {

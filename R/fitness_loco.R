@@ -1,7 +1,7 @@
 #' Leave-One-Cohort-Out NSGA Fitness
 #'
 #' Factory for the leave-one-cohort-out (LOCO) fitness used by
-#' [optimize_panel_transferable()]. Split out of that file to keep the main
+#' [optimize_panel()] when `fitness_mode = "loco"`. Split out to keep the main
 #' orchestration function readable.
 #'
 #' @name fitness_loco

@@ -67,14 +67,14 @@ test_that("LOCO fitness scores every candidate out of cohort", {
 # Integration: LOCO fitness runs end-to-end on a small fixture
 # (slow — uses NSGA). Kept brief, mirroring test-rotating-validation.R.
 
-test_that("optimize_panel_transferable runs with fitness_mode = 'loco'", {
+test_that("optimize_panel runs with fitness_mode = 'loco'", {
   skip_slow_tests()
   set.seed(11)
   sim <- simulate_expression_data(p = 40L, n = 40L, k = 2L, seed = 11L,
                                   shift_scale = 0.3)
   pool <- head(sim$metadata$informative_genes, 10L)
 
-  result <- optimize_panel_transferable(
+  result <- optimize_panel(
     x = sim$x_list, y = sim$y_list,
     feature_pool = pool,
     max_features = 3L,
@@ -95,7 +95,7 @@ test_that("optimize_panel_transferable runs with fitness_mode = 'loco'", {
   expect_null(result@control$n_val_splits)
 })
 
-test_that("optimize_panel_transferable rejects fitness_mode = 'loco' on one cohort", {
+test_that("optimize_panel rejects fitness_mode = 'loco' on one cohort", {
   skip_slow_tests()
   set.seed(12)
   sim <- simulate_expression_data(p = 30L, n = 60L, k = 1L, seed = 12L,
@@ -103,7 +103,7 @@ test_that("optimize_panel_transferable rejects fitness_mode = 'loco' on one coho
   pool <- head(sim$metadata$informative_genes, 8L)
 
   expect_error(
-    optimize_panel_transferable(
+    optimize_panel(
       x = sim$x_list, y = sim$y_list,
       feature_pool = pool,
       max_features = 3L,

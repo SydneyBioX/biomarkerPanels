@@ -2,7 +2,7 @@
 % Please edit documentation in R/optimize_panel_transferable.R
 \name{optimize_panel_transferable}
 \alias{optimize_panel_transferable}
-\title{Optimize Biomarker Panels with Transferability Focus}
+\title{Optimize Biomarker Panels with Transferability Focus (Deprecated)}
 \usage{
 optimize_panel_transferable(
   x,
@@ -70,7 +70,10 @@ on-the-fly during optimization (default \code{"pairwise_ratios"}). See
 
 \item{assay}{For \code{SummarizedExperiment} inputs, assay name or index.}
 
-\item{seed}{Optional integer seed for reproducibility.}
+\item{seed}{Optional integer seed for reproducibility. When \code{NULL} and
+\code{feature_pool} is also \code{NULL}, a seed is drawn and reused for both the
+feature-selection partition and the \code{\link[=optimize_panel]{optimize_panel()}} call, so the two
+partitions match and held-out samples never leak into feature selection.}
 
 \item{regularized}{Logical; if \code{TRUE} (default), use regularized regression.}
 
@@ -84,33 +87,16 @@ that allows variable panel sizes in the Pareto front. See
 \item{n_top_features}{Number of top features to select via
 \code{select_transferable_features()} when \code{feature_pool} is NULL (default 50).}
 
-\item{fitness_mode}{Fitness-evaluation strategy:
-\code{"within_cohort_val"} (default) trains on the combined train partition and
-evaluates on the combined validation partition — both partitions contain
-samples from every cohort, so a candidate can win by fitting
-within-cohort structure. \code{"within_cohort_rotating"} pools train and
-validation samples, pre-computes \code{n_val_splits} stratified train/val
-splits, and rotates to the next split every NSGA generation. This is
-the MOO analogue of mini-batch SGD: no single split can be overfit to,
-and final Pareto-solution metrics are averaged across all K splits for
-an honest cross-split number. Feature selection still runs on the
-original training partition only, so held-out labels never influence
-the feature pool. \code{"loco"} (leave-one-cohort-out) ignores the
-validation partition and pools train+val per cohort; each candidate is
-scored by iteratively training on all-but-one cohort and predicting on the
-held-out cohort. Metrics are computed on the concatenated out-of-cohort
-predictions, making cross-cohort transferability the objective NSGA
-actually optimizes for. Requires \verb{>=2} cohorts.}
+\item{fitness_mode}{Fitness-evaluation strategy: \code{"within_cohort_val"}
+(default), \code{"within_cohort_rotating"}, or \code{"loco"}. See
+\code{\link[=optimize_panel]{optimize_panel()}} for the description of each.}
 
 \item{n_val_splits}{Number of rotating train/val splits to pre-compute
 when \code{fitness_mode = "within_cohort_rotating"} (default 10).}
 
 \item{record_history}{Logical; if \code{TRUE}, capture the population, fitness,
 and NSGA rank at every generation and attach the result to the returned
-\code{OptimizationResult}. Retrieve via \code{\link[=nsga_history]{nsga_history()}}. Default \code{FALSE}.
-Adds modest overhead (one matrix copy per generation) and is intended for
-diagnostic / visualization use, e.g. plotting how the Pareto front
-evolves over \code{maxiter}.}
+\code{OptimizationResult}. Retrieve via \code{\link[=nsga_history]{nsga_history()}}. Default \code{FALSE}.}
 }
 \value{
 An \code{OptimizationResult} containing Pareto-optimal solutions and
@@ -119,18 +105,21 @@ inspect solutions, \code{\link[=fit_panel]{fit_panel()}} to fit a model, \code{\
 NP threshold calibration, and \code{\link[=evaluate_panel]{evaluate_panel()}} for validation.
 }
 \description{
-Wrapper implementing a train/validation/held-out split strategy for
-cross-cohort generalizability. Partitions each cohort into training
-(for NSGA optimization), validation (for solution selection), and
-held-out (stored for downstream NP threshold calibration via
-\code{\link[=calibrate_panel]{calibrate_panel()}}).
-}
-\details{
-Uses base-feature-first selection: NSGA searches over base features
-(O(n) search space), then feature transforms (e.g., pairwise ratios) are
-applied on-the-fly during fitness evaluation.
+Deprecated thin wrapper. Use \code{\link[=optimize_panel]{optimize_panel()}} directly, with
+\code{fitness_mode}, \code{train_ratio}, and \code{val_ratio}: the train/validation/
+held-out split and the \code{"within_cohort_val"} / \code{"within_cohort_rotating"} /
+\code{"loco"} fitness strategies this function used to implement are now part of
+\code{\link[=optimize_panel]{optimize_panel()}} itself (a held-out share exists whenever
+\code{train_ratio + val_ratio < 1}).
+
+When \code{feature_pool} is \code{NULL}, this wrapper still partitions the data and
+runs \code{select_transferable_features()} on the training partition only, so
+the old leakage-safe auto-selection behaviour survives for one release;
+pass \code{feature_pool} explicitly (or call \code{select_transferable_features()}
+yourself and pass its result) to skip that step and call \code{\link[=optimize_panel]{optimize_panel()}}
+directly instead.
 }
 \seealso{
-\code{\link[=fit_panel]{fit_panel()}}, \code{\link[=calibrate_panel]{calibrate_panel()}}, \code{\link[=evaluate_panel]{evaluate_panel()}},
-\code{\link[=summarize_solutions]{summarize_solutions()}}
+\code{\link[=optimize_panel]{optimize_panel()}}, \code{\link[=fit_panel]{fit_panel()}}, \code{\link[=calibrate_panel]{calibrate_panel()}},
+\code{\link[=evaluate_panel]{evaluate_panel()}}, \code{\link[=summarize_solutions]{summarize_solutions()}}
 }

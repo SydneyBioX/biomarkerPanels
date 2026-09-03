@@ -196,7 +196,7 @@ NULL
 #' @return A `TransferablePanelResult` with NP threshold, per-cohort metrics,
 #'   and weighted variance.
 #' @export
-#' @seealso [fit_panel()], [optimize_panel_transferable()], [evaluate_panel()]
+#' @seealso [fit_panel()], [optimize_panel()], [evaluate_panel()]
 calibrate_panel <- function(panel, x_heldout, y_heldout,
                             cohort_heldout = NULL,
                             np_alpha = 0.15, np_delta = 0.05) {

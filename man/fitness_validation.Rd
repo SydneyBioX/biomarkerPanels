@@ -5,6 +5,6 @@
 \title{Validation-Based NSGA Fitness}
 \description{
 Factory for the train-on-training / evaluate-on-validation fitness used by
-\code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}. Split out of that file to keep the main
-orchestration function readable.
+\code{\link[=optimize_panel]{optimize_panel()}} when \code{fitness_mode = "within_cohort_val"}. Split out to
+keep the main orchestration function readable.
 }

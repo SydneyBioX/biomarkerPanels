@@ -20,12 +20,12 @@ evaluate_pareto_solutions(
 
 \item{x}{Held-out validation data: a matrix, data.frame,
 \code{SummarizedExperiment}, or list of such objects. When \code{NULL} (default),
-automatically uses held-out data stored by
-\code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}.}
+automatically uses held-out data stored on \code{optimization_result} by
+\code{\link[=optimize_panel]{optimize_panel()}} (present when \code{train_ratio + val_ratio < 1}).}
 
 \item{y}{Held-out validation labels: a factor (or list of factors when \code{x}
 is a list). When \code{NULL} (default), automatically uses held-out labels
-stored by \code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}.}
+stored the same way.}
 
 \item{cohort}{Optional factor identifying cohort membership for each sample
 when \code{x} is a single matrix. Ignored when \code{x} is a list of cohorts. When
@@ -62,8 +62,8 @@ held-out validation data. This provides the metrics data frame used by
 In addition to the always-present descriptive columns (\code{sensitivity},
 \code{specificity}, \code{auc} at a 0.5 cutoff), each solution is re-scored on the
 objectives the optimisation actually targeted. Those are recovered from
-\code{optimization_result@control$objectives} (stored by \code{\link[=optimize_panel]{optimize_panel()}} and
-\code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}) and reported in columns prefixed \code{obj_},
+\code{optimization_result@control$objectives} (stored by \code{\link[=optimize_panel]{optimize_panel()}})
+and reported in columns prefixed \code{obj_},
 so \code{obj_auc} or \code{obj_sensitivity_at_specificity} are directly comparable to
 the training-side values in \code{solutions(optimization_result)}.
 
@@ -79,6 +79,6 @@ evaluate_pareto_solutions(opt, x_test, y_test)
 }
 }
 \seealso{
-\code{\link[=optimize_panel]{optimize_panel()}}, \code{\link[=optimize_panel_transferable]{optimize_panel_transferable()}}, \code{\link[=fit_panel]{fit_panel()}},
-\code{\link[=evaluate_panel]{evaluate_panel()}}, \code{\link[=plot_pareto_front]{plot_pareto_front()}}
+\code{\link[=optimize_panel]{optimize_panel()}}, \code{\link[=fit_panel]{fit_panel()}}, \code{\link[=evaluate_panel]{evaluate_panel()}},
+\code{\link[=plot_pareto_front]{plot_pareto_front()}}
 }

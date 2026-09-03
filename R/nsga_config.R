@@ -180,8 +180,8 @@ NULL
 
 #' Assemble NSGA Parameters and Run the Search
 #'
-#' Shared back half of [optimize_panel()] and [optimize_panel_transferable()]:
-#' builds the rmoo parameter list, adds NSGA-III reference points when needed,
+#' Shared back half of every `fitness_mode` of [optimize_panel()]: builds the
+#' rmoo parameter list, adds NSGA-III reference points when needed,
 #' optionally seeds the RNG, seeds the initial population with sparse
 #' suggestions spanning panel sizes, and dispatches to [rmoo::nsga2()] or
 #' [rmoo::nsga3()].

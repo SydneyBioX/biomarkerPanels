@@ -9,8 +9,8 @@ NULL
 
 #' Build the Pareto Solutions Data Frame from an NSGA Result
 #'
-#' Shared post-processing for [optimize_panel()] and
-#' [optimize_panel_transferable()]. Extracts the rank-1 (Pareto-optimal)
+#' Shared post-processing for every `fitness_mode` of [optimize_panel()].
+#' Extracts the rank-1 (Pareto-optimal)
 #' population from an `rmoo` result, re-evaluates each candidate to recover its
 #' features and objective metrics, drops constraint-infeasible solutions, filters
 #' any solutions that became dominated on re-evaluation, and assembles the

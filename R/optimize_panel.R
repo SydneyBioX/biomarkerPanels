@@ -241,7 +241,8 @@ optimize_panel <- function(x, y,
   # Seed once, immediately before partitioning, so the split and the search are
   # both reproducible. Nothing above draws from the RNG; nothing may be
   # inserted between here and .stratified_partition_cohorts() without changing
-  # the split (optimize_panel_transferable() reproduces it with the same seed).
+  # the split (the deprecated optimize_panel_transferable() wrapper reproduces
+  # it with the same seed).
   # ---------------------------------------------------------------------------
   if (!is.null(seed)) {
     set.seed(as.integer(seed))

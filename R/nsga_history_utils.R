@@ -2,8 +2,8 @@
 #'
 #' Internal helpers for capturing and materializing the per-generation
 #' population/fitness/front history during an NSGA-II/III run. The capture
-#' machinery is shared verbatim by [optimize_panel()] and
-#' [optimize_panel_transferable()]; these factories remove that duplication.
+#' machinery is shared by every `fitness_mode` of [optimize_panel()]; these
+#' factories remove that duplication.
 #'
 #' @name nsga_history_utils
 #' @noRd

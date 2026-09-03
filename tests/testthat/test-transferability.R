@@ -155,25 +155,27 @@ test_that("NP threshold fallback works without nproc", {
 # Slow tests (full optimization pipeline)
 # -----------------------------------------------------------------------------
 
-test_that("optimize_panel_transferable returns OptimizationResult", {
+test_that("optimize_panel returns OptimizationResult with a held-out share", {
   skip_slow_tests()
   set.seed(789)
 
   # Create multi-cohort data
   sim <- simulate_expression_data(p = 30, n = 200, k = 3, seed = 42)
+  pool <- head(sim$metadata$informative_genes, 15)
 
-  result <- optimize_panel_transferable(
+  result <- optimize_panel(
     x = sim$x_list,
     y = sim$y_list,
     objectives = define_objectives(metrics = c("sensitivity", "specificity", "num_features")),
     max_features = 4,
+    feature_pool = pool,
+    fitness_mode = "within_cohort_val",
     train_ratio = 0.7,
     val_ratio = 0.2,
     np_alpha = 0.15,
     np_delta = 0.05,
     feature_transform = "none",
-    nsga_control = list(popSize = 12, maxiter = 8),
-    n_top_features = 15
+    nsga_control = list(popSize = 12, maxiter = 8)
   )
 
   expect_s4_class(result, "OptimizationResult")
@@ -204,22 +206,23 @@ test_that("optimize_panel_transferable returns OptimizationResult", {
   expect_true(length(panel@features) >= 1)
 })
 
-test_that("feature selection uses training data only (no leakage)", {
+test_that("optimize_panel() with an explicit feature_pool respects max_features and partition shares", {
   skip_slow_tests()
   set.seed(101)
 
   sim <- simulate_expression_data(p = 25, n = 200, k = 2, seed = 42)
+  pool <- head(sim$metadata$informative_genes, 10)
 
-  # Run with automatic feature selection (feature_pool = NULL)
-  result <- optimize_panel_transferable(
+  result <- optimize_panel(
     x = sim$x_list,
     y = sim$y_list,
+    feature_pool = pool,
     max_features = 3,
+    fitness_mode = "within_cohort_val",
     train_ratio = 0.7,
     val_ratio = 0.2,
     feature_transform = "none",
     nsga_control = list(popSize = 10, maxiter = 6),
-    n_top_features = 10,
     seed = 42
   )
 
@@ -243,16 +246,18 @@ test_that("per-cohort metrics are populated for all cohorts", {
 
   n_cohorts <- 4
   sim <- simulate_expression_data(p = 20, n = 200, k = n_cohorts, seed = 42)
+  pool <- head(sim$metadata$informative_genes, 8)
 
-  opt <- optimize_panel_transferable(
+  opt <- optimize_panel(
     x = sim$x_list,
     y = sim$y_list,
+    feature_pool = pool,
     max_features = 3,
+    fitness_mode = "within_cohort_val",
     train_ratio = 0.7,
     val_ratio = 0.2,
     feature_transform = "none",
-    nsga_control = list(popSize = 8, maxiter = 5),
-    n_top_features = 8
+    nsga_control = list(popSize = 8, maxiter = 5)
   )
 
   panel <- fit_panel(opt)
@@ -274,16 +279,16 @@ test_that("single cohort is handled gracefully", {
 
   sim <- simulate_expression_data(p = 20, n = 200, k = 1, seed = 42)
 
-  opt <- optimize_panel_transferable(
+  opt <- optimize_panel(
     x = sim$x_list,
     y = sim$y_list,
     max_features = 3,
     feature_pool = sim$metadata$informative_genes[1:5],
+    fitness_mode = "within_cohort_val",
     train_ratio = 0.7,
     val_ratio = 0.2,
     feature_transform = "none",
-    nsga_control = list(popSize = 8, maxiter = 5),
-    n_top_features = 8
+    nsga_control = list(popSize = 8, maxiter = 5)
   )
 
   expect_s4_class(opt, "OptimizationResult")
@@ -315,4 +320,35 @@ test_that("calibrate_panel validates inputs", {
     calibrate_panel("not_a_panel", matrix(1:4, 2, 2), factor(c("No", "Yes"))),
     "BiomarkerPanelResult"
   )
+})
+
+test_that("optimize_panel_transferable() is a deprecated wrapper that auto-selects features and draws a seed", {
+  skip_slow_tests()
+
+  sim <- simulate_expression_data(p = 25, n = 200, k = 2, seed = 42)
+
+  warnings_seen <- character()
+  result <- withCallingHandlers(
+    optimize_panel_transferable(
+      x = sim$x_list,
+      y = sim$y_list,
+      max_features = 3,
+      feature_pool = NULL,
+      train_ratio = 0.7,
+      val_ratio = 0.2,
+      feature_transform = "none",
+      nsga_control = list(popSize = 10, maxiter = 6),
+      n_top_features = 10,
+      seed = NULL
+    ),
+    warning = function(w) {
+      warnings_seen <<- c(warnings_seen, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+
+  expect_true(any(grepl("deprecated", warnings_seen)))
+  expect_s4_class(result, "OptimizationResult")
+  expect_true(!is.null(result@control$heldout_x))
+  expect_true(is.numeric(result@control$seed) && length(result@control$seed) == 1L)
 })

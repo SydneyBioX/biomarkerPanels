@@ -84,7 +84,7 @@ test_that(".generate_stratified_splits rejects invalid inputs", {
 # Integration: rotating fitness runs end-to-end on a small fixture
 # (slow — uses NSGA). Kept brief.
 
-test_that("optimize_panel_transferable runs with within_cohort_rotating", {
+test_that("optimize_panel runs with fitness_mode = 'within_cohort_rotating'", {
   skip_slow_tests()
   set.seed(11)
   sim <- simulate_expression_data(p = 40L, n = 40L, k = 2L, seed = 11L,
@@ -92,7 +92,7 @@ test_that("optimize_panel_transferable runs with within_cohort_rotating", {
   # Use only the most informative genes as pool to keep the test fast
   pool <- head(sim$metadata$informative_genes, 10L)
 
-  result <- optimize_panel_transferable(
+  result <- optimize_panel(
     x = sim$x_list, y = sim$y_list,
     feature_pool = pool,
     max_features = 3L,
