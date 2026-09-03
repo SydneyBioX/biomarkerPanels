@@ -255,132 +255,41 @@ optimize_panel <- function(x, y,
   nsga_args <- utils::modifyList(nsga_defaults, nsga_control)
 
 
-  # Create CV folds for fitness evaluation (if enabled)
-  cv_fold_ids <- NULL
   if (!fitness_cv) {
     warning("fitness_cv = FALSE: NSGA will use in-sample scoring, which risks ",
             "overfitting during optimization. Consider fitness_cv = TRUE for ",
             "more reliable panel selection.", call. = FALSE)
   }
-  if (fitness_cv) {
-    n_samples <- nrow(x_pool)
-    if (n_samples < fitness_cv_folds * 2L) {
-      warning("Too few samples for ", fitness_cv_folds, "-fold CV in fitness evaluation. ",
-              "Falling back to in-sample scoring.", call. = FALSE)
-      fitness_cv <- FALSE
-    } else {
-      cv_fold_ids <- .create_stratified_folds(truth, fitness_cv_folds)
-    }
-  }
 
-  # Shared selector and transform cache used by fitness evaluation and
-  # history materialization.
-  scaffold <- .make_fitness_scaffold(
+  # Shared selector used by fitness evaluation (inside the factory) and by
+  # history materialization here.
+  panel_selector <- .make_panel_selector(
     feature_pool = colnames(x_pool),
     max_features = max_features,
     min_features_required = min_features_required,
-    selection_threshold = selection_threshold,
-    matrices = list(x = x_pool),
-    feature_transform = feature_transform,
-    objectives = objectives,
-    constraints = constraints
+    selection_threshold = selection_threshold
   )
-  panel_selector <- scaffold$selector
-  transform_panel <- scaffold$transform
   select_base_features <- function(decision_vec) {
     panel_selector(decision_vec)$base_features
   }
 
-  cv_glm_design_terms <- NULL
-  if (fitness_cv && !is.null(cv_fold_ids) && !regularized) {
-    cv_glm_design_terms <- .prepare_cv_glm_design_terms(cohort, cv_fold_ids)
-  }
-  in_sample_glm_design_terms <- NULL
-  if (!fitness_cv && !regularized) {
-    in_sample_glm_design_terms <- .prepare_glm_design_terms(
-      cohort_train = cohort,
-      cohort_new = cohort,
-      predict_cohort = "observed"
-    )
-  }
-
-  evaluate_candidate <- function(decision_vec = NULL, selection = NULL) {
-    if (is.null(selection)) {
-      selection <- panel_selector(decision_vec)
-    }
-    selected_base_features <- selection$base_features
-
-    transformed <- transform_panel(selected_base_features)
-    x_selected <- transformed$matrices$x
-    selected_features <- transformed$features
-
-    # Step 3: Compute scores using CV (out-of-fold predictions) or in-sample
-    if (fitness_cv && !is.null(cv_fold_ids)) {
-      # Cross-validation based scoring: prevents overfitting
-      scores <- .compute_cv_scores(
-        x_selected = x_selected,
-        truth = truth,
-        fold_ids = cv_fold_ids,
-        cohort = cohort,
-        regularized = regularized,
-        alpha = regularized_alpha,
-        glm_design_terms = cv_glm_design_terms
-      )
-    } else {
-      # In-sample scoring (for backward compatibility or small datasets)
-      scores <- if (!regularized) {
-        .fit_predict_binomial_glm(
-          x_train = x_selected,
-          truth = truth,
-          x_new = x_selected,
-          cohort_train = cohort,
-          cohort_new = cohort,
-          predict_cohort = "observed",
-          design_terms = in_sample_glm_design_terms
-        )
-      } else {
-        .default_scoring_fn(
-          x_selected = x_selected,
-          selected_features = selected_features,
-          truth = truth,
-          cohort = cohort,
-          regularized = regularized,
-          alpha = regularized_alpha
-        )
-      }
-    }
-
-    if (!is.numeric(scores) || length(scores) != nrow(x_pool)) {
-      stop("Scoring must return a numeric vector matching the number of samples.",
-           call. = FALSE)
-    }
-
-    # Step 4: Evaluate constraints
-    constraints_eval <- .evaluate_constraints(
-      constraint_specs, truth, scores,
-      selected = selected_base_features, cohort = cohort, x = x_selected
-    )
-    constraint_results <- constraints_eval$results
-    feasible <- constraints_eval$feasible
-
-    # Step 5: Evaluate objectives on the transformed scoring matrix.
-    metrics <- .evaluate_objectives(
-      objectives, truth, scores,
-      selected = selected_base_features, cohort = cohort, x = x_selected
-    )
-
-    # Return BOTH base features and transformed features
-    list(
-      base_features = selected_base_features,  # Original genes selected
-      features = selected_features,             # Transformed features (for model)
-      scores = scores,
-      metrics = metrics,
-      constraint_results = constraint_results,
-      feasible = feasible
-    )
-  }
-
-  objective_wrapper <- scaffold$finalize(evaluate_candidate)$wrapper
+  fitness_fn <- .make_cv_fitness(
+    x = x_pool,
+    y = truth,
+    cohort = cohort,
+    feature_pool = colnames(x_pool),
+    max_features = max_features,
+    objectives = objectives,
+    constraints = constraints,
+    regularized = regularized,
+    alpha = regularized_alpha,
+    feature_transform = feature_transform,
+    min_features_required = min_features_required,
+    selection_threshold = selection_threshold,
+    fitness_cv = fitness_cv,
+    fitness_cv_folds = fitness_cv_folds
+  )
+  objective_wrapper <- fitness_fn$wrapper
 
   # Optional per-generation history capture. We build a closure that pushes
   # each generation's population, fitness, and front into a parent-scope env.
@@ -411,7 +320,7 @@ optimize_panel <- function(x, y,
   # Extract the Pareto front, re-evaluate, drop infeasible/dominated solutions,
   # and assemble the wide-format solutions data frame.
   solutions_df <- .build_pareto_solutions_df(
-    nsga_result, evaluate_candidate, objectives, objective_directions,
+    nsga_result, fitness_fn$evaluate, objectives, objective_directions,
     infeasible_msg = "No solutions satisfied the supplied constraints. Consider relaxing them."
   )
 

@@ -69,6 +69,7 @@ Collate:
     'feature_alignment.R'
     'feature_transforms.R'
     'fitness_cache_utils.R'
+    'fitness_cv.R'
     'fitness_eval.R'
     'fitness_loco.R'
     'fitness_rotating_validation.R'
