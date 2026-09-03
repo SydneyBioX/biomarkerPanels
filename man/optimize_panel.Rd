@@ -18,12 +18,19 @@ optimize_panel(
   nsga_control = list(),
   assay = NULL,
   seed = NULL,
-  fitness_cv = TRUE,
+  fitness_mode = c("cv", "in_sample", "within_cohort_val", "within_cohort_rotating",
+    "loco"),
   fitness_cv_folds = 5L,
+  n_val_splits = 10L,
+  train_ratio = 1,
+  val_ratio = 0,
+  np_alpha = 0.15,
+  np_delta = 0.05,
   regularized = TRUE,
   regularized_alpha = 0.5,
   selection_threshold = "adaptive",
-  record_history = FALSE
+  record_history = FALSE,
+  fitness_cv = NULL
 )
 }
 \arguments{
@@ -85,19 +92,46 @@ as it is slower than sequential execution due to overhead.}
 
 \item{assay}{For \code{SummarizedExperiment} inputs, assay name or index to use.}
 
-\item{seed}{Optional integer seed for reproducibility. When provided, sets
-the random seed before running NSGA optimization. This ensures
-reproducible results across runs. If \code{NULL} (default), no seed is set and
-results may vary between runs.}
+\item{seed}{Optional integer seed for reproducibility. When provided, the
+seed is set once before partitioning, so both the data split and the NSGA
+search are reproducible. If \code{NULL} (default), no seed is set and results
+may vary between runs.}
 
-\item{fitness_cv}{Logical; if \code{TRUE} (default), use cross-validation when
-evaluating candidate solutions during NSGA optimization. This prevents
-overfitting by computing objective metrics on held-out fold predictions
-rather than in-sample predictions. Recommended for fair comparison with
-regularized methods like Lasso.}
+\item{fitness_mode}{How candidate panels are scored during the NSGA search:
+\describe{
+\item{"cv"}{(Default) k-fold cross-validation within the training
+partition; objectives are computed on out-of-fold predictions.}
+\item{"in_sample"}{Train and score on the same samples. Fast but
+overfits; kept for small datasets and backward compatibility.}
+\item{"within_cohort_val"}{Train on the training partition, score on the
+validation partition. Requires \code{val_ratio > 0}.}
+\item{"within_cohort_rotating"}{Pool train and validation, pre-compute
+\code{n_val_splits} stratified splits, and rotate to the next split every
+generation so no single split can be overfit to. Requires
+\code{val_ratio > 0}.}
+\item{"loco"}{Leave-one-cohort-out: score each candidate on concatenated
+out-of-cohort predictions, making cross-cohort transferability the
+objective. Requires at least 2 cohorts.}
+}}
 
 \item{fitness_cv_folds}{Number of cross-validation folds for fitness
-evaluation when \code{fitness_cv = TRUE}. Default is 5.}
+evaluation when \code{fitness_mode = "cv"}. Default is 5.}
+
+\item{n_val_splits}{Number of rotating train/validation splits to
+pre-compute when \code{fitness_mode = "within_cohort_rotating"} (default 10).}
+
+\item{train_ratio, val_ratio}{Per-cohort shares used for stratified
+partitioning; the remainder (\code{1 - train_ratio - val_ratio}) is held out and
+stored on the result for \code{\link[=calibrate_panel]{calibrate_panel()}}. The default
+\code{train_ratio = 1}, \code{val_ratio = 0} means no partitioning at all: the whole
+input is the training data.}
+
+\item{np_alpha}{Type I error rate for Neyman-Pearson threshold selection.
+Stored on the result for \code{\link[=calibrate_panel]{calibrate_panel()}} when a held-out partition
+exists (default 0.15).}
+
+\item{np_delta}{Tolerance for Neyman-Pearson threshold selection, stored
+alongside \code{np_alpha} (default 0.05).}
 
 \item{regularized}{Logical; if \code{TRUE} (default), use regularized regression
 (elastic net via glmnet) for scoring candidates during optimization. This
@@ -122,6 +156,10 @@ and NSGA rank at every generation and attach the result to the returned
 Adds modest overhead (one matrix copy per generation) and is intended for
 diagnostic / visualization use, e.g. plotting how the Pareto front
 evolves over \code{maxiter}.}
+
+\item{fitness_cv}{Deprecated. Logical alias for \code{fitness_mode}: \code{TRUE} maps
+to \code{"cv"} and \code{FALSE} to \code{"in_sample"}. Supplying it emits a deprecation
+warning and overrides \code{fitness_mode}.}
 }
 \value{
 An \code{OptimizationResult} containing the Pareto-optimal solutions.

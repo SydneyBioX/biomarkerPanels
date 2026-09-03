@@ -57,17 +57,40 @@
 #'   values based on feature pool size. Note: `parallel = TRUE` is not recommended
 #'   as it is slower than sequential execution due to overhead.
 #' @param assay For `SummarizedExperiment` inputs, assay name or index to use.
-#' @param seed Optional integer seed for reproducibility. When provided, sets
-#'   the random seed before running NSGA optimization. This ensures
-#'   reproducible results across runs. If `NULL` (default), no seed is set and
-#'   results may vary between runs.
-#' @param fitness_cv Logical; if `TRUE` (default), use cross-validation when
-#'   evaluating candidate solutions during NSGA optimization. This prevents
-#'   overfitting by computing objective metrics on held-out fold predictions
-#'   rather than in-sample predictions. Recommended for fair comparison with
-#'   regularized methods like Lasso.
+#' @param seed Optional integer seed for reproducibility. When provided, the
+#'   seed is set once before partitioning, so both the data split and the NSGA
+#'   search are reproducible. If `NULL` (default), no seed is set and results
+#'   may vary between runs.
+#' @param fitness_mode How candidate panels are scored during the NSGA search:
+#'   \describe{
+#'     \item{"cv"}{(Default) k-fold cross-validation within the training
+#'       partition; objectives are computed on out-of-fold predictions.}
+#'     \item{"in_sample"}{Train and score on the same samples. Fast but
+#'       overfits; kept for small datasets and backward compatibility.}
+#'     \item{"within_cohort_val"}{Train on the training partition, score on the
+#'       validation partition. Requires `val_ratio > 0`.}
+#'     \item{"within_cohort_rotating"}{Pool train and validation, pre-compute
+#'       `n_val_splits` stratified splits, and rotate to the next split every
+#'       generation so no single split can be overfit to. Requires
+#'       `val_ratio > 0`.}
+#'     \item{"loco"}{Leave-one-cohort-out: score each candidate on concatenated
+#'       out-of-cohort predictions, making cross-cohort transferability the
+#'       objective. Requires at least 2 cohorts.}
+#'   }
 #' @param fitness_cv_folds Number of cross-validation folds for fitness
-#'   evaluation when `fitness_cv = TRUE`. Default is 5.
+#'   evaluation when `fitness_mode = "cv"`. Default is 5.
+#' @param n_val_splits Number of rotating train/validation splits to
+#'   pre-compute when `fitness_mode = "within_cohort_rotating"` (default 10).
+#' @param train_ratio,val_ratio Per-cohort shares used for stratified
+#'   partitioning; the remainder (`1 - train_ratio - val_ratio`) is held out and
+#'   stored on the result for [calibrate_panel()]. The default
+#'   `train_ratio = 1`, `val_ratio = 0` means no partitioning at all: the whole
+#'   input is the training data.
+#' @param np_alpha Type I error rate for Neyman-Pearson threshold selection.
+#'   Stored on the result for [calibrate_panel()] when a held-out partition
+#'   exists (default 0.15).
+#' @param np_delta Tolerance for Neyman-Pearson threshold selection, stored
+#'   alongside `np_alpha` (default 0.05).
 #' @param regularized Logical; if `TRUE` (default), use regularized regression
 #'   (elastic net via glmnet) for scoring candidates during optimization. This
 #'   typically produces more stable fitness estimates and better out-of-sample
@@ -89,6 +112,9 @@
 #'   improve accuracy. Adaptive selection finds natural breakpoints in the
 #'   weight distribution, enabling the `num_features` objective to drive panel
 #'   size diversity.
+#' @param fitness_cv Deprecated. Logical alias for `fitness_mode`: `TRUE` maps
+#'   to `"cv"` and `FALSE` to `"in_sample"`. Supplying it emits a deprecation
+#'   warning and overrides `fitness_mode`.
 #' @return An `OptimizationResult` containing the Pareto-optimal solutions.
 #'   Use [summarize_solutions()] to inspect solutions and [fit_panel()] to
 #'   fit a model on a selected solution.
@@ -107,12 +133,19 @@ optimize_panel <- function(x, y,
                            nsga_control = list(),
                            assay = NULL,
                            seed = NULL,
-                           fitness_cv = TRUE,
+                           fitness_mode = c("cv", "in_sample", "within_cohort_val",
+                                            "within_cohort_rotating", "loco"),
                            fitness_cv_folds = 5L,
+                           n_val_splits = 10L,
+                           train_ratio = 1,
+                           val_ratio = 0,
+                           np_alpha = 0.15,
+                           np_delta = 0.05,
                            regularized = TRUE,
                            regularized_alpha = 0.5,
                            selection_threshold = "adaptive",
-                           record_history = FALSE) {
+                           record_history = FALSE,
+                           fitness_cv = NULL) {
   algorithm <- match.arg(algorithm)
   feature_alignment <- match.arg(feature_alignment)
   if (!requireNamespace("rmoo", quietly = TRUE)) {
@@ -120,23 +153,35 @@ optimize_panel <- function(x, y,
          call. = FALSE)
   }
 
-  if (!is.character(feature_transform) || length(feature_transform) != 1L ||
-      !nzchar(feature_transform)) {
-    stop("`feature_transform` must be a single non-empty character string.", call. = FALSE)
-  }
-  if (!exists(feature_transform, envir = .transform_registry, inherits = FALSE)) {
-    available <- ls(.transform_registry)
-    stop(
-      "Unknown feature transform '", feature_transform, "'. ",
-      "Available: ", paste(available, collapse = ", "), ". ",
-      "Use register_feature_transform() to add custom transforms.",
-      call. = FALSE
-    )
-  }
-  .validate_positive_integer(fitness_cv_folds, "fitness_cv_folds", min = 2L)
-  .validate_probability(regularized_alpha, "regularized_alpha", bounds = "closed")
-  .validate_selection_threshold(selection_threshold)
+  opts <- .validate_optimize_panel_args(
+    fitness_mode = fitness_mode,
+    fitness_cv = fitness_cv,
+    fitness_cv_folds = fitness_cv_folds,
+    n_val_splits = n_val_splits,
+    train_ratio = train_ratio,
+    val_ratio = val_ratio,
+    regularized_alpha = regularized_alpha,
+    selection_threshold = selection_threshold,
+    feature_transform = feature_transform,
+    np_alpha = np_alpha,
+    np_delta = np_delta,
+    seed = seed
+  )
+  fitness_mode <- opts$fitness_mode
+  fitness_cv_folds <- opts$fitness_cv_folds
+  n_val_splits <- opts$n_val_splits
+  heldout_ratio <- opts$heldout_ratio
 
+  if (fitness_mode == "in_sample") {
+    warning("fitness_mode = \"in_sample\": NSGA will use in-sample scoring, which ",
+            "risks overfitting during optimization. Consider fitness_mode = \"cv\" ",
+            "for more reliable panel selection.", call. = FALSE)
+  }
+
+  # ---------------------------------------------------------------------------
+  # Resolve the base feature pool against the raw, aligned input. This runs on
+  # the whole dataset (feature *names* only, no labels), before any split.
+  # ---------------------------------------------------------------------------
   inputs_raw <- .prepare_cohort_inputs(x, y, assay = assay, transform = "none",
                                        feature_alignment = feature_alignment)
   raw_x_mat <- .ensure_feature_colnames(inputs_raw$x)
@@ -144,7 +189,6 @@ optimize_panel <- function(x, y,
 
   feature_pool_arg <- feature_pool
   feature_pool_base <- raw_feature_names
-  feature_pool_final <- NULL
 
   if (!is.null(feature_pool_arg)) {
     if (is.numeric(feature_pool_arg)) {
@@ -168,7 +212,6 @@ optimize_panel <- function(x, y,
           )
         }
         feature_pool_base <- components
-        feature_pool_final <- feature_pool_arg
       } else {
         missing <- setdiff(feature_pool_arg, raw_feature_names)
         stop(
@@ -194,18 +237,70 @@ optimize_panel <- function(x, y,
     }
   }
 
-  # Prepare raw (untransformed) data - transform is applied on-the-fly during fitness evaluation
-  inputs <- .prepare_cohort_inputs(
-    x,
-    y,
-    assay = assay,
-    transform = "none",  # Always raw - transform applied after feature selection
-    feature_subset = feature_pool_base,
-    feature_alignment = feature_alignment
-  )
-  x_raw <- inputs$x
-  truth <- inputs$truth
-  cohort <- inputs$cohort
+  # ---------------------------------------------------------------------------
+  # Seed once, immediately before partitioning, so the split and the search are
+  # both reproducible. Nothing above draws from the RNG; nothing may be
+  # inserted between here and .stratified_partition_cohorts() without changing
+  # the split (optimize_panel_transferable() reproduces it with the same seed).
+  # ---------------------------------------------------------------------------
+  if (!is.null(seed)) {
+    set.seed(as.integer(seed))
+  }
+
+  partition_info <- NULL
+  if (opts$partitioned) {
+    x_list <- if (.is_cohort_list(x)) x else list(x)
+    y_list <- if (.is_cohort_list(x)) y else list(y)
+    if (!is.list(y_list) || length(y_list) != length(x_list)) {
+      stop("`y` must be a list of response vectors matching `x`.", call. = FALSE)
+    }
+    # Partitioning subsets rows, which is meaningless for a
+    # SummarizedExperiment; coerce cohorts to sample-by-feature matrices first.
+    x_list <- lapply(x_list, .extract_feature_matrix, assay = assay)
+
+    partitions <- .stratified_partition_cohorts(
+      x_list, y_list, train_ratio, opts$val_ratio
+    )
+    partition_info <- partitions$partition_info
+
+    prepare_partition <- function(part_x, part_y) {
+      .prepare_cohort_inputs(
+        part_x, part_y,
+        assay = assay,
+        transform = "none",
+        feature_subset = feature_pool_base,
+        feature_alignment = feature_alignment
+      )
+    }
+    train_inputs <- prepare_partition(partitions$train_x, partitions$train_y)
+    val_inputs <- if (opts$val_ratio > 0) {
+      prepare_partition(partitions$val_x, partitions$val_y)
+    } else {
+      NULL
+    }
+    heldout_inputs <- if (heldout_ratio > 0) {
+      prepare_partition(partitions$heldout_x, partitions$heldout_y)
+    } else {
+      NULL
+    }
+  } else {
+    train_inputs <- .prepare_cohort_inputs(
+      x, y,
+      assay = assay,
+      transform = "none",
+      feature_subset = feature_pool_base,
+      feature_alignment = feature_alignment
+    )
+    val_inputs <- NULL
+    heldout_inputs <- NULL
+  }
+
+  # Train + validation pooled: what the returned result carries as its
+  # training data, and what the pooled fitness modes (LOCO, rotating) search on.
+  pooled <- .combine_partitions(train_inputs, val_inputs)
+  x_raw <- pooled$x
+  truth <- pooled$truth
+  cohort <- pooled$cohort
 
   # Feature pool is now BASE features (not aggregated)
   feature_pool <- feature_pool_base
@@ -254,13 +349,6 @@ optimize_panel <- function(x, y,
   nsga_defaults <- .get_adaptive_nsga_defaults(decision_dim, algorithm)
   nsga_args <- utils::modifyList(nsga_defaults, nsga_control)
 
-
-  if (!fitness_cv) {
-    warning("fitness_cv = FALSE: NSGA will use in-sample scoring, which risks ",
-            "overfitting during optimization. Consider fitness_cv = TRUE for ",
-            "more reliable panel selection.", call. = FALSE)
-  }
-
   # Shared selector used by fitness evaluation (inside the factory) and by
   # history materialization here.
   panel_selector <- .make_panel_selector(
@@ -273,21 +361,27 @@ optimize_panel <- function(x, y,
     panel_selector(decision_vec)$base_features
   }
 
-  fitness_fn <- .make_cv_fitness(
-    x = x_pool,
-    y = truth,
+  fitness_fn <- .make_optimize_panel_fitness(
+    fitness_mode = fitness_mode,
+    x_pool = x_pool,
+    truth = truth,
     cohort = cohort,
+    train_inputs = train_inputs,
+    val_inputs = val_inputs,
     feature_pool = colnames(x_pool),
     max_features = max_features,
     objectives = objectives,
     constraints = constraints,
     regularized = regularized,
-    alpha = regularized_alpha,
+    regularized_alpha = regularized_alpha,
     feature_transform = feature_transform,
     min_features_required = min_features_required,
     selection_threshold = selection_threshold,
-    fitness_cv = fitness_cv,
-    fitness_cv_folds = fitness_cv_folds
+    fitness_cv_folds = fitness_cv_folds,
+    n_val_splits = n_val_splits,
+    train_ratio = train_ratio,
+    val_ratio = opts$val_ratio,
+    seed = seed
   )
   objective_wrapper <- fitness_fn$wrapper
 
@@ -295,8 +389,6 @@ optimize_panel <- function(x, y,
   # each generation's population, fitness, and front into a parent-scope env.
   # The decision-weight matrix is needed to reconstruct base_features post-run
   # (we don't compute features inside the monitor to keep per-iter overhead low).
-  # The capture machinery is shared with optimize_panel_transferable() via
-  # nsga_history_utils.R.
   history_buffer <- .make_history_buffer()
   history_monitor <- .make_history_monitor(
     history_buffer, objective_directions, names(objectives)
@@ -314,7 +406,7 @@ optimize_panel <- function(x, y,
     min_features = min_features_required,
     max_features = max_features,
     seed = seed,
-    set_seed = TRUE
+    set_seed = FALSE
   )
 
   # Extract the Pareto front, re-evaluate, drop infeasible/dominated solutions,
@@ -347,23 +439,50 @@ optimize_panel <- function(x, y,
     selection_threshold = selection_threshold,
     regularized = regularized,
     regularized_alpha = if (regularized) regularized_alpha else NULL,
+    fitness_mode = fitness_mode,
     objective_directions = objective_directions,
     # Full objective descriptors (label/direction/fun, including any metric
     # params such as target specificity) so downstream evaluation can re-score
     # held-out data on the criteria the search actually optimised.
     objectives = objectives
   )
+  if (fitness_mode == "cv") {
+    control$fitness_cv_folds <- fitness_cv_folds
+  }
+  if (fitness_mode == "within_cohort_rotating") {
+    control$n_val_splits <- n_val_splits
+  }
+  # Held-out data (and the NP parameters that consume it) only exist when a
+  # held-out share was requested. evaluate_pareto_front() and calibrate_panel()
+  # test these fields for NULL.
+  if (heldout_ratio > 0) {
+    control <- c(control, list(
+      heldout_x = heldout_inputs$x,
+      heldout_y = heldout_inputs$truth,
+      heldout_cohort = heldout_inputs$cohort,
+      np_alpha = np_alpha,
+      np_delta = np_delta,
+      partition_info = list(
+        train_ratio = train_ratio,
+        val_ratio = opts$val_ratio,
+        heldout_ratio = heldout_ratio,
+        partition_sizes = partition_info
+      )
+    ))
+  }
 
-  # Build training signature
+  # Build training signature (counts describe the pooled train + val data)
+  cohort_labels <- levels(cohort)
+  cohort_counts <- setNames(as.list(as.integer(table(cohort))), cohort_labels)
   training_signature <- list(
     n = nrow(x_raw),
     p = ncol(x_raw),
     class_balance = table(truth),
     feature_pool_size = length(feature_pool),
     base_feature_pool_size = length(feature_pool_base),
-    num_cohorts = length(inputs$cohort_names),
-    cohort_labels = inputs$cohort_names,
-    cohort_counts = inputs$cohort_counts
+    num_cohorts = length(cohort_labels),
+    cohort_labels = cohort_labels,
+    cohort_counts = cohort_counts
   )
 
   # Materialize per-generation history if it was captured. For each individual

@@ -367,26 +367,3 @@ optimize_panel_transferable <- function(
       aggregated_cohort = combined_cohort,
       history = history_out)
 }
-
-#' Combine Train and Validation Partitions
-#'
-#' Row-binds the feature matrices and concatenates the response and cohort
-#' factors of two prepared partitions, preserving the training partition's
-#' response levels and the union of cohort levels.
-#'
-#' @param train_inputs,val_inputs Lists with `x`, `truth`, and `cohort`.
-#' @return List with combined `x`, `truth`, and `cohort`.
-#' @noRd
-.combine_partitions <- function(train_inputs, val_inputs) {
-  list(
-    x = rbind(train_inputs$x, val_inputs$x),
-    truth = factor(
-      c(as.character(train_inputs$truth), as.character(val_inputs$truth)),
-      levels = levels(train_inputs$truth)
-    ),
-    cohort = factor(
-      c(as.character(train_inputs$cohort), as.character(val_inputs$cohort)),
-      levels = unique(c(levels(train_inputs$cohort), levels(val_inputs$cohort)))
-    )
-  )
-}

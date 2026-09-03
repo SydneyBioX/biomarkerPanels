@@ -9,44 +9,57 @@ NULL
 
 #' Validate Partition Ratios for Train/Validation/Held-out Split
 #'
-#' Ensures that train, validation, and held-out ratios satisfy minimum
-#' requirements for meaningful model fitting and evaluation.
+#' Ensures that the train and validation shares are usable proportions. A share
+#' of exactly 0 is allowed for validation and held-out: the caller then skips
+#' that partition entirely. Only the training share carries a floor, so that a
+#' model can still be fitted.
 #'
 #' @param train_ratio Proportion of data for training (must be >= 0.5).
-#' @param val_ratio Proportion of data for validation (must be >= 0.1).
+#' @param val_ratio Proportion of data for validation (0 to disable).
 #' @return Invisibly returns TRUE if valid; otherwise throws an error.
 #' @noRd
 .validate_partition_ratios <- function(train_ratio, val_ratio) {
   .validate_probability(train_ratio, "train_ratio", bounds = "closed")
   .validate_probability(val_ratio, "val_ratio", bounds = "closed")
 
-  heldout_ratio <- 1 - train_ratio - val_ratio
-
   if (train_ratio < 0.5) {
     stop("`train_ratio` must be at least 0.5 to ensure sufficient training data.",
          call. = FALSE)
   }
-  if (val_ratio < 0.1) {
-    stop("`val_ratio` must be at least 0.1 to ensure meaningful validation.",
-         call. = FALSE)
-  }
-  if (heldout_ratio < 0.05) {
-    stop("Held-out ratio (1 - train_ratio - val_ratio) must be at least 0.05. ",
-         "Current: ", round(heldout_ratio, 3), call. = FALSE)
+  if (train_ratio + val_ratio > 1 + 1e-8) {
+    stop("`train_ratio` + `val_ratio` must not exceed 1. Current sum: ",
+         round(train_ratio + val_ratio, 3), call. = FALSE)
   }
 
   invisible(TRUE)
 }
 
+#' Held-out Share Implied by Train and Validation Ratios
+#'
+#' Returns `1 - train_ratio - val_ratio`, snapped to exactly 0 when the
+#' remainder is only floating-point dust (e.g. `1 - 0.7 - 0.3` is 5.6e-17, not
+#' 0). Callers use the snapped value to decide whether a held-out partition
+#' exists at all.
+#'
+#' @param train_ratio,val_ratio Partition shares.
+#' @return Numeric scalar in \[0, 1\].
+#' @noRd
+.heldout_ratio <- function(train_ratio, val_ratio) {
+  heldout <- 1 - train_ratio - val_ratio
+  if (heldout < 1e-8) 0 else heldout
+}
+
 #' Stratified Partitioning of Multi-Cohort Data
 #'
 #' Partitions each cohort's data into train, validation, and held-out sets
-#' while maintaining class balance within each partition.
+#' while maintaining class balance within each partition. A share of 0 for
+#' validation or held-out is honoured: that partition comes back as zero-row
+#' matrices / zero-length factors and is not size-checked.
 #'
 #' @param x_list List of feature matrices (one per cohort).
 #' @param y_list List of binary response factors (one per cohort).
 #' @param train_ratio Proportion of data for training.
-#' @param val_ratio Proportion of data for validation.
+#' @param val_ratio Proportion of data for validation (0 to disable).
 #' @return List containing:
 #'   \describe{
 #'     \item{train_x}{List of training matrices (one per cohort)}
@@ -69,6 +82,7 @@ NULL
 
   n_cohorts <- length(x_list)
   cohort_names <- .default_cohort_names(x_list)
+  heldout_ratio <- .heldout_ratio(train_ratio, val_ratio)
 
   train_x <- vector("list", n_cohorts)
   train_y <- vector("list", n_cohorts)
@@ -113,13 +127,22 @@ NULL
       }
 
       shuffled <- sample(idx)
-      n_train <- max(1L, round(n_class * train_ratio))
-      n_val <- max(1L, round(n_class * val_ratio))
-      n_heldout <- n_class - n_train - n_val
+      n_train <- min(n_class, max(1L, round(n_class * train_ratio)))
+
+      # Rounding train and val independently only works when held-out absorbs
+      # the remainder. With no held-out share, val takes exactly what train
+      # leaves, otherwise the two rounded counts can overrun n_class.
+      n_val <- if (val_ratio <= 0) {
+        0L
+      } else if (heldout_ratio == 0) {
+        n_class - n_train
+      } else {
+        max(1L, round(n_class * val_ratio))
+      }
+      n_heldout <- max(0L, n_class - n_train - n_val)
 
       # Ensure at least 1 sample in held-out if possible
-
-      if (n_heldout < 1L && n_class >= 3L) {
+      if (heldout_ratio > 0 && n_heldout < 1L && n_class >= 3L) {
         n_heldout <- 1L
         if (n_train > n_val) {
           n_train <- n_train - 1L
@@ -164,8 +187,12 @@ NULL
     }
 
     check_partition_size("training", length(yes_parts$train), length(no_parts$train))
-    check_partition_size("validation", length(yes_parts$val), length(no_parts$val))
-    check_partition_size("held-out", length(yes_parts$heldout), length(no_parts$heldout))
+    if (val_ratio > 0) {
+      check_partition_size("validation", length(yes_parts$val), length(no_parts$val))
+    }
+    if (heldout_ratio > 0) {
+      check_partition_size("held-out", length(yes_parts$heldout), length(no_parts$heldout))
+    }
 
     # Store partitions
     train_x[[i]] <- x_i[train_idx, , drop = FALSE]
@@ -204,5 +231,45 @@ NULL
     heldout_y = heldout_y,
     cohort_names = cohort_names,
     partition_info = partition_info
+  )
+}
+
+#' Combine Train and Validation Partitions
+#'
+#' Row-binds the feature matrices and concatenates the response and cohort
+#' factors of two prepared partitions, preserving the training partition's
+#' response levels and the union of cohort levels. A `NULL` validation
+#' partition (val share of 0) returns the training partition unchanged.
+#'
+#' @param train_inputs,val_inputs Lists with `x`, `truth`, and `cohort`.
+#'   `val_inputs` may be `NULL`.
+#' @return List with combined `x`, `truth`, and `cohort`.
+#' @noRd
+.combine_partitions <- function(train_inputs, val_inputs) {
+  if (is.null(val_inputs)) {
+    return(list(
+      x = train_inputs$x,
+      truth = train_inputs$truth,
+      cohort = train_inputs$cohort
+    ))
+  }
+
+  combined_x <- rbind(train_inputs$x, val_inputs$x)
+  # rbind() drops attributes; reference_norm needs its reference feature back.
+  ref_attr <- attr(train_inputs$x, "reference_feature")
+  if (!is.null(ref_attr)) {
+    attr(combined_x, "reference_feature") <- ref_attr
+  }
+
+  list(
+    x = combined_x,
+    truth = factor(
+      c(as.character(train_inputs$truth), as.character(val_inputs$truth)),
+      levels = levels(train_inputs$truth)
+    ),
+    cohort = factor(
+      c(as.character(train_inputs$cohort), as.character(val_inputs$cohort)),
+      levels = unique(c(levels(train_inputs$cohort), levels(val_inputs$cohort)))
+    )
   )
 }

@@ -47,7 +47,7 @@ test_that("feature_pool accepts base features with pairwise aggregator", {
     feature_pool = c("GeneA", "GeneC", "GeneB"),
     feature_transform = "pairwise_ratios",
     regularized = TRUE,
-    fitness_cv = FALSE,
+    fitness_mode = "in_sample",
     nsga_control = list(popSize = 12, maxiter = 5)
   )
 
@@ -104,7 +104,7 @@ test_that("optimize_panel works with reference_norm aggregator", {
     max_features = 2,
     feature_transform = "reference_norm",
     regularized = FALSE,
-    fitness_cv = FALSE,
+    fitness_mode = "in_sample",
     nsga_control = list(popSize = 12, maxiter = 8)
   )
 
@@ -150,7 +150,7 @@ test_that("custom aggregator can be registered and used", {
     objectives = define_objectives(metrics = c("sensitivity", "specificity")),
     max_features = 2,
     feature_transform = "center_features",
-    fitness_cv = FALSE,
+    fitness_mode = "in_sample",
     nsga_control = list(popSize = 12, maxiter = 6)
   )
 

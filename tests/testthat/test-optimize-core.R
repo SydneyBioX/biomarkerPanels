@@ -143,3 +143,96 @@ test_that("optimize_panel validates selection_threshold", {
     "selection_threshold"
   )
 })
+
+# ============================================================================
+# fitness_mode dispatch and partitioning
+# ============================================================================
+
+test_that("fitness_mode = 'loco' with no partitioning stores no held-out data", {
+  skip_slow_tests()
+  sim <- simulate_expression_data(p = 20, n = 120, k = 2, seed = 11)
+
+  res <- optimize_panel(
+    x = sim$x_list,
+    y = sim$y_list,
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
+    max_features = 3,
+    feature_pool = colnames(sim$x_list[[1]])[seq_len(6)],
+    feature_transform = "none",
+    fitness_mode = "loco",
+    train_ratio = 1,
+    seed = 7,
+    nsga_control = list(popSize = 12, maxiter = 5)
+  )
+
+  expect_equal(res@control$fitness_mode, "loco")
+  expect_null(res@control$heldout_x)
+  expect_null(res@control$partition_info)
+  # Nothing was split off, so the result carries every input sample.
+  expect_equal(nrow(res@aggregated_x), sum(vapply(sim$x_list, nrow, integer(1))))
+})
+
+test_that("within_cohort_val partitioning stores held-out data and partition info", {
+  skip_slow_tests()
+  sim <- simulate_expression_data(p = 20, n = 120, k = 2, seed = 12)
+
+  res <- optimize_panel(
+    x = sim$x_list,
+    y = sim$y_list,
+    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
+    max_features = 3,
+    feature_pool = colnames(sim$x_list[[1]])[seq_len(6)],
+    feature_transform = "none",
+    fitness_mode = "within_cohort_val",
+    train_ratio = 0.7,
+    val_ratio = 0.2,
+    seed = 7,
+    nsga_control = list(popSize = 12, maxiter = 5)
+  )
+
+  n_total <- sum(vapply(sim$x_list, nrow, integer(1)))
+  expect_equal(res@control$fitness_mode, "within_cohort_val")
+  expect_true(nrow(res@control$heldout_x) > 0)
+  expect_equal(length(res@control$heldout_y), nrow(res@control$heldout_x))
+  expect_equal(res@control$partition_info$heldout_ratio, 0.1)
+  # aggregated data is train + val; held-out is disjoint from it.
+  expect_equal(nrow(res@aggregated_x) + nrow(res@control$heldout_x), n_total)
+})
+
+test_that("fitness_cv is a deprecated alias for fitness_mode", {
+  skip_slow_tests()
+  sim <- simulate_expression_data(p = 20, n = 80, k = 1, seed = 13)
+
+  # Two warnings are expected here: the deprecation, and the standing
+  # in-sample-scoring caution that fitness_cv = FALSE maps onto.
+  warnings_seen <- character()
+  res <- withCallingHandlers(
+    optimize_panel(
+      x = sim$x_list[[1]],
+      y = sim$y_list[[1]],
+      objectives = define_objectives(metrics = c("sensitivity", "specificity")),
+      max_features = 3,
+      feature_pool = colnames(sim$x_list[[1]])[seq_len(6)],
+      feature_transform = "none",
+      fitness_cv = FALSE,
+      nsga_control = list(popSize = 12, maxiter = 5)
+    ),
+    warning = function(w) {
+      warnings_seen <<- c(warnings_seen, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+
+  expect_true(any(grepl("deprecated", warnings_seen)))
+  expect_true(any(grepl("in_sample", warnings_seen)))
+  expect_equal(res@control$fitness_mode, "in_sample")
+})
+
+test_that("validation-based fitness modes require a validation share", {
+  sim <- simulate_expression_data(p = 10, n = 40, k = 2, seed = 14)
+  expect_error(
+    optimize_panel(sim$x_list, sim$y_list,
+                   fitness_mode = "within_cohort_val", train_ratio = 0.7, val_ratio = 0),
+    "requires `val_ratio` > 0|val_ratio"
+  )
+})

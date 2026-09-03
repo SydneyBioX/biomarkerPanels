@@ -43,7 +43,7 @@ test_that("plot_pareto_front rejects non-OptimizationResult input", {
     feature_transform = "none",
     nsga_control  = list(popSize = 10, maxiter = 5),
     seed          = 42,
-    fitness_cv    = FALSE
+    fitness_mode  = "in_sample"
   )
   list(opt = opt, x_test = x_test, y_test = y_test)
 }

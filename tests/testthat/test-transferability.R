@@ -12,16 +12,10 @@ test_that("partition ratio validation rejects invalid ratios", {
     "train_ratio.*at least 0.5"
   )
 
-  # val_ratio < 0.1
+  # train + val over 1 leaves a negative held-out share
   expect_error(
-    .validate_partition_ratios(0.7, 0.05),
-    "val_ratio.*at least 0.1"
-  )
-
-  # held-out ratio < 0.05
-  expect_error(
-    .validate_partition_ratios(0.8, 0.17),
-    "Held-out ratio.*at least 0.05"
+    .validate_partition_ratios(0.7, 0.4),
+    "must not exceed 1"
   )
 
   # Invalid types
@@ -38,6 +32,11 @@ test_that("partition ratio validation rejects invalid ratios", {
   expect_invisible(.validate_partition_ratios(0.7, 0.2))
   expect_invisible(.validate_partition_ratios(0.5, 0.4))
   expect_invisible(.validate_partition_ratios(0.6, 0.3))
+
+  # Zero shares are legal: they mean "skip that partition"
+  expect_invisible(.validate_partition_ratios(1, 0))
+  expect_invisible(.validate_partition_ratios(0.7, 0))
+  expect_invisible(.validate_partition_ratios(0.7, 0.3))
 })
 
 test_that("stratified partitioning preserves class balance", {
