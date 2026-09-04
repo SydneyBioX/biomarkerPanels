@@ -108,7 +108,6 @@
 #'   feature selection, or `"adaptive"` (default) to use gap-based selection
 #'   that allows variable panel sizes in the Pareto front. Fixed thresholds
 #'   (e.g., 0.5) tend to produce panels at `max_features` because more features
-
 #'   improve accuracy. Adaptive selection finds natural breakpoints in the
 #'   weight distribution, enabling the `num_features` objective to drive panel
 #'   size diversity.

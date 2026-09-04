@@ -187,7 +187,7 @@ head(result@objectives)
 
 ### Held-Out Partitioning
 
-The multi-cohort call above scores every candidate in-sample by default. Pass
+The multi-cohort call above scores every candidate by 5-fold cross-validation within the training data by default. Pass
 `fitness_mode` together with `train_ratio` (and `val_ratio`) to carve off a
 stratified partition per cohort and score candidates against it instead:
 `fitness_mode = "loco"` scores each candidate on left-out cohorts,
