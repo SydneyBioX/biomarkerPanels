@@ -1,5 +1,25 @@
 # biomarkerPanels 0.2.0.9000
 
+## Breaking changes
+
+* `optimize_panel()` gains `fitness_mode` (`"cv"`, `"in_sample"`,
+  `"within_cohort_val"`, `"within_cohort_rotating"`, `"loco"`) plus
+  `train_ratio` / `val_ratio` partitioning, `np_alpha`, `np_delta`, and
+  `n_val_splits` — the scoring strategies and train/validation/held-out split
+  that `optimize_panel_transferable()` used to provide are now built into
+  `optimize_panel()` itself.
+* `fitness_cv` is deprecated in favour of `fitness_mode`: `fitness_cv = TRUE`
+  maps to `fitness_mode = "cv"` and `fitness_cv = FALSE` maps to
+  `fitness_mode = "in_sample"`, with a deprecation warning either way.
+* `optimize_panel_transferable()` is deprecated and will be removed in the
+  next minor release. Call `optimize_panel()` directly instead, e.g.
+  `optimize_panel(x, y, fitness_mode = "within_cohort_val", train_ratio = 0.7,
+  val_ratio = 0.2)`.
+* Seeded runs now produce different numbers than 0.2.0: cross-validation folds
+  for `fitness_mode = "cv"` (formerly `fitness_cv = TRUE`) are now drawn from
+  the seeded RNG stream, which also makes them reproducible for a given
+  `seed` (they previously were not).
+
 ## Bug fixes
 
 * A `data.frame` passed as `x` to `evaluate_panel()`, `evaluate_pareto_front()`

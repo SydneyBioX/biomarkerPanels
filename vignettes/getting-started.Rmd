@@ -185,6 +185,18 @@ result@metrics
 head(result@objectives)
 ```
 
+### Held-Out Partitioning
+
+The multi-cohort call above scores every candidate in-sample by default. Pass
+`fitness_mode` together with `train_ratio` (and `val_ratio`) to carve off a
+stratified partition per cohort and score candidates against it instead:
+`fitness_mode = "loco"` scores each candidate on left-out cohorts,
+`"within_cohort_val"` and `"within_cohort_rotating"` score on a held-back
+validation share, and `"cv"` (the overall default) k-fold cross-validates
+within the training partition. Whenever `train_ratio + val_ratio < 1`, the
+remaining share is stored on `result@control$heldout_x` / `heldout_y` /
+`heldout_cohort` for `calibrate_panel()` to use afterwards.
+
 ### Visualise Trade-offs
 
 We can visualise Pareto-efficient solutions with `plot_pareto_front()`. Pick any

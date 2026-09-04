@@ -177,6 +177,22 @@ threshold-based selection allows variable panel sizes, making the
 lists of such objects. Optimisation should be run on training data only---use
 \code{\link[=evaluate_panel]{evaluate_panel()}} for held-out validation.
 }
+\section{Partitioning}{
+
+When \code{train_ratio + val_ratio < 1}, each cohort is stratified into
+train / validation / held-out shares before the search runs; \code{fitness_mode}
+determines which of these partitions
+the NSGA search actually scores against (see above). The returned
+\code{OptimizationResult} always carries the pooled train + validation data as
+\code{aggregated_x}/\code{aggregated_y}/\code{aggregated_cohort}. The held-out partition,
+\code{np_alpha}, \code{np_delta}, and \code{partition_info} are stored on \code{control} only
+when a positive held-out share exists (\code{train_ratio + val_ratio < 1}); with
+the default \verb{train_ratio = 1, val_ratio = 0} no partitioning happens at all
+and those fields are absent. \code{\link[=calibrate_panel]{calibrate_panel()}} and
+\code{\link[=evaluate_pareto_solutions]{evaluate_pareto_solutions()}} read \code{control$heldout_x} /
+\code{control$heldout_y} / \code{control$heldout_cohort} when present.
+}
+
 \seealso{
 \code{\link[=fit_panel]{fit_panel()}}, \code{\link[=summarize_solutions]{summarize_solutions()}}, \code{\link[=evaluate_panel]{evaluate_panel()}}
 }

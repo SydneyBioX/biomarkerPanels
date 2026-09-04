@@ -86,6 +86,34 @@ result <- optimize_panel(
 )
 ```
 
+### Held-out calibration
+
+Set `train_ratio` / `val_ratio` below 1 to carve off a stratified held-out
+share per cohort; `optimize_panel()` scores candidates on the strategy named
+by `fitness_mode` and stores the held-out partition on the result for
+`calibrate_panel()`:
+
+```r
+result <- optimize_panel(
+  x = list(site_A = mat1, site_B = mat2, site_C = mat3),
+  y = list(site_A = y1, site_B = y2, site_C = y3),
+  feature_pool = top_de,
+  fitness_mode = "loco",
+  train_ratio = 0.8,
+  val_ratio = 0
+)
+
+panel <- fit_panel(result)
+calibrated <- calibrate_panel(
+  panel,
+  x_heldout = result@control$heldout_x,
+  y_heldout = result@control$heldout_y,
+  cohort_heldout = result@control$heldout_cohort
+)
+np_threshold(calibrated)
+per_cohort_metrics(calibrated)
+```
+
 ### Feature pre-filtering
 
 Reduce the search space before optimization:

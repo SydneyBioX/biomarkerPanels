@@ -115,6 +115,19 @@
 #' @param fitness_cv Deprecated. Logical alias for `fitness_mode`: `TRUE` maps
 #'   to `"cv"` and `FALSE` to `"in_sample"`. Supplying it emits a deprecation
 #'   warning and overrides `fitness_mode`.
+#' @section Partitioning:
+#' When `train_ratio + val_ratio < 1`, each cohort is stratified into
+#' train / validation / held-out shares before the search runs; `fitness_mode`
+#' determines which of these partitions
+#' the NSGA search actually scores against (see above). The returned
+#' `OptimizationResult` always carries the pooled train + validation data as
+#' `aggregated_x`/`aggregated_y`/`aggregated_cohort`. The held-out partition,
+#' `np_alpha`, `np_delta`, and `partition_info` are stored on `control` only
+#' when a positive held-out share exists (`train_ratio + val_ratio < 1`); with
+#' the default `train_ratio = 1, val_ratio = 0` no partitioning happens at all
+#' and those fields are absent. [`calibrate_panel()`] and
+#' [`evaluate_pareto_solutions()`] read `control$heldout_x` /
+#' `control$heldout_y` / `control$heldout_cohort` when present.
 #' @return An `OptimizationResult` containing the Pareto-optimal solutions.
 #'   Use [summarize_solutions()] to inspect solutions and [fit_panel()] to
 #'   fit a model on a selected solution.
