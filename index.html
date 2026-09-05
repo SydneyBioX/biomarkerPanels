@@ -173,10 +173,34 @@
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
+<h3 id="held-out-calibration">Held-out calibration<a class="anchor" aria-label="anchor" href="#held-out-calibration"></a>
+</h3>
+<p>Set <code>train_ratio</code> / <code>val_ratio</code> below 1 to carve off a stratified held-out share per cohort; <code><a href="reference/optimize_panel.html">optimize_panel()</a></code> scores candidates on the strategy named by <code>fitness_mode</code> and stores the held-out partition on the result for <code><a href="reference/calibrate_panel.html">calibrate_panel()</a></code>:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/optimize_panel.html">optimize_panel</a></span><span class="op">(</span></span>
+<span>  x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>site_A <span class="op">=</span> <span class="va">mat1</span>, site_B <span class="op">=</span> <span class="va">mat2</span>, site_C <span class="op">=</span> <span class="va">mat3</span><span class="op">)</span>,</span>
+<span>  y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>site_A <span class="op">=</span> <span class="va">y1</span>, site_B <span class="op">=</span> <span class="va">y2</span>, site_C <span class="op">=</span> <span class="va">y3</span><span class="op">)</span>,</span>
+<span>  feature_pool <span class="op">=</span> <span class="va">top_de</span>,</span>
+<span>  fitness_mode <span class="op">=</span> <span class="st">"loco"</span>,</span>
+<span>  train_ratio <span class="op">=</span> <span class="fl">0.8</span>,</span>
+<span>  val_ratio <span class="op">=</span> <span class="fl">0</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">panel</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/fit_panel.html">fit_panel</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
+<span><span class="va">calibrated</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/calibrate_panel.html">calibrate_panel</a></span><span class="op">(</span></span>
+<span>  <span class="va">panel</span>,</span>
+<span>  x_heldout <span class="op">=</span> <span class="va">result</span><span class="op">@</span><span class="va">control</span><span class="op">$</span><span class="va">heldout_x</span>,</span>
+<span>  y_heldout <span class="op">=</span> <span class="va">result</span><span class="op">@</span><span class="va">control</span><span class="op">$</span><span class="va">heldout_y</span>,</span>
+<span>  cohort_heldout <span class="op">=</span> <span class="va">result</span><span class="op">@</span><span class="va">control</span><span class="op">$</span><span class="va">heldout_cohort</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/np_threshold.html">np_threshold</a></span><span class="op">(</span><span class="va">calibrated</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/per_cohort_metrics.html">per_cohort_metrics</a></span><span class="op">(</span><span class="va">calibrated</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level3">
 <h3 id="feature-pre-filtering">Feature pre-filtering<a class="anchor" aria-label="anchor" href="#feature-pre-filtering"></a>
 </h3>
 <p>Reduce the search space before optimization:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Via differential expression</span></span>
 <span><span class="va">top_de</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/select_de_features.html">select_de_features</a></span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, n_features <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
 <span></span>
@@ -314,12 +338,12 @@
 </h2>
 <p><strong>Q: How do I optimize for rule-out screening (high sensitivity)?</strong></p>
 <p>Use <code>define_ruleout_objectives()</code> which enforces a sensitivity constraint and optimizes partial AUC in the high-sensitivity region:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">objectives</span> <span class="op">&lt;-</span> <span class="fu">define_ruleout_objectives</span><span class="op">(</span>min_sensitivity <span class="op">=</span> <span class="fl">0.95</span><span class="op">)</span></span></code></pre></div>
 <p><strong>Q: Should I use NSGA-II or NSGA-III?</strong></p>
 <p>NSGA-III (default) provides better Pareto front diversity via reference-point selection and is recommended for many-objective problems (3+). NSGA-II uses crowding distance and is typically adequate for 2 objectives; pass <code>algorithm = "NSGA-II"</code> to select it explicitly.</p>
 <p><strong>Q: How do I add a custom objective?</strong></p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/register_metric.html">register_metric</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="st">"my_metric"</span>,</span>
 <span>  fun <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">truth</span>, <span class="va">scores</span>, <span class="va">selected</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span> <span class="va">...</span> <span class="op">}</span>,</span>
@@ -340,11 +364,11 @@
 <h2 id="how-to-cite">How to Cite<a class="anchor" aria-label="anchor" href="#how-to-cite"></a>
 </h2>
 <p>If you use biomarkerPanels in your research, please cite:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode bibtex"><code class="sourceCode bibtex"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co">@software{biomarkerPanels,</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="co">  author = {Robertson, Harry},</span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">  title = {biomarkerPanels: Multi-objective Optimization for Biomarker Panel Discovery},</span></span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">  url = {https://github.com/SydneyBioX/biomarkerPanels}</span></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bibtex"><code class="sourceCode bibtex"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co">@software{biomarkerPanels,</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="co">  author = {Robertson, Harry},</span></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co">  title = {biomarkerPanels: Multi-objective Optimization for Biomarker Panel Discovery},</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">  url = {https://github.com/SydneyBioX/biomarkerPanels}</span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">}</span></span></code></pre></div>
 </div>
 </div>
   </div>

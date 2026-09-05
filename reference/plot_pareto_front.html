@@ -103,14 +103,14 @@ returned ggplot object.</p>
 <dt id="arg-x">x<a class="anchor" aria-label="anchor" href="#arg-x"></a></dt>
 <dd><p>Held-out validation data: a matrix, data.frame,
 <code>SummarizedExperiment</code>, or list of such objects. When <code>NULL</code> (default),
-automatically uses held-out data stored by
-<code><a href="optimize_panel_transferable.html">optimize_panel_transferable()</a></code>.</p></dd>
+automatically uses held-out data stored on <code>optimization_result</code> by
+<code><a href="optimize_panel.html">optimize_panel()</a></code> (present when <code>train_ratio + val_ratio &lt; 1</code>).</p></dd>
 
 
 <dt id="arg-y">y<a class="anchor" aria-label="anchor" href="#arg-y"></a></dt>
 <dd><p>Held-out validation labels: a factor (or list of factors when <code>x</code>
 is a list). When <code>NULL</code> (default), automatically uses held-out labels
-stored by <code><a href="optimize_panel_transferable.html">optimize_panel_transferable()</a></code>.</p></dd>
+stored the same way.</p></dd>
 
 
 <dt id="arg-cohort">cohort<a class="anchor" aria-label="anchor" href="#arg-cohort"></a></dt>

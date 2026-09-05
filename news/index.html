@@ -60,6 +60,16 @@
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.2.0.9000" id="biomarkerpanels-0209000">biomarkerPanels 0.2.0.9000<a class="anchor" aria-label="anchor" href="#biomarkerpanels-0209000"></a></h2>
 <div class="section level3">
+<h3 id="breaking-changes-0-2-0-9000">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-0-2-0-9000"></a></h3>
+<ul><li>
+<code><a href="../reference/optimize_panel.html">optimize_panel()</a></code> gains <code>fitness_mode</code> (<code>"cv"</code>, <code>"in_sample"</code>, <code>"within_cohort_val"</code>, <code>"within_cohort_rotating"</code>, <code>"loco"</code>) plus <code>train_ratio</code> / <code>val_ratio</code> partitioning, <code>np_alpha</code>, <code>np_delta</code>, and <code>n_val_splits</code> — the scoring strategies and train/validation/held-out split that <code><a href="../reference/optimize_panel_transferable.html">optimize_panel_transferable()</a></code> used to provide are now built into <code><a href="../reference/optimize_panel.html">optimize_panel()</a></code> itself.</li>
+<li>
+<code>fitness_cv</code> is deprecated in favour of <code>fitness_mode</code>: <code>fitness_cv = TRUE</code> maps to <code>fitness_mode = "cv"</code> and <code>fitness_cv = FALSE</code> maps to <code>fitness_mode = "in_sample"</code>, with a deprecation warning either way.</li>
+<li>
+<code><a href="../reference/optimize_panel_transferable.html">optimize_panel_transferable()</a></code> is deprecated and will be removed in the next minor release. Call <code><a href="../reference/optimize_panel.html">optimize_panel()</a></code> directly instead, e.g. <code>optimize_panel(x, y, fitness_mode = "within_cohort_val", train_ratio = 0.7, val_ratio = 0.2)</code>.</li>
+<li>Seeded runs now produce different numbers than 0.2.0: cross-validation folds for <code>fitness_mode = "cv"</code> (formerly <code>fitness_cv = TRUE</code>) are now drawn from the seeded RNG stream, which also makes them reproducible for a given <code>seed</code> (they previously were not).</li>
+</ul></div>
+<div class="section level3">
 <h3 id="bug-fixes-0-2-0-9000">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-2-0-9000"></a></h3>
 <ul><li>A <code>data.frame</code> passed as <code>x</code> to <code><a href="../reference/evaluate_panel.html">evaluate_panel()</a></code>, <code>evaluate_pareto_front()</code> or the cohort helpers was mistaken for a multi-cohort list (<code><a href="https://rdrr.io/r/base/list.html" class="external-link">is.list()</a></code> is <code>TRUE</code> for data.frames), failing with “When <code>x</code> is a list, <code>y</code> must also be a list.” All cohort-list dispatch now goes through <code>.is_cohort_list()</code>, which excludes data.frames and SummarizedExperiments; <code><a href="../reference/optimize_panel_transferable.html">optimize_panel_transferable()</a></code> likewise rejects a bare data.frame instead of splitting its columns into cohorts.</li>
 </ul></div>

@@ -259,6 +259,24 @@ optimisation run.</p>
 <span><span class="va">result</span><span class="op">@</span><span class="va">metrics</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">result</span><span class="op">@</span><span class="va">objectives</span><span class="op">)</span></span></code></pre></div>
 <div class="section level3">
+<h3 id="held-out-partitioning">Held-Out Partitioning<a class="anchor" aria-label="anchor" href="#held-out-partitioning"></a>
+</h3>
+<p>The multi-cohort call above scores every candidate by 5-fold
+cross-validation within the training data by default. Pass
+<code>fitness_mode</code> together with <code>train_ratio</code> (and
+<code>val_ratio</code>) to carve off a stratified partition per cohort
+and score candidates against it instead:
+<code>fitness_mode = "loco"</code> scores each candidate on left-out
+cohorts, <code>"within_cohort_val"</code> and
+<code>"within_cohort_rotating"</code> score on a held-back validation
+share, and <code>"cv"</code> (the overall default) k-fold
+cross-validates within the training partition. Whenever
+<code>train_ratio + val_ratio &lt; 1</code>, the remaining share is
+stored on <code>result@control$heldout_x</code> / <code>heldout_y</code>
+/ <code>heldout_cohort</code> for <code><a href="../reference/calibrate_panel.html">calibrate_panel()</a></code> to use
+afterwards.</p>
+</div>
+<div class="section level3">
 <h3 id="visualise-trade-offs">Visualise Trade-offs<a class="anchor" aria-label="anchor" href="#visualise-trade-offs"></a>
 </h3>
 <p>We can visualise Pareto-efficient solutions with
