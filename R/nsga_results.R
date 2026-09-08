@@ -12,7 +12,8 @@ NULL
 #' Shared post-processing for every `fitness_mode` of [optimize_panel()].
 #' Extracts the rank-1 (Pareto-optimal)
 #' population from an `rmoo` result, re-evaluates each candidate to recover its
-#' features and objective metrics, drops constraint-infeasible solutions, filters
+#' features and objective metrics, drops constraint-infeasible solutions, collapses
+#' duplicate panels (same base-feature set), filters
 #' any solutions that became dominated on re-evaluation, and assembles the
 #' wide-format solutions data frame (one row per solution, list columns for
 #' `base_features`/`features`, one numeric column per objective).
@@ -52,6 +53,16 @@ NULL
     stop(infeasible_msg, call. = FALSE)
   }
   solutions <- solutions[feasible_vec]
+
+  # Collapse duplicate panels. The genome-to-panel decoding is many-to-one
+  # (distinct weight vectors with the same top-ranked features decode to the
+  # same panel), so a converged population can contain many rank-1 members that
+  # are the same feature set. Identical rows never dominate each other, so
+  # .filter_dominated() would keep every copy.
+  panel_keys <- vapply(solutions, function(sol) {
+    .panel_key(sort(sol$base_features))
+  }, character(1))
+  solutions <- solutions[!duplicated(panel_keys)]
 
   metric_matrix <- do.call(rbind, lapply(solutions, `[[`, "metrics"))
   colnames(metric_matrix) <- names(objectives)
