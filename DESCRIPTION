@@ -98,6 +98,7 @@ Collate:
     'panel_selection.R'
     'panel_summarization.R'
     'pareto_feature_stability.R'
+    'ruleout_features.R'
     'ruv_features.R'
     'ruv_features_helpers.R'
     'simulate_expression_data.R'

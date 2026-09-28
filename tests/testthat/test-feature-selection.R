@@ -308,3 +308,132 @@ test_that("select_discriminative_features validates parameters", {
     "`min_auc` must be a numeric scalar"
   )
 })
+
+# ==============================================================================
+# select_ruleout_features tests
+# ==============================================================================
+
+# Builds a matrix contrasting two kinds of case/control separation. Controls
+# are N(0, 1). "auc_high" has 30 cases far above controls and 10 cases only
+# modestly above them (mean 1.5), giving a high AUC but a poor specificity once
+# the threshold must reach into that overlapping group to capture 90% of
+# cases. "tail_clean" has 36 cases well above every control and 4 cases far
+# below them: a lower AUC, but the top 90% of cases separate perfectly.
+# "down" mirrors "tail_clean" in the opposite direction; "moderate" is a
+# uniformly modest shift (specificity ~0.4 at 90% sensitivity); "noise" has no
+# signal.
+make_ruleout_fixture <- function(seed = 1L) {
+  set.seed(seed)
+  n_case <- 40L
+  n_ctrl <- 40L
+  ctrl <- rnorm(n_ctrl)
+
+  auc_high <- c(rnorm(30, mean = 6), rnorm(10, mean = 1.5))
+  tail_clean <- c(rnorm(36, mean = 5, sd = 0.3), rnorm(4, mean = -6))
+
+  x <- cbind(
+    auc_high = c(auc_high, ctrl),
+    tail_clean = c(tail_clean, ctrl),
+    down = c(-tail_clean, -ctrl),
+    moderate = c(rnorm(n_case, mean = 1), rnorm(n_ctrl)),
+    noise = rnorm(n_case + n_ctrl)
+  )
+  y <- factor(rep(c("Yes", "No"), c(n_case, n_ctrl)), levels = c("No", "Yes"))
+  list(x = x, y = y)
+}
+
+test_that("select_ruleout_features ranks by tail specificity rather than AUC", {
+  fx <- make_ruleout_fixture()
+
+  # Sanity: auc_high really has the higher AUC.
+  auc <- biomarkerPanels:::.compute_rank_auc(fx$x, as.integer(fx$y) - 1L)
+  expect_gt(auc[["auc_high"]], auc[["tail_clean"]])
+
+  selected <- select_ruleout_features(fx$x, fx$y, n_features = 5)
+
+  expect_type(selected, "character")
+  expect_equal(length(selected), 5)
+  expect_lt(match("tail_clean", selected), match("auc_high", selected))
+  expect_equal(selected[4:5], c("moderate", "noise"))
+  expect_equal(length(select_ruleout_features(fx$x, fx$y, n_features = 2)), 2)
+})
+
+test_that("select_ruleout_features is direction-agnostic", {
+  fx <- make_ruleout_fixture()
+  spec <- biomarkerPanels:::.spec_at_sensitivity_by_feature(
+    fx$x, as.integer(fx$y) - 1L, 0.90
+  )
+  expect_equal(spec[["down"]], spec[["tail_clean"]])
+  expect_equal(spec[["tail_clean"]], 1)
+})
+
+test_that("select_ruleout_features threshold always captures >= target sensitivity", {
+  fx <- make_ruleout_fixture()
+  y <- as.integer(fx$y) - 1L
+  x_pos <- fx$x[y == 1L, ]
+  n <- nrow(x_pos)
+  for (target in c(0.8, 0.9, 0.95, 1)) {
+    thr <- apply(x_pos, 2, biomarkerPanels:::.ruleout_thresholds, target = target)
+    captured_up <- colMeans(sweep(x_pos, 2, thr[1L, ], ">="))
+    captured_down <- colMeans(sweep(x_pos, 2, thr[2L, ], "<="))
+    expect_true(all(captured_up >= target), info = paste("up", target))
+    expect_true(all(captured_down >= target), info = paste("down", target))
+    # No slack: exactly ceiling(n * target) cases are kept (no ties in fixture).
+    expect_equal(unname(captured_up * n), rep(ceiling(n * target), ncol(x_pos)))
+    expect_equal(unname(captured_down * n), rep(ceiling(n * target), ncol(x_pos)))
+  }
+})
+
+test_that("select_ruleout_features 'min' aggregation penalises cohort-specific features", {
+  fx1 <- make_ruleout_fixture(1L)
+  fx2 <- make_ruleout_fixture(2L)
+  # In cohort 2, tail_clean carries no signal at all.
+  fx2$x[, "tail_clean"] <- fx2$x[, "noise"]
+
+  x_list <- list(fx1$x, fx2$x)
+  y_list <- list(fx1$y, fx2$y)
+
+  by_min <- select_ruleout_features(x_list, y_list, n_features = 6)
+  by_mean <- select_ruleout_features(x_list, y_list,
+    n_features = 6,
+    cohort_aggregation = "mean"
+  )
+
+  # "down" is perfect in both cohorts and tops both rankings.
+  expect_equal(by_min[1], "down")
+  expect_equal(by_mean[1], "down")
+  # tail_clean: spec 1 in cohort 1, ~0 in cohort 2. moderate: ~0.4 in both.
+  # Worst-cohort ranking prefers the consistently moderate feature; mean
+  # ranking is seduced by the single excellent cohort.
+  expect_lt(match("moderate", by_min), match("tail_clean", by_min))
+  expect_lt(match("tail_clean", by_mean), match("moderate", by_mean))
+})
+
+test_that("select_ruleout_features handles NA values and rejects single-class cohorts", {
+  fx <- make_ruleout_fixture()
+  x_na <- fx$x
+  # Blank three of tail_clean's clean cases: with 37 cases left only three may
+  # be missed, so one of its four far-below cases must now be captured and
+  # tail_clean's specificity drops from 1 to 0.
+  x_na[1:3, "tail_clean"] <- NA
+  x_na[41:43, "auc_high"] <- NA
+  x_na[, "noise"] <- NA
+
+  spec <- biomarkerPanels:::.spec_at_sensitivity_by_feature(
+    x_na, as.integer(fx$y) - 1L, 0.90
+  )
+  expect_equal(spec[["tail_clean"]], 0)
+  expect_equal(spec[["down"]], 1)
+  expect_true(is.na(spec[["noise"]]))
+
+  selected <- select_ruleout_features(x_na, fx$y, n_features = 10)
+  expect_equal(length(selected), 4)
+  expect_equal(selected[1], "down")
+
+  y_one_class <- factor(rep("Yes", nrow(fx$x)), levels = c("No", "Yes"))
+  expect_error(
+    select_ruleout_features(fx$x, y_one_class),
+    "at least one case and one control"
+  )
+  expect_error(select_ruleout_features(fx$x, fx$y, target_sensitivity = 0))
+})

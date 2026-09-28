@@ -1,5 +1,13 @@
 # biomarkerPanels 0.2.0.9000
 
+## New features
+
+* `select_ruleout_features()` pre-filters candidates for rule-out panels by
+  ranking each feature on the univariate specificity it reaches when its
+  threshold captures at least `target_sensitivity` of cases (both directions
+  tried). Per-cohort specificities are combined by worst cohort (`"min"`,
+  default) or `"mean"`. Returns a character vector like `select_de_features()`.
+
 ## Breaking changes
 
 * `optimize_panel()` gains `fitness_mode` (`"cv"`, `"in_sample"`,

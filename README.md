@@ -143,6 +143,7 @@ result <- optimize_panel(x, y, feature_pool = top_de, ...)
 | `select_de_features()` | Pre-filter features via differential expression |
 | `select_transferable_features()` | Pre-filter features by cross-cohort ridge stability |
 | `select_discriminative_features()` | Pre-filter by within-cohort AUC, penalised for batch separation |
+| `select_ruleout_features()` | Pre-filter by univariate specificity at a sensitivity target (rule-out) |
 | `select_ruv_features()` | Pre-filter via RUV-4 signal vs. unwanted-variation scoring |
 | `metric_registry()` | View all available objective functions |
 
