@@ -6,7 +6,9 @@
   ranking each feature on the univariate specificity it reaches when its
   threshold captures at least `target_sensitivity` of cases (both directions
   tried). Per-cohort specificities are combined by worst cohort (`"min"`,
-  default) or `"mean"`. Returns a character vector like `select_de_features()`.
+  default) or `"mean"` within each direction before the better direction is
+  kept, so a feature must separate cases the same way in every cohort.
+  Returns a character vector like `select_de_features()`.
 
 ## Breaking changes
 

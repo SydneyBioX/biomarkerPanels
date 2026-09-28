@@ -15,7 +15,11 @@ NULL
 #' positive, or low values call positive) and the better one is kept, so the
 #' score is direction-agnostic. With multiple cohorts the per-cohort
 #' specificities are combined by `cohort_aggregation` (the default `"min"`
-#' rewards features that hold up in every cohort) before ranking.
+#' rewards features that hold up in every cohort) *within* each direction, and
+#' only then is the better direction kept. The direction is therefore shared
+#' by every cohort: a feature that is high in cases in one cohort and low in
+#' another cannot score well in both, which matters for ratio transforms, where
+#' a direction flip cancels rather than adds signal.
 #'
 #' This differs from AUC-based ranking (e.g. [select_discriminative_features()])
 #' in that only the high-sensitivity tail of the ROC curve counts: a feature
@@ -70,7 +74,7 @@ select_ruleout_features <- function(x_list,
   cohort_names <- prepared$cohort_names
   feature_names <- prepared$feature_names
 
-  spec_matrix <- vapply(seq_along(matrices), function(k) {
+  spec_by_cohort <- lapply(seq_along(matrices), function(k) {
     y <- responses[[k]]
     if (!any(y == 1L) || !any(y == 0L)) {
       stop(
@@ -80,17 +84,23 @@ select_ruleout_features <- function(x_list,
       )
     }
     .spec_at_sensitivity_by_feature(matrices[[k]], y, target_sensitivity)
-  }, numeric(length(feature_names)))
+  })
 
-  if (is.null(dim(spec_matrix))) {
-    spec_matrix <- matrix(spec_matrix, ncol = length(matrices))
+  # Aggregate across cohorts within each direction, then keep the better
+  # direction, so one direction has to hold in every cohort.
+  aggregate_cohorts <- function(direction) {
+    spec_matrix <- vapply(spec_by_cohort, function(spec) spec[, direction],
+                          numeric(length(feature_names)))
+    if (is.null(dim(spec_matrix))) {
+      spec_matrix <- matrix(spec_matrix, ncol = length(matrices))
+    }
+    switch(
+      cohort_aggregation,
+      min = apply(spec_matrix, 1, min),
+      mean = rowMeans(spec_matrix)
+    )
   }
-
-  scores <- switch(
-    cohort_aggregation,
-    min = apply(spec_matrix, 1, min),
-    mean = rowMeans(spec_matrix)
-  )
+  scores <- pmax(aggregate_cohorts("up"), aggregate_cohorts("down"))
   names(scores) <- feature_names
 
   scores <- scores[!is.na(scores)]
@@ -107,7 +117,8 @@ select_ruleout_features <- function(x_list,
 #' For each column, sets the threshold at the observed case value that captures
 #' the smallest number of cases still meeting `target_sensitivity`, and reports
 #' the fraction of controls falling on the negative side. Both call directions
-#' are evaluated and the larger specificity is returned.
+#' are evaluated and returned separately, so callers can hold the direction
+#' fixed across cohorts.
 #'
 #' With `n` non-missing case values, `k = ceiling(n * target_sensitivity)`
 #' cases must be called positive. The "up" threshold is the `(n - k + 1)`-th
@@ -119,8 +130,9 @@ select_ruleout_features <- function(x_list,
 #' @param x Numeric matrix (samples x features).
 #' @param y Integer 0/1 vector of labels (1 = case).
 #' @param target_sensitivity Sensitivity floor in `(0, 1]`.
-#' @return Numeric vector of specificities, one per column of `x`. `NA` where a
-#'   column has no non-missing case values.
+#' @return Numeric matrix of specificities with one row per column of `x` and
+#'   columns `up` (positive if `x >= t`) and `down` (positive if `x <= t`).
+#'   `NA` where a column has no non-missing case or control values.
 #' @noRd
 .spec_at_sensitivity_by_feature <- function(x, y, target_sensitivity) {
   x_pos <- x[y == 1L, , drop = FALSE]
@@ -135,7 +147,7 @@ select_ruleout_features <- function(x_list,
   spec_up <- colMeans(sweep(x_neg, 2, t_up, "<"), na.rm = TRUE)
   spec_down <- colMeans(sweep(x_neg, 2, t_down, ">"), na.rm = TRUE)
 
-  spec <- pmax(spec_up, spec_down, na.rm = TRUE)
+  spec <- cbind(up = spec_up, down = spec_down)
   spec[is.na(t_up) | is.nan(spec)] <- NA_real_
   spec
 }

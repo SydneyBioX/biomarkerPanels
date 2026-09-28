@@ -363,8 +363,26 @@ test_that("select_ruleout_features is direction-agnostic", {
   spec <- biomarkerPanels:::.spec_at_sensitivity_by_feature(
     fx$x, as.integer(fx$y) - 1L, 0.90
   )
-  expect_equal(spec[["down"]], spec[["tail_clean"]])
-  expect_equal(spec[["tail_clean"]], 1)
+  expect_equal(spec[["down", "down"]], spec[["tail_clean", "up"]])
+  expect_equal(spec[["tail_clean", "up"]], 1)
+})
+
+test_that("select_ruleout_features requires one direction across cohorts", {
+  fx1 <- make_ruleout_fixture(1L)
+  fx2 <- make_ruleout_fixture(2L)
+  # "flip" separates perfectly in both cohorts, but its cases are high in
+  # cohort 1 and low in cohort 2, so no single direction works in both.
+  fx1$x <- cbind(fx1$x, flip = fx1$x[, "tail_clean"])
+  fx2$x <- cbind(fx2$x, flip = fx2$x[, "down"])
+
+  selected <- select_ruleout_features(
+    list(fx1$x, fx2$x), list(fx1$y, fx2$y), n_features = 6
+  )
+
+  # Scoring each cohort's best direction before taking the worst cohort would
+  # give "flip" a perfect score; a shared direction leaves it below the
+  # consistently moderate feature.
+  expect_lt(match("moderate", selected), match("flip", selected))
 })
 
 test_that("select_ruleout_features threshold always captures >= target sensitivity", {
@@ -422,9 +440,9 @@ test_that("select_ruleout_features handles NA values and rejects single-class co
   spec <- biomarkerPanels:::.spec_at_sensitivity_by_feature(
     x_na, as.integer(fx$y) - 1L, 0.90
   )
-  expect_equal(spec[["tail_clean"]], 0)
-  expect_equal(spec[["down"]], 1)
-  expect_true(is.na(spec[["noise"]]))
+  expect_equal(max(spec["tail_clean", ]), 0)
+  expect_equal(spec[["down", "down"]], 1)
+  expect_true(all(is.na(spec["noise", ])))
 
   selected <- select_ruleout_features(x_na, fx$y, n_features = 10)
   expect_equal(length(selected), 4)

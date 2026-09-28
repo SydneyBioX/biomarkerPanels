@@ -43,7 +43,11 @@ classifier when its threshold is set to capture at least
 positive, or low values call positive) and the better one is kept, so the
 score is direction-agnostic. With multiple cohorts the per-cohort
 specificities are combined by \code{cohort_aggregation} (the default \code{"min"}
-rewards features that hold up in every cohort) before ranking.
+rewards features that hold up in every cohort) \emph{within} each direction, and
+only then is the better direction kept. The direction is therefore shared
+by every cohort: a feature that is high in cases in one cohort and low in
+another cannot score well in both, which matters for ratio transforms, where
+a direction flip cancels rather than adds signal.
 }
 \details{
 This differs from AUC-based ranking (e.g. \code{\link[=select_discriminative_features]{select_discriminative_features()}})
