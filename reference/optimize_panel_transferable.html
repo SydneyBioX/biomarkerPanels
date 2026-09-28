@@ -102,7 +102,7 @@ directly instead.</p>
 <span>  algorithm <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"NSGA-III"</span>, <span class="st">"NSGA-II"</span><span class="op">)</span>,</span>
 <span>  nsga_control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  assay <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  seed <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">42L</span>,</span>
 <span>  regularized <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  regularized_alpha <span class="op">=</span> <span class="fl">0.5</span>,</span>
 <span>  selection_threshold <span class="op">=</span> <span class="st">"adaptive"</span>,</span>
@@ -186,10 +186,11 @@ on-the-fly during optimization (default <code>"pairwise_ratios"</code>). See
 
 
 <dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
-<dd><p>Optional integer seed for reproducibility. When <code>NULL</code> and
-<code>feature_pool</code> is also <code>NULL</code>, a seed is drawn and reused for both the
-feature-selection partition and the <code><a href="optimize_panel.html">optimize_panel()</a></code> call, so the two
-partitions match and held-out samples never leak into feature selection.</p></dd>
+<dd><p>Integer seed for reproducibility (default <code>42L</code>, as in
+<code><a href="optimize_panel.html">optimize_panel()</a></code>). When <code>NULL</code> and <code>feature_pool</code> is also <code>NULL</code>, a seed
+is drawn and reused for both the feature-selection partition and the
+<code><a href="optimize_panel.html">optimize_panel()</a></code> call, so the two partitions match and held-out samples
+never leak into feature selection.</p></dd>
 
 
 <dt id="arg-regularized">regularized<a class="anchor" aria-label="anchor" href="#arg-regularized"></a></dt>

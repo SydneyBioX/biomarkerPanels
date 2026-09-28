@@ -68,6 +68,7 @@
 <url><loc>/reference/plot_pareto_front.html</loc></url>
 <url><loc>/reference/register_feature_transform.html</loc></url>
 <url><loc>/reference/register_metric.html</loc></url>
+<url><loc>/reference/ruleout_features.html</loc></url>
 <url><loc>/reference/ruv_features.html</loc></url>
 <url><loc>/reference/ruv_features_helpers.html</loc></url>
 <url><loc>/reference/select_batch_associated_features.html</loc></url>
@@ -75,6 +76,7 @@
 <url><loc>/reference/select_discriminative_features.html</loc></url>
 <url><loc>/reference/select_features_for_ratios.html</loc></url>
 <url><loc>/reference/select_panel_inclusion_frequency.html</loc></url>
+<url><loc>/reference/select_ruleout_features.html</loc></url>
 <url><loc>/reference/select_ruv_features.html</loc></url>
 <url><loc>/reference/select_transferable_features.html</loc></url>
 <url><loc>/reference/simulate_expression_data.html</loc></url>

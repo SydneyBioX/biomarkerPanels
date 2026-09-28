@@ -60,6 +60,11 @@
     <div class="section level2">
 <h2 class="page-header" data-toc-text="0.2.0.9000" id="biomarkerpanels-0209000">biomarkerPanels 0.2.0.9000<a class="anchor" aria-label="anchor" href="#biomarkerpanels-0209000"></a></h2>
 <div class="section level3">
+<h3 id="new-features-0-2-0-9000">New features<a class="anchor" aria-label="anchor" href="#new-features-0-2-0-9000"></a></h3>
+<ul><li>
+<code><a href="../reference/select_ruleout_features.html">select_ruleout_features()</a></code> pre-filters candidates for rule-out panels by ranking each feature on the univariate specificity it reaches when its threshold captures at least <code>target_sensitivity</code> of cases (both directions tried). Per-cohort specificities are combined by worst cohort (<code>"min"</code>, default) or <code>"mean"</code>. Returns a character vector like <code><a href="../reference/select_de_features.html">select_de_features()</a></code>.</li>
+</ul></div>
+<div class="section level3">
 <h3 id="breaking-changes-0-2-0-9000">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-0-2-0-9000"></a></h3>
 <ul><li>
 <code><a href="../reference/optimize_panel.html">optimize_panel()</a></code> gains <code>fitness_mode</code> (<code>"cv"</code>, <code>"in_sample"</code>, <code>"within_cohort_val"</code>, <code>"within_cohort_rotating"</code>, <code>"loco"</code>) plus <code>train_ratio</code> / <code>val_ratio</code> partitioning, <code>np_alpha</code>, <code>np_delta</code>, and <code>n_val_splits</code> — the scoring strategies and train/validation/held-out split that <code><a href="../reference/optimize_panel_transferable.html">optimize_panel_transferable()</a></code> used to provide are now built into <code><a href="../reference/optimize_panel.html">optimize_panel()</a></code> itself.</li>
@@ -67,6 +72,10 @@
 <code>fitness_cv</code> is deprecated in favour of <code>fitness_mode</code>: <code>fitness_cv = TRUE</code> maps to <code>fitness_mode = "cv"</code> and <code>fitness_cv = FALSE</code> maps to <code>fitness_mode = "in_sample"</code>, with a deprecation warning either way.</li>
 <li>
 <code><a href="../reference/optimize_panel_transferable.html">optimize_panel_transferable()</a></code> is deprecated and will be removed in the next minor release. Call <code><a href="../reference/optimize_panel.html">optimize_panel()</a></code> directly instead, e.g. <code>optimize_panel(x, y, fitness_mode = "within_cohort_val", train_ratio = 0.7, val_ratio = 0.2)</code>.</li>
+<li>
+<code><a href="../reference/optimize_panel.html">optimize_panel()</a></code> (and the deprecated <code><a href="../reference/optimize_panel_transferable.html">optimize_panel_transferable()</a></code>) now default to <code>seed = 42L</code>, so calls that omit <code>seed</code> are deterministic; pass <code>seed = NULL</code> for the old unseeded behaviour. The seed is set on the global RNG, so downstream random steps (e.g. <code><a href="../reference/fit_panel.html">fit_panel()</a></code>’s <code>cv.glmnet</code> folds) become reproducible too.</li>
+<li>
+<code>optimize_panel(feature_pool = NULL)</code> (the default) now warns that it is searching every shared feature and may be slow. <code><a href="../reference/optimize_panel.html">optimize_panel()</a></code> never selects features itself: pass a pre-selected pool to narrow the search.</li>
 <li>Seeded runs now produce different numbers than 0.2.0: cross-validation folds for <code>fitness_mode = "cv"</code> (formerly <code>fitness_cv = TRUE</code>) are now drawn from the seeded RNG stream, which also makes them reproducible for a given <code>seed</code> (they previously were not).</li>
 </ul></div>
 <div class="section level3">
