@@ -17,7 +17,7 @@ optimize_panel(
   algorithm = c("NSGA-III", "NSGA-II"),
   nsga_control = list(),
   assay = NULL,
-  seed = NULL,
+  seed = 42L,
   fitness_mode = c("cv", "in_sample", "within_cohort_val", "within_cohort_rotating",
     "loco"),
   fitness_cv_folds = 5L,
@@ -52,7 +52,9 @@ weight > 0.5 in the decision vector. Minimum is 2 features when
 integer indices) to consider during optimization. These are the original
 feature names before any transformation. When using pairwise transforms,
 transformed labels like \code{"A--B"} are also accepted and will be mapped
-back to their constituent base features. Defaults to all features.}
+back to their constituent base features. Each cohort is subset to these
+columns; no further selection is applied. Defaults to \code{NULL}, which
+searches every shared feature and warns that this can be slow.}
 
 \item{feature_transform}{Transformation applied to selected features
 after base feature selection. The NSGA algorithm selects base features,
@@ -92,10 +94,12 @@ as it is slower than sequential execution due to overhead.}
 
 \item{assay}{For \code{SummarizedExperiment} inputs, assay name or index to use.}
 
-\item{seed}{Optional integer seed for reproducibility. When provided, the
-seed is set once before partitioning, so both the data split and the NSGA
-search are reproducible. If \code{NULL} (default), no seed is set and results
-may vary between runs.}
+\item{seed}{Integer seed for reproducibility (default \code{42L}). The seed is
+set once before partitioning, so both the data split and the NSGA search
+are reproducible. It is set on the global RNG and is not restored on exit,
+so a resampling loop around \code{optimize_panel()} must pass its own seed per
+iteration. Pass \code{NULL} to leave the RNG untouched (results then vary
+between runs).}
 
 \item{fitness_mode}{How candidate panels are scored during the NSGA search:
 \describe{

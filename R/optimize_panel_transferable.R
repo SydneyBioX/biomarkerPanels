@@ -38,10 +38,11 @@
 #'   `"NSGA-II"`.
 #' @param nsga_control Named list of arguments passed to rmoo.
 #' @param assay For `SummarizedExperiment` inputs, assay name or index.
-#' @param seed Optional integer seed for reproducibility. When `NULL` and
-#'   `feature_pool` is also `NULL`, a seed is drawn and reused for both the
-#'   feature-selection partition and the [optimize_panel()] call, so the two
-#'   partitions match and held-out samples never leak into feature selection.
+#' @param seed Integer seed for reproducibility (default `42L`, as in
+#'   [optimize_panel()]). When `NULL` and `feature_pool` is also `NULL`, a seed
+#'   is drawn and reused for both the feature-selection partition and the
+#'   [optimize_panel()] call, so the two partitions match and held-out samples
+#'   never leak into feature selection.
 #' @param regularized Logical; if `TRUE` (default), use regularized regression.
 #' @param regularized_alpha Elastic net mixing parameter (default 0.5).
 #' @param selection_threshold Either a fixed numeric threshold in (0,1) for
@@ -82,7 +83,7 @@ optimize_panel_transferable <- function(
   algorithm = c("NSGA-III", "NSGA-II"),
   nsga_control = list(),
   assay = NULL,
-  seed = NULL,
+  seed = 42L,
   regularized = TRUE,
   regularized_alpha = 0.5,
   selection_threshold = "adaptive",

@@ -24,7 +24,9 @@
 #'   integer indices) to consider during optimization. These are the original
 #'   feature names before any transformation. When using pairwise transforms,
 #'   transformed labels like `"A--B"` are also accepted and will be mapped
-#'   back to their constituent base features. Defaults to all features.
+#'   back to their constituent base features. Each cohort is subset to these
+#'   columns; no further selection is applied. Defaults to `NULL`, which
+#'   searches every shared feature and warns that this can be slow.
 #' @param feature_transform Transformation applied to selected features
 #'   after base feature selection. The NSGA algorithm selects base features,
 #'   then this transform is applied on-the-fly. Defaults to `"pairwise_ratios"`,
@@ -57,10 +59,12 @@
 #'   values based on feature pool size. Note: `parallel = TRUE` is not recommended
 #'   as it is slower than sequential execution due to overhead.
 #' @param assay For `SummarizedExperiment` inputs, assay name or index to use.
-#' @param seed Optional integer seed for reproducibility. When provided, the
-#'   seed is set once before partitioning, so both the data split and the NSGA
-#'   search are reproducible. If `NULL` (default), no seed is set and results
-#'   may vary between runs.
+#' @param seed Integer seed for reproducibility (default `42L`). The seed is
+#'   set once before partitioning, so both the data split and the NSGA search
+#'   are reproducible. It is set on the global RNG and is not restored on exit,
+#'   so a resampling loop around `optimize_panel()` must pass its own seed per
+#'   iteration. Pass `NULL` to leave the RNG untouched (results then vary
+#'   between runs).
 #' @param fitness_mode How candidate panels are scored during the NSGA search:
 #'   \describe{
 #'     \item{"cv"}{(Default) k-fold cross-validation within the training
@@ -144,7 +148,7 @@ optimize_panel <- function(x, y,
                            algorithm = c("NSGA-III", "NSGA-II"),
                            nsga_control = list(),
                            assay = NULL,
-                           seed = NULL,
+                           seed = 42L,
                            fitness_mode = c("cv", "in_sample", "within_cohort_val",
                                             "within_cohort_rotating", "loco"),
                            fitness_cv_folds = 5L,
@@ -202,7 +206,14 @@ optimize_panel <- function(x, y,
   feature_pool_arg <- feature_pool
   feature_pool_base <- raw_feature_names
 
-  if (!is.null(feature_pool_arg)) {
+  if (is.null(feature_pool_arg)) {
+    warning(
+      "`feature_pool = NULL`: searching all ", length(raw_feature_names),
+      " shared features, which can take a long time. Pass a pre-selected ",
+      "`feature_pool` (e.g. from select_de_features()) to narrow the search.",
+      call. = FALSE
+    )
+  } else {
     if (is.numeric(feature_pool_arg)) {
       feature_pool_base <- .resolve_feature_pool(feature_pool_arg, raw_feature_names)
     } else {
@@ -349,7 +360,8 @@ optimize_panel <- function(x, y,
   }
   decision_dim <- ncol(x_pool)  # Decision dimension = number of BASE features
 
-  if (decision_dim > 200) {
+  # A NULL pool has already warned above.
+  if (decision_dim > 200 && !is.null(feature_pool_arg)) {
     warning("Optimizing over more than 200 features may be slow; consider ",
             "reducing `feature_pool` for exploration.")
   }

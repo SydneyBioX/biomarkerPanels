@@ -23,6 +23,14 @@
   next minor release. Call `optimize_panel()` directly instead, e.g.
   `optimize_panel(x, y, fitness_mode = "within_cohort_val", train_ratio = 0.7,
   val_ratio = 0.2)`.
+* `optimize_panel()` (and the deprecated `optimize_panel_transferable()`)
+  now default to `seed = 42L`, so calls that omit `seed` are deterministic;
+  pass `seed = NULL` for the old unseeded behaviour. The seed is set on the
+  global RNG, so downstream random steps (e.g. `fit_panel()`'s `cv.glmnet`
+  folds) become reproducible too.
+* `optimize_panel(feature_pool = NULL)` (the default) now warns that it is
+  searching every shared feature and may be slow. `optimize_panel()` never
+  selects features itself: pass a pre-selected pool to narrow the search.
 * Seeded runs now produce different numbers than 0.2.0: cross-validation folds
   for `fitness_mode = "cv"` (formerly `fitness_cv = TRUE`) are now drawn from
   the seeded RNG stream, which also makes them reproducible for a given

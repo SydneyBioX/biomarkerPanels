@@ -21,7 +21,7 @@ optimize_panel_transferable(
   algorithm = c("NSGA-III", "NSGA-II"),
   nsga_control = list(),
   assay = NULL,
-  seed = NULL,
+  seed = 42L,
   regularized = TRUE,
   regularized_alpha = 0.5,
   selection_threshold = "adaptive",
@@ -70,10 +70,11 @@ on-the-fly during optimization (default \code{"pairwise_ratios"}). See
 
 \item{assay}{For \code{SummarizedExperiment} inputs, assay name or index.}
 
-\item{seed}{Optional integer seed for reproducibility. When \code{NULL} and
-\code{feature_pool} is also \code{NULL}, a seed is drawn and reused for both the
-feature-selection partition and the \code{\link[=optimize_panel]{optimize_panel()}} call, so the two
-partitions match and held-out samples never leak into feature selection.}
+\item{seed}{Integer seed for reproducibility (default \code{42L}, as in
+\code{\link[=optimize_panel]{optimize_panel()}}). When \code{NULL} and \code{feature_pool} is also \code{NULL}, a seed
+is drawn and reused for both the feature-selection partition and the
+\code{\link[=optimize_panel]{optimize_panel()}} call, so the two partitions match and held-out samples
+never leak into feature selection.}
 
 \item{regularized}{Logical; if \code{TRUE} (default), use regularized regression.}
 
