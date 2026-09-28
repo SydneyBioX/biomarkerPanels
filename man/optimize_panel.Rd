@@ -46,7 +46,8 @@ experiments representing one or more cohorts.}
 \item{max_features}{Maximum number of biomarkers permitted in a panel. Acts
 as an upper bound; actual panel size varies based on how many features have
 weight > 0.5 in the decision vector. Minimum is 2 features when
-\code{regularized = TRUE} (glmnet requirement), or 1 when \code{regularized = FALSE}.}
+\code{regularized = TRUE} (glmnet requirement), or 1 when \code{regularized = FALSE}.
+\code{NULL} removes the cap (panels may use the whole \code{feature_pool}).}
 
 \item{feature_pool}{Optional subset of base feature identifiers (names or
 integer indices) to consider during optimization. These are the original

@@ -20,6 +20,7 @@
 #'   as an upper bound; actual panel size varies based on how many features have
 #'   weight > 0.5 in the decision vector. Minimum is 2 features when
 #'   `regularized = TRUE` (glmnet requirement), or 1 when `regularized = FALSE`.
+#'   `NULL` removes the cap (panels may use the whole `feature_pool`).
 #' @param feature_pool Optional subset of base feature identifiers (names or
 #'   integer indices) to consider during optimization. These are the original
 #'   feature names before any transformation. When using pairwise transforms,
@@ -334,6 +335,15 @@ optimize_panel <- function(x, y,
   }
 
   min_features_required <- .min_features_required(regularized, feature_transform)
+
+  if (is.null(max_features)) {
+    max_features <- length(feature_pool)
+  }
+  if (!is.numeric(max_features) || length(max_features) != 1L ||
+      is.na(max_features)) {
+    stop("`max_features` must be a single number or NULL.", call. = FALSE)
+  }
+  max_features <- as.integer(max_features)
 
   if (max_features < min_features_required) {
     stop("`max_features` must be at least ", min_features_required,
