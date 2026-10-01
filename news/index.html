@@ -62,7 +62,7 @@
 <div class="section level3">
 <h3 id="new-features-0-2-0-9000">New features<a class="anchor" aria-label="anchor" href="#new-features-0-2-0-9000"></a></h3>
 <ul><li>
-<code><a href="../reference/select_ruleout_features.html">select_ruleout_features()</a></code> pre-filters candidates for rule-out panels by ranking each feature on the univariate specificity it reaches when its threshold captures at least <code>target_sensitivity</code> of cases (both directions tried). Per-cohort specificities are combined by worst cohort (<code>"min"</code>, default) or <code>"mean"</code>. Returns a character vector like <code><a href="../reference/select_de_features.html">select_de_features()</a></code>.</li>
+<code><a href="../reference/select_ruleout_features.html">select_ruleout_features()</a></code> pre-filters candidates for rule-out panels by ranking each feature on the univariate specificity it reaches when its threshold captures at least <code>target_sensitivity</code> of cases (both directions tried). Per-cohort specificities are combined by worst cohort (<code>"min"</code>, default) or <code>"mean"</code> within each direction before the better direction is kept, so a feature must separate cases the same way in every cohort. Returns a character vector like <code><a href="../reference/select_de_features.html">select_de_features()</a></code>.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="breaking-changes-0-2-0-9000">Breaking changes<a class="anchor" aria-label="anchor" href="#breaking-changes-0-2-0-9000"></a></h3>

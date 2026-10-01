@@ -5,7 +5,11 @@ target_sensitivity of cases. Both directions are tried (high values call
 positive, or low values call positive) and the better one is kept, so the
 score is direction-agnostic. With multiple cohorts the per-cohort
 specificities are combined by cohort_aggregation (the default "min"
-rewards features that hold up in every cohort) before ranking.'><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
+rewards features that hold up in every cohort) within each direction, and
+only then is the better direction kept. The direction is therefore shared
+by every cohort: a feature that is high in cases in one cohort and low in
+another cannot score well in both, which matters for ratio transforms, where
+a direction flip cancels rather than adds signal.'><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
 <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
 <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
 <![endif]--></head><body data-spy="scroll" data-target="#toc">
@@ -71,7 +75,11 @@ classifier when its threshold is set to capture at least
 positive, or low values call positive) and the better one is kept, so the
 score is direction-agnostic. With multiple cohorts the per-cohort
 specificities are combined by <code>cohort_aggregation</code> (the default <code>"min"</code>
-rewards features that hold up in every cohort) before ranking.</p>
+rewards features that hold up in every cohort) <em>within</em> each direction, and
+only then is the better direction kept. The direction is therefore shared
+by every cohort: a feature that is high in cases in one cohort and low in
+another cannot score well in both, which matters for ratio transforms, where
+a direction flip cancels rather than adds signal.</p>
     </div>
 
     <div id="ref-usage">
