@@ -51,6 +51,7 @@
 <url><loc>/reference/metric_specificity_at_sensitivity.html</loc></url>
 <url><loc>/reference/min_metric_constraint.html</loc></url>
 <url><loc>/reference/n_solutions.html</loc></url>
+<url><loc>/reference/nonredundant_features.html</loc></url>
 <url><loc>/reference/np_fit.html</loc></url>
 <url><loc>/reference/np_threshold.html</loc></url>
 <url><loc>/reference/nsga_history.html</loc></url>
@@ -75,6 +76,7 @@
 <url><loc>/reference/select_de_features.html</loc></url>
 <url><loc>/reference/select_discriminative_features.html</loc></url>
 <url><loc>/reference/select_features_for_ratios.html</loc></url>
+<url><loc>/reference/select_nonredundant_features.html</loc></url>
 <url><loc>/reference/select_panel_inclusion_frequency.html</loc></url>
 <url><loc>/reference/select_ruleout_features.html</loc></url>
 <url><loc>/reference/select_ruv_features.html</loc></url>
