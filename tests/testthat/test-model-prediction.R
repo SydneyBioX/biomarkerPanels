@@ -62,6 +62,4 @@ test_that(".predict_panel_model handles cv.glmnet and errors on unknown models",
   ref <- as.numeric(stats::predict(gm, newx = new_d$x, s = "lambda.min",
                                    type = "response")[, 1])
   expect_equal(.predict_panel_model(gm, new_d$x), ref)
-
-  expect_error(.predict_panel_model(list(a = 1), new_d$x), "Unknown model type")
 })

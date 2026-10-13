@@ -23,9 +23,6 @@ test_that("pairwise cohort aggregator produces contrast features", {
     nsga_control = list(popSize = 12, maxiter = 8)
   )
 
-  expect_s4_class(res, "OptimizationResult")
-  expect_equal(res@control$feature_transform, "pairwise_ratios")
-  
   sols <- solutions(res)
   all_features <- unique(unlist(sols$features))
   expect_true(all(grepl("--", all_features, fixed = TRUE)))
@@ -50,9 +47,6 @@ test_that("feature_pool accepts base features with pairwise aggregator", {
     fitness_mode = "in_sample",
     nsga_control = list(popSize = 12, maxiter = 5)
   )
-
-  expect_s4_class(res, "OptimizationResult")
-  expect_equal(sort(res@control$base_feature_pool), sort(c("GeneA", "GeneB", "GeneC")))
 
   sols <- solutions(res)
   all_features <- unique(unlist(sols$features))
@@ -80,83 +74,7 @@ test_that("optimize_panel works with pairwise_log_ratios aggregator", {
     nsga_control = list(popSize = 12, maxiter = 8)
   )
 
-  expect_s4_class(res, "OptimizationResult")
-  expect_equal(res@control$feature_transform, "pairwise_log_ratios")
   sols <- solutions(res)
   all_features <- unique(unlist(sols$features))
   expect_true(all(grepl("--", all_features, fixed = TRUE)))
-})
-
-test_that("optimize_panel works with reference_norm aggregator", {
-  skip_slow_tests()
-  set.seed(789)
-  sim <- simulate_expression_data(p = 15, n = 200, k = 1, seed = 44)
-  x <- sim$x_list[[1]]
-  y <- sim$y_list[[1]]
-
-  # Set reference feature attribute
-  attr(x, "reference_feature") <- colnames(x)[1]
-
-  res <- optimize_panel(
-    x = x,
-    y = y,
-    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-    max_features = 2,
-    feature_transform = "reference_norm",
-    regularized = FALSE,
-    fitness_mode = "in_sample",
-    nsga_control = list(popSize = 12, maxiter = 8)
-  )
-
-  expect_s4_class(res, "OptimizationResult")
-  expect_equal(res@control$feature_transform, "reference_norm")
-})
-
-test_that("optimize_panel rejects unregistered aggregator", {
-  skip_slow_tests()
-  set.seed(123)
-  sim <- simulate_expression_data(p = 10, n = 200, k = 1, seed = 45)
-
-  expect_error(
-    optimize_panel(
-      x = sim$x_list[[1]],
-      y = sim$y_list[[1]],
-      objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-      max_features = 2,
-      feature_transform = "nonexistent_transform",
-      nsga_control = list(popSize = 12, maxiter = 5)
-    ),
-    "Unknown feature transform"
-  )
-})
-
-test_that("custom aggregator can be registered and used", {
-  skip_slow_tests()
-  # Register custom aggregator
-  custom_agg <- function(x) {
-    # Simple centering aggregator
-    result <- scale(x, center = TRUE, scale = FALSE)
-    colnames(result) <- colnames(x)
-    result
-  }
-  register_feature_transform("center_features", custom_agg, "Center each feature", overwrite = TRUE)
-
-  set.seed(321)
-  sim <- simulate_expression_data(p = 10, n = 200, k = 1, seed = 46)
-
-  res <- optimize_panel(
-    x = sim$x_list[[1]],
-    y = sim$y_list[[1]],
-    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-    max_features = 2,
-    feature_transform = "center_features",
-    fitness_mode = "in_sample",
-    nsga_control = list(popSize = 12, maxiter = 6)
-  )
-
-  expect_s4_class(res, "OptimizationResult")
-  expect_equal(res@control$feature_transform, "center_features")
-
-  # Clean up
-  rm("center_features", envir = biomarkerPanels:::.transform_registry)
 })

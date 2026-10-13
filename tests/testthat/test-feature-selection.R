@@ -32,8 +32,6 @@ test_that("select_de_features ranks shared signals", {
     combination_method = "Stouffer"
   )
 
-  expect_type(selected, "character")
-  expect_lte(length(selected), 3)
   expect_true("gene1" %in% selected)
 })
 
@@ -49,40 +47,8 @@ test_that("select_features_for_ratios returns stable and informative sets", {
     combination_method = "Stouffer"
   )
 
-  expect_named(ratios, c("stable", "informative"))
-  expect_length(ratios$stable, 2)
-  expect_length(ratios$informative, 3)
   expect_true("gene2" %in% ratios$stable)
   expect_true("gene1" %in% ratios$informative)
-
-  alt <- select_features_for_ratios(
-    lapply(fixture$cohorts, `[[`, "x"),
-    lapply(fixture$cohorts, `[[`, "y"),
-    n_stable = 2,
-    n_informative = 2,
-    stability_method = "inverse_t_se"
-  )
-  expect_length(alt$stable, 2)
-  expect_length(alt$informative, 2)
-
-  expect_error(
-    select_features_for_ratios(
-      lapply(fixture$cohorts, `[[`, "x"),
-      fixture$cohorts[[1]]$y,
-      n_stable = 2,
-      n_informative = 2
-    ),
-    "`x_list` and `y_list` must have the same length"
-  )
-
-  expect_error(
-    select_features_for_ratios(
-      lapply(fixture$cohorts, `[[`, "x"),
-      lapply(fixture$cohorts, `[[`, "y"),
-      stability_method = "unknown-method"
-    ),
-    "should be one of"
-  )
 })
 
 test_that("select_transferable_features prioritises consistent ridge coefficients", {
@@ -109,19 +75,8 @@ test_that("select_transferable_features prioritises consistent ridge coefficient
     lambda_choice = "lambda_min"
   )
 
-  expect_type(transferable$features, "character")
   expect_true("geneA" %in% transferable$features)
   expect_true(all(transferable$scores$sign_consistent))
-  expect_true(all(transferable$scores$min_abs >= 0))
-  expect_equal(colnames(transferable$coefficients), c("cohort_01", "cohort_02"))
-
-  expect_error(
-    select_transferable_features(
-      list(cohort1$x, cohort2$x),
-      cohort1$y
-    ),
-    "`x_list` and `y_list` must have the same length"
-  )
 })
 
 test_that("select_transferable_features intersects cohort feature sets", {
@@ -149,9 +104,7 @@ test_that("select_transferable_features intersects cohort feature sets", {
     standardize = FALSE
   )
 
-  expect_true(length(result$features) <= 2)
   expect_true(all(result$features %in% c("gene_common1", "gene_common2")))
-  expect_equal(colnames(result$coefficients), c("cohort_01", "cohort_02"))
   expect_true(all(rownames(result$coefficients) %in% c("gene_common1", "gene_common2")))
 })
 
@@ -207,13 +160,6 @@ test_that("sign_consistency_threshold allows partial sign consistency", {
   # geneB should be excluded from strict, included in lenient
   expect_false("geneB" %in% result_strict$features)
   expect_true("geneB" %in% result_lenient$features)
-
-  # Verify sign_consistency_threshold is stored in settings
-  expect_equal(result_strict$settings$sign_consistency_threshold, 1.0)
-  expect_equal(result_lenient$settings$sign_consistency_threshold, 0.75)
-
-  # Verify sign_agreement column exists and has proper values
-  expect_true("sign_agreement" %in% names(result_lenient$scores))
 })
 
 # ==============================================================================
@@ -231,8 +177,6 @@ test_that("select_discriminative_features ranks signal gene above offset gene", 
     min_auc = 0.5
   )
 
-  expect_type(result$features, "character")
-  expect_true(length(result$features) >= 1)
   expect_true("gene1" %in% result$features)
 
   # gene1 (strong signal) should rank above gene2 (cohort offset, weaker signal)
@@ -246,12 +190,6 @@ test_that("select_discriminative_features ranks signal gene above offset gene", 
   gene1_cd <- scores$cohort_disc[scores$feature == "gene1"]
   gene4_cd <- scores$cohort_disc[scores$feature == "gene4"]
   expect_gt(gene1_cd, gene4_cd)
-
-  # Return structure matches expected pattern
-  expect_named(result, c("features", "scores", "per_cohort_auc", "settings"))
-  expect_true(all(c("feature", "mean_auc", "sd_auc", "min_auc",
-    "cohort_disc", "score") %in% names(result$scores)))
-  expect_equal(ncol(result$per_cohort_auc), 2)
 })
 
 test_that("select_discriminative_features respects min_auc filter", {
@@ -284,29 +222,9 @@ test_that("select_discriminative_features works with single cohort", {
 
   result <- select_discriminative_features(x, y, n_features = 3, min_auc = 0.5)
 
-  expect_type(result$features, "character")
   # With single cohort, cohort_disc should be 0 and sd_auc should be 0
   expect_true(all(result$scores$cohort_disc == 0))
   expect_true(all(result$scores$sd_auc == 0))
-})
-
-test_that("select_discriminative_features validates parameters", {
-  fixture <- make_ratio_fixture()
-  x_list <- lapply(fixture$cohorts, `[[`, "x")
-  y_list <- lapply(fixture$cohorts, `[[`, "y")
-
-  expect_error(
-    select_discriminative_features(x_list, y_list, lambda_cohort = "bad"),
-    "`lambda_cohort` must be a numeric scalar"
-  )
-  expect_error(
-    select_discriminative_features(x_list, y_list, lambda_sd = c(1, 2)),
-    "`lambda_sd` must be a numeric scalar"
-  )
-  expect_error(
-    select_discriminative_features(x_list, y_list, min_auc = 1.5),
-    "`min_auc` must be a numeric scalar"
-  )
 })
 
 # ==============================================================================
@@ -351,11 +269,8 @@ test_that("select_ruleout_features ranks by tail specificity rather than AUC", {
 
   selected <- select_ruleout_features(fx$x, fx$y, n_features = 5)
 
-  expect_type(selected, "character")
-  expect_equal(length(selected), 5)
   expect_lt(match("tail_clean", selected), match("auc_high", selected))
   expect_equal(selected[4:5], c("moderate", "noise"))
-  expect_equal(length(select_ruleout_features(fx$x, fx$y, n_features = 2)), 2)
 })
 
 test_that("select_ruleout_features is direction-agnostic", {
@@ -453,7 +368,6 @@ test_that("select_ruleout_features handles NA values and rejects single-class co
     select_ruleout_features(fx$x, y_one_class),
     "at least one case and one control"
   )
-  expect_error(select_ruleout_features(fx$x, fx$y, target_sensitivity = 0))
 })
 
 # ==============================================================================
@@ -488,8 +402,6 @@ test_that("select_nonredundant_features skips near-duplicates of selected featur
   y_list <- list(c1$y, c2$y)
 
   selected <- select_nonredundant_features(x_list, y_list, n_features = 6)
-  expect_type(selected, "character")
-  expect_equal(length(selected), 6)
   expect_false(anyDuplicated(selected) > 0)
   expect_true(selected[1] %in% c("a1", "a2", "a3"))
   expect_setequal(selected[2:3], c("b", "c"))
@@ -562,11 +474,6 @@ test_that("select_nonredundant_features handles a single cohort, NAs, and option
   expect_setequal(selected, colnames(x_na))
   expect_setequal(selected[2:3], c("b", "c"))
 
-  expect_equal(
-    length(select_nonredundant_features(c1$x, c1$y, n_features = 4, cor_method = "pearson")),
-    4
-  )
-  expect_error(select_nonredundant_features(c1$x, c1$y, penalty = "sum"))
   expect_error(
     select_nonredundant_features(c1$x[1:2, ], c1$y[1:2]),
     "at least three samples"

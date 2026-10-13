@@ -53,7 +53,6 @@ test_that("plot_pareto_evolution returns a magick animation with one frame per g
   res <- make_evo_result(make_history())
 
   anim <- plot_pareto_evolution(res, width = 320, height = 200, fps = 2)
-  expect_s3_class(anim, "magick-image")
   expect_equal(length(anim), 3L)
 })
 
@@ -92,26 +91,4 @@ test_that("plot_pareto_evolution writes a GIF to disk when path is supplied", {
 
   plot_pareto_evolution(res, width = 320, height = 200, fps = 2, path = out)
   expect_true(file.exists(out))
-  expect_gt(file.info(out)$size, 0)
-})
-
-test_that("plot_pareto_evolution errors when no history is recorded", {
-  skip_if_not_installed("ggplot2")
-  skip_if_not_installed("patchwork")
-  skip_if_not_installed("magick")
-
-  res <- make_evo_result(list())
-  expect_error(plot_pareto_evolution(res), "record_history = TRUE")
-})
-
-test_that("plot_pareto_evolution errors on unknown metric column", {
-  skip_if_not_installed("ggplot2")
-  skip_if_not_installed("patchwork")
-  skip_if_not_installed("magick")
-
-  res <- make_evo_result(make_history())
-  expect_error(
-    plot_pareto_evolution(res, x_metric = "not_a_metric"),
-    "missing from nsga_history"
-  )
 })

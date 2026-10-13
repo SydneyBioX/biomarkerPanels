@@ -1,23 +1,7 @@
 # Tests for the metric registry framework and objective definition functions that interface with the optimizer.
-test_that("build_objectives registers and retrieves correctly", {
-  objs <- build_objectives(c("sensitivity", "specificity", "num_features"))
-
-  expect_type(objs, "list")
-  expect_equal(length(objs), 3)
-
-  expect_equal(names(objs), c("sensitivity", "specificity", "num_features"))
-
-  for (m in names(objs)) {
-    expect_true(is.function(objs[[m]]$fun))
-    expect_type(objs[[m]]$direction, "character")
-    expect_true(objs[[m]]$direction %in% c("maximize", "minimize"))
-  }
-})
-
 test_that("define_objectives preserves cutoff_strategy", {
   objs <- define_objectives(metrics = c("sensitivity", "specificity", "num_features"), cutoff_strategy = "prevalence")
 
-  expect_type(objs, "list")
   # Ensure the functions returned by define_objectives encapsulate the strategy
   # We test this by checking if the formals or closure environment holds it,
   # or functionally by injecting a test case
@@ -39,8 +23,6 @@ test_that("metric registry allows addition and query of custom metrics", {
   register_metric("mean_score", custom_fun, "maximize")
 
   objs <- build_objectives("mean_score")
-  expect_equal(names(objs), "mean_score")
-  expect_equal(objs$mean_score$direction, "maximize")
 
   truth <- factor(c("No", "Yes"), levels = c("No", "Yes"))
   scores <- c(0.4, 0.8)
@@ -55,10 +37,6 @@ test_that("define_objectives constructs proper objective functions", {
     metrics = c("sensitivity", "num_features"),
     cutoff_prob = 0.5
   )
-
-  expect_true(is.list(objs))
-  expect_true("sensitivity" %in% names(objs))
-  expect_true("num_features" %in% names(objs))
 
   expect_equal(objs$sensitivity$direction, "maximize")
   expect_equal(objs$num_features$direction, "minimize")

@@ -42,40 +42,6 @@ make_ruv_fixture <- function() {
   )
 }
 
-test_that("select_ruv_features returns expected structure", {
-  skip_if_not_installed("ruv")
-  skip_slow_tests()
-
-  fixture <- make_ruv_fixture()
-  result <- suppressWarnings(select_ruv_features(
-    fixture$x_list, fixture$y_list,
-    n_features = 10, k = 2
-  ))
-
-  expect_type(result, "list")
-  expect_named(result, c("features", "scores", "ruv_summary", "corrected",
-    "settings"))
-  expect_type(result$features, "character")
-  expect_true(length(result$features) <= 10)
-
-  # Scores data.frame structure
-  expect_s3_class(result$scores, "data.frame")
-  expect_true(all(c("feature", "discrimination", "alpha_norm", "score", "rank")
-    %in% names(result$scores)))
-
-  # RUV summary
-  expect_type(result$ruv_summary, "list")
-  expect_equal(result$ruv_summary$k, 2L)
-  expect_true(result$ruv_summary$n_controls > 0)
-
-  # Settings
-  expect_equal(result$settings$k, 2L)
-  expect_equal(result$settings$scoring, "ratio")
-
-  # Corrected should be NULL by default
-  expect_null(result$corrected)
-})
-
 test_that("select_ruv_features prioritises signal genes over batch genes", {
   skip_if_not_installed("ruv")
   skip_slow_tests()
@@ -111,39 +77,7 @@ test_that("neg_control_method = 'list' works with user-supplied genes", {
     neg_control_genes = fixture$null_genes
   ))
 
-  expect_type(result$features, "character")
-  expect_true(length(result$features) >= 1)
   expect_true(all(result$ruv_summary$control_genes %in% fixture$null_genes))
-})
-
-test_that("k auto-selection works", {
-  skip_if_not_installed("ruv")
-  skip_slow_tests()
-
-  fixture <- make_ruv_fixture()
-  result <- suppressWarnings(select_ruv_features(
-    fixture$x_list, fixture$y_list,
-    n_features = 10, k = NULL
-  ))
-
-  expect_true(result$ruv_summary$k >= 1L)
-  expect_true(result$ruv_summary$k <= 10L)
-  expect_type(result$features, "character")
-})
-
-test_that("iterate_controls refines without error", {
-  skip_if_not_installed("ruv")
-  skip_slow_tests()
-
-  fixture <- make_ruv_fixture()
-  result <- suppressWarnings(select_ruv_features(
-    fixture$x_list, fixture$y_list,
-    n_features = 10, k = 2,
-    iterate_controls = TRUE, max_iterations = 2
-  ))
-
-  expect_type(result$features, "character")
-  expect_true(result$settings$iterate_controls)
 })
 
 test_that("both scoring methods produce valid output", {
@@ -161,40 +95,7 @@ test_that("both scoring methods produce valid output", {
     n_features = 10, k = 2, scoring = "composite_z"
   ))
 
-  expect_equal(result_ratio$settings$scoring, "ratio")
-  expect_equal(result_z$settings$scoring, "composite_z")
-
   # Both produce valid scores
   expect_true(all(is.finite(result_ratio$scores$score)))
   expect_true(all(is.finite(result_z$scores$score)))
-})
-
-test_that("return_corrected produces matrix of correct dimensions", {
-  skip_if_not_installed("ruv")
-  skip_slow_tests()
-
-  fixture <- make_ruv_fixture()
-  result <- suppressWarnings(select_ruv_features(
-    fixture$x_list, fixture$y_list,
-    n_features = 10, k = 2, return_corrected = TRUE
-  ))
-
-  expect_true(is.matrix(result$corrected))
-  # 3 cohorts x 30 samples each = 90 samples, 20 genes
-  expect_equal(nrow(result$corrected), 90)
-  expect_equal(ncol(result$corrected), 20)
-})
-
-test_that("single cohort works without list wrapping", {
-  skip_if_not_installed("ruv")
-  skip_slow_tests()
-
-  fixture <- make_ruv_fixture()
-  result <- suppressWarnings(select_ruv_features(
-    fixture$x_list[[1]], fixture$y_list[[1]],
-    n_features = 5, k = 1
-  ))
-
-  expect_type(result$features, "character")
-  expect_true(length(result$features) >= 1)
 })

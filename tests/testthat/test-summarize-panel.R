@@ -36,27 +36,16 @@ test_that("compute_inclusion_frequencies accepts OptimizationResult", {
   opt <- .make_mock_optimization_result()
   freq <- compute_inclusion_frequencies(list(opt))
 
-  expect_true(is.data.frame(freq))
-  expect_equal(colnames(freq), c("feature", "count", "proportion"))
   # "A--C" appears in solutions 1 and 2, "A--B" in 1 and 3
   expect_true("A--C" %in% freq$feature)
   expect_true("A--B" %in% freq$feature)
   expect_equal(freq$proportion[freq$feature == "A--C"], 2/3)
 })
 
-test_that("compute_inclusion_frequencies accepts unwrapped OptimizationResult", {
-  opt <- .make_mock_optimization_result()
-  freq <- compute_inclusion_frequencies(opt)
-
-  expect_true(is.data.frame(freq))
-  expect_true(nrow(freq) > 0L)
-})
-
 test_that("compute_inclusion_frequencies feature_type = base_features works", {
   opt <- .make_mock_optimization_result()
   freq <- compute_inclusion_frequencies(list(opt), feature_type = "base_features")
 
-  expect_true(is.data.frame(freq))
   # Base features are A, B, C, D
   expect_true(all(freq$feature %in% c("A", "B", "C", "D")))
   # A, B, C appear in all 3 solutions

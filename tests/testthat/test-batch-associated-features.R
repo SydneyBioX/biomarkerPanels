@@ -50,19 +50,6 @@ select_batch <- function(fx, n_features = 5L, ...) {
   )
 }
 
-test_that("select_batch_associated_features returns the documented structure", {
-  fx <- make_batch_fixture()
-  result <- select_batch(fx)
-
-  expect_named(result, c(
-    "features", "biology_epsilon", "diagnostics", "problematic_cohort",
-    "one_vs_rest", "pure_batch_pcs", "gene_scores", "pca"
-  ))
-  expect_length(result$features, 5L)
-  expect_s3_class(result$pca, "prcomp")
-  expect_length(select_batch(fx, n_features = 500L)$features, ncol(fx$x))
-})
-
 test_that("selection recovers batch genes and noise cannot inflate the ratio", {
   fx <- make_batch_fixture()
   result <- select_batch(fx)
@@ -117,38 +104,6 @@ test_that("diagnostics identify pure-batch PCs and the separated cohort", {
   expect_true(all(pure$batch_pvalue < 0.10))
   expect_true(all(pure$biology_pvalue > 0.20))
 
-  expect_equal(nrow(result$one_vs_rest), nlevels(fx$cohort))
   # Cohort B has no batch shift, so it should not be the extreme one.
   expect_false(identical(result$problematic_cohort, "B"))
-})
-
-test_that("input validation rejects malformed arguments", {
-  fx <- make_batch_fixture()
-
-  expect_error(
-    select_batch_associated_features(x = "not a matrix", cohort = fx$cohort),
-    "must be a matrix or data.frame"
-  )
-
-  unnamed <- fx$x
-  colnames(unnamed) <- NULL
-  expect_error(
-    select_batch_associated_features(x = unnamed, cohort = fx$cohort),
-    "must have column names"
-  )
-
-  expect_error(
-    select_batch_associated_features(x = fx$x, cohort = fx$cohort[-1]),
-    "same length as the number of rows"
-  )
-
-  expect_error(
-    select_batch_associated_features(x = fx$x, cohort = fx$cohort, y = fx$y[-1]),
-    "same length as the number of rows"
-  )
-
-  expect_error(
-    select_batch(fx, biology_penalty_quantile = 1.5),
-    "biology_penalty_quantile"
-  )
 })

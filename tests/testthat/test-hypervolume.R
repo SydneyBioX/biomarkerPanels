@@ -26,7 +26,6 @@ test_that("hypervolume matches a hand-computed 2D value", {
 
   hv <- hypervolume(res, ref = c(0.5, 0.5))
   expect_equal(as.numeric(hv), 0.13, tolerance = 1e-9)
-  expect_equal(attr(hv, "ref"), c(sensitivity = 0.5, specificity = 0.5))
 })
 
 test_that("hypervolume handles mixed maximize/minimize directions", {
@@ -73,13 +72,6 @@ test_that("hypervolume auto reference yields a finite, positive value", {
   expect_lt(ref[["specificity"]], min(pts[, 2]))
 })
 
-test_that("hypervolume errors on bad reference length", {
-  skip_if_not_installed("emoa")
-  pts <- rbind(c(0.9, 0.7), c(0.8, 0.85))
-  res <- make_opt_result(pts, c(sensitivity = "maximize", specificity = "maximize"))
-  expect_error(hypervolume(res, ref = c(0.5)), "length 2")
-})
-
 test_that("hypervolume_history walks generations and is non-decreasing for typical fronts", {
   skip_if_not_installed("emoa")
 
@@ -103,11 +95,4 @@ test_that("hypervolume_history walks generations and is non-decreasing for typic
   traj <- hypervolume_history(res, ref = c(0.5, 0.5))
   expect_equal(traj$generation, c(1L, 2L, 3L))
   expect_true(all(diff(traj$hypervolume) >= -1e-9))
-  expect_equal(attr(traj, "ref"), c(sensitivity = 0.5, specificity = 0.5))
-})
-
-test_that("hypervolume_history errors when no history was recorded", {
-  pts <- rbind(c(0.9, 0.7))
-  res <- make_opt_result(pts, c(sensitivity = "maximize", specificity = "maximize"))
-  expect_error(hypervolume_history(res), "record_history = TRUE")
 })

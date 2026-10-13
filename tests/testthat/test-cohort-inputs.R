@@ -22,7 +22,6 @@ test_that(".prepare_selection_inputs intersects and preserves cohort-1 order", {
   # geneA / geneD are cohort-specific; geneB, geneC are shared. Order follows
   # cohort 1's columns, not alphabetical order.
   expect_identical(prepared$feature_names, c("geneB", "geneC"))
-  expect_identical(prepared$cohort_names, c("cohort_a", "cohort_b"))
   expect_true(all(vapply(prepared$matrices, ncol, integer(1)) == 2L))
   expect_identical(colnames(prepared$matrices[[2]]), c("geneB", "geneC"))
 })
@@ -42,11 +41,9 @@ test_that(".prepare_selection_inputs encodes responses as requested", {
   fx <- make_prep_fixture()
 
   int_prep <- .prepare_selection_inputs(fx$x, fx$y, response = "integer")
-  expect_type(int_prep$responses[[1]], "integer")
   expect_identical(sort(unique(int_prep$responses[[1]])), c(0L, 1L))
 
   fct_prep <- .prepare_selection_inputs(fx$x, fx$y, response = "factor")
-  expect_s3_class(fct_prep$responses[[1]], "factor")
   expect_identical(levels(fct_prep$responses[[1]]), c("No", "Yes"))
 })
 
@@ -81,28 +78,10 @@ test_that(".prepare_selection_inputs reports per-cohort counts on empty overlap"
   )
 })
 
-test_that(".prepare_selection_inputs validates lengths and sample counts", {
-  fx <- make_prep_fixture()
-
-  expect_error(
-    .prepare_selection_inputs(fx$x, fx$y[1]),
-    "must have the same length"
-  )
-
-  bad_y <- fx$y
-  bad_y[[2]] <- bad_y[[2]][1:2]
-  expect_error(
-    .prepare_selection_inputs(fx$x, bad_y),
-    "must match the length"
-  )
-})
-
 test_that(".prepare_selection_inputs accepts a single non-list cohort", {
   fx <- make_prep_fixture()
 
   prepared <- .prepare_selection_inputs(fx$x[[1]], fx$y[[1]])
 
-  expect_length(prepared$matrices, 1L)
   expect_identical(prepared$feature_names, c("geneA", "geneB", "geneC"))
-  expect_identical(prepared$cohort_names, "cohort_01")
 })

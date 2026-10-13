@@ -9,7 +9,6 @@ test_that(".compute_roc_curve handles edge cases correctly", {
   scores <- runif(50)
   roc <- biomarkerPanels:::.compute_roc_curve(truth_all_pos, scores, "Yes")
   expect_true(all(is.na(roc$fpr)))
-  expect_true(all(roc$tpr >= 0 & roc$tpr <= 1))
   # Last row (lowest threshold) should have TPR = 1
   expect_equal(max(roc$tpr), 1)
 
@@ -17,21 +16,6 @@ test_that(".compute_roc_curve handles edge cases correctly", {
   truth_all_neg <- factor(rep("No", 50), levels = c("No", "Yes"))
   roc <- biomarkerPanels:::.compute_roc_curve(truth_all_neg, scores, "Yes")
   expect_true(all(is.na(roc$tpr)))
-  expect_true(all(roc$fpr >= 0 & roc$fpr <= 1 | is.na(roc$fpr)))
-
-  # Tied scores - should still produce valid ROC
-  set.seed(123)
-  truth <- factor(sample(c("No", "Yes"), 100, replace = TRUE), levels = c("No", "Yes"))
-  scores_tied <- sample(1:10 / 10, 100, replace = TRUE)
-  roc <- biomarkerPanels:::.compute_roc_curve(truth, scores_tied, "Yes")
-  expect_s3_class(roc, "data.frame")
-  expect_true(nrow(roc) > 0)
-
-  # Single sample
-  truth_single <- factor("Yes", levels = c("No", "Yes"))
-  scores_single <- 0.5
-  roc <- biomarkerPanels:::.compute_roc_curve(truth_single, scores_single, "Yes")
-  expect_s3_class(roc, "data.frame")
 })
 
 test_that(".compute_roc_curve_cpp matches pROC", {

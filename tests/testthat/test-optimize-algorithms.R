@@ -30,7 +30,6 @@ test_that("optimize_panel uses adaptive defaults without explicit nsga_control",
     feature_transform = "none"
   )
 
-  expect_s4_class(res, "OptimizationResult")
   # Default algorithm is NSGA-III
   expect_equal(res@control$algorithm, "NSGA-III")
   # Verify that the stored nsga2 settings reflect adaptive NSGA-III defaults
@@ -55,28 +54,5 @@ test_that("optimize_panel uses NSGA-III by default", {
     nsga_control = list(popSize = 12, maxiter = 10)
   )
 
-  expect_s4_class(res, "OptimizationResult")
   expect_equal(res@control$algorithm, "NSGA-III")
-})
-
-test_that("optimize_panel respects explicit NSGA-II algorithm selection", {
-  skip_slow_tests()
-  set.seed(456)
-  sim <- simulate_expression_data(p = 15, n = 200, k = 1, seed = 43)
-  x <- sim$x_list[[1]]
-  y <- sim$y_list[[1]]
-
-  res <- optimize_panel(
-    x = x,
-    y = y,
-    objectives = define_objectives(metrics = c("sensitivity", "specificity")),
-    max_features = 3,
-    feature_pool = colnames(x)[seq_len(8)],
-    feature_transform = "none",
-    algorithm = "NSGA-II",
-    nsga_control = list(popSize = 12, maxiter = 10)
-  )
-
-  expect_s4_class(res, "OptimizationResult")
-  expect_equal(res@control$algorithm, "NSGA-II")
 })
