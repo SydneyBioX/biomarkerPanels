@@ -84,6 +84,7 @@ Collate:
     'metric_registry.R'
     'model_fitting.R'
     'model_prediction.R'
+    'nonredundant_features.R'
     'np_fit.R'
     'np_utils.R'
     'nsga_config.R'

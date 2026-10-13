@@ -455,3 +455,120 @@ test_that("select_ruleout_features handles NA values and rejects single-class co
   )
   expect_error(select_ruleout_features(fx$x, fx$y, target_sensitivity = 0))
 })
+
+# ==============================================================================
+# select_nonredundant_features tests
+# ==============================================================================
+
+# Two cohorts of 100 samples. "a1"-"a3" are near-copies of one strong signal,
+# "b" and "c" are weaker signals independent of "a" given the label, "noise"
+# has none. Sharing the label still correlates "b"/"c" with "a" (|r| ~ 0.4),
+# so they need enough relevance to stay clear of "noise" after the penalty.
+make_redundancy_cohort <- function(seed) {
+  set.seed(seed)
+  n <- 100L
+  y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+  lab <- as.integer(y) - 1L
+  a <- 2 * lab + rnorm(n)
+  x <- cbind(
+    a1 = a + rnorm(n, sd = 0.05),
+    a2 = a + rnorm(n, sd = 0.05),
+    a3 = a + rnorm(n, sd = 0.05),
+    b = 1.6 * lab + rnorm(n),
+    c = 1.4 * lab + rnorm(n),
+    noise = rnorm(n)
+  )
+  list(x = x, y = y)
+}
+
+test_that("select_nonredundant_features skips near-duplicates of selected features", {
+  c1 <- make_redundancy_cohort(1L)
+  c2 <- make_redundancy_cohort(2L)
+  x_list <- list(c1$x, c2$x)
+  y_list <- list(c1$y, c2$y)
+
+  selected <- select_nonredundant_features(x_list, y_list, n_features = 6)
+  expect_type(selected, "character")
+  expect_equal(length(selected), 6)
+  expect_false(anyDuplicated(selected) > 0)
+  expect_true(selected[1] %in% c("a1", "a2", "a3"))
+  expect_setequal(selected[2:3], c("b", "c"))
+})
+
+test_that("select_nonredundant_features mean penalty admits duplicates sooner than max", {
+  c1 <- make_redundancy_cohort(1L)
+  c2 <- make_redundancy_cohort(2L)
+  # Several independent unit-signal features dilute a mean penalty, so a
+  # near-duplicate of the first pick eventually beats them; under max it never
+  # does while independent features remain.
+  add_independent <- function(cohort, seed) {
+    set.seed(seed)
+    lab <- as.integer(cohort$y) - 1L
+    extra <- sapply(1:4, function(i) 0.8 * lab + rnorm(length(lab)))
+    colnames(extra) <- paste0("ind", 1:4)
+    cohort$x <- cbind(cohort$x, extra)
+    cohort
+  }
+  c1 <- add_independent(c1, 11L)
+  c2 <- add_independent(c2, 12L)
+  x_list <- list(c1$x, c2$x)
+  y_list <- list(c1$y, c2$y)
+
+  sel_max <- select_nonredundant_features(x_list, y_list, n_features = 10, penalty = "max")
+  sel_mean <- select_nonredundant_features(x_list, y_list, n_features = 10, penalty = "mean")
+
+  first_dup <- function(sel) min(which(sel %in% c("a1", "a2", "a3"))[-1])
+  expect_lt(first_dup(sel_mean), first_dup(sel_max))
+  # Under max, every independent signal precedes the second cluster member.
+  expect_true(all(match(c("b", "c", paste0("ind", 1:4)), sel_max) < first_dup(sel_max)))
+})
+
+test_that("select_nonredundant_features measures redundancy within cohort", {
+  set.seed(3)
+  n <- 60L
+  make <- function(offset) {
+    y <- factor(rep(c("No", "Yes"), each = n / 2), levels = c("No", "Yes"))
+    lab <- as.integer(y) - 1L
+    list(
+      x = cbind(
+        a = 2 * lab + rnorm(n) + offset,
+        # Independent of "a" within each cohort, but shares its cohort offset,
+        # so pooled across cohorts the two look strongly correlated.
+        batchy = 1.5 * lab + rnorm(n) + offset,
+        weak = 0.8 * lab + rnorm(n)
+      ),
+      y = y
+    )
+  }
+  c1 <- make(0)
+  c2 <- make(20)
+  pooled_cor <- cor(rbind(c1$x, c2$x), method = "spearman")["a", "batchy"]
+  expect_gt(pooled_cor, 0.8)
+
+  selected <- select_nonredundant_features(
+    list(c1$x, c2$x), list(c1$y, c2$y), n_features = 3
+  )
+  expect_equal(selected, c("a", "batchy", "weak"))
+})
+
+test_that("select_nonredundant_features handles a single cohort, NAs, and options", {
+  c1 <- make_redundancy_cohort(1L)
+  expect_equal(length(select_nonredundant_features(c1$x, c1$y, n_features = 100)), 6)
+
+  x_na <- c1$x
+  x_na[c(1, 5, 40), "b"] <- NA
+  x_na[c(2, 33), "a2"] <- NA
+  selected <- select_nonredundant_features(x_na, c1$y, n_features = 6)
+  expect_setequal(selected, colnames(x_na))
+  expect_setequal(selected[2:3], c("b", "c"))
+
+  expect_equal(
+    length(select_nonredundant_features(c1$x, c1$y, n_features = 4, cor_method = "pearson")),
+    4
+  )
+  expect_error(select_nonredundant_features(c1$x, c1$y, penalty = "sum"))
+  expect_error(
+    select_nonredundant_features(c1$x[1:2, ], c1$y[1:2]),
+    "at least three samples"
+  )
+})

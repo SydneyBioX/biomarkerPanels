@@ -9,6 +9,13 @@
   default) or `"mean"` within each direction before the better direction is
   kept, so a feature must separate cases the same way in every cohort.
   Returns a character vector like `select_de_features()`.
+* `select_nonredundant_features()` ranks candidates by greedy mRMR for
+  panels where every slot costs an assay: relevance is the pooled limma |t|
+  (cohort as a covariate, scaled to [0, 1]) and redundancy is within-cohort
+  |correlation| (Spearman by default) averaged over cohorts, so shared batch
+  structure is not counted as co-regulation. `penalty = "max"` (default)
+  subtracts a candidate's largest |correlation| with any selected feature;
+  `penalty = "mean"` subtracts the average.
 
 ## Breaking changes
 
