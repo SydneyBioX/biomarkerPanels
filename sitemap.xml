@@ -1,6 +1,5 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>/404.html</loc></url>
-<url><loc>/DEVELOPER.html</loc></url>
 <url><loc>/articles/getting-started.html</loc></url>
 <url><loc>/articles/index.html</loc></url>
 <url><loc>/authors.html</loc></url>
@@ -28,7 +27,6 @@
 <url><loc>/reference/evaluate_panel_by_cohort.html</loc></url>
 <url><loc>/reference/evaluate_pareto_solutions.html</loc></url>
 <url><loc>/reference/evaluate_sensitivity.html</loc></url>
-<url><loc>/reference/fake_gene_expression.html</loc></url>
 <url><loc>/reference/feature_stability.html</loc></url>
 <url><loc>/reference/feature_stability_analysis.html</loc></url>
 <url><loc>/reference/feature_transform_registry.html</loc></url>

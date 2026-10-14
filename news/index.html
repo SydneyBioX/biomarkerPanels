@@ -79,6 +79,7 @@
 <li>
 <code>optimize_panel(feature_pool = NULL)</code> (the default) now warns that it is searching every shared feature and may be slow. <code><a href="../reference/optimize_panel.html">optimize_panel()</a></code> never selects features itself: pass a pre-selected pool to narrow the search.</li>
 <li>Seeded runs now produce different numbers than 0.2.0: cross-validation folds for <code>fitness_mode = "cv"</code> (formerly <code>fitness_cv = TRUE</code>) are now drawn from the seeded RNG stream, which also makes them reproducible for a given <code>seed</code> (they previously were not).</li>
+<li>The <code>fake_gene_expression</code> dataset has been removed. Generate the same data with <code>simulate_expression_data(p = 250, n = 100, k = 4, seed = 20240220)</code>.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="bug-fixes-0-2-0-9000">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-2-0-9000"></a></h3>

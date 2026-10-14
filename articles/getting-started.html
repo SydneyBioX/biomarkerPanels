@@ -108,47 +108,26 @@ inspect the results.</li>
 </ol>
 </div>
 <div class="section level2">
-<h2 id="load-a-multi-cohort-dataset">1. Load a Multi-cohort Dataset<a class="anchor" aria-label="anchor" href="#load-a-multi-cohort-dataset"></a>
+<h2 id="simulate-a-multi-cohort-dataset">1. Simulate a Multi-cohort Dataset<a class="anchor" aria-label="anchor" href="#simulate-a-multi-cohort-dataset"></a>
 </h2>
-<p>For demonstration we ship a small synthetic dataset in the test
-fixtures. In a package build, these files would live in
-<code>inst/extdata/</code>; here we reuse the fixture directly.</p>
+<p>For demonstration we simulate four cohorts with
+<code><a href="../reference/simulate_expression_data.html">simulate_expression_data()</a></code>. The <code>metadata</code>
+element records which genes carry the planted signal.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fixture_candidates</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"fake_gene_expression.Rds"</span>, package <span class="op">=</span> <span class="st">"biomarkerPanels"</span><span class="op">)</span>,</span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"test-data"</span>, <span class="st">"fake_gene_expression.Rds"</span>, package <span class="op">=</span> <span class="st">"biomarkerPanels"</span><span class="op">)</span>,</span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="st">".."</span>, <span class="st">"tests"</span>, <span class="st">"data"</span>, <span class="st">"fake_gene_expression.Rds"</span><span class="op">)</span>,</span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="st">".."</span>, <span class="st">".."</span>, <span class="st">"tests"</span>, <span class="st">"data"</span>, <span class="st">"fake_gene_expression.Rds"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">fixture_candidates</span> <span class="op">&lt;-</span> <span class="va">fixture_candidates</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nzchar</a></span><span class="op">(</span><span class="va">fixture_candidates</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="va">fixture_path</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
-<span><span class="kw">for</span> <span class="op">(</span><span class="va">candidate</span> <span class="kw">in</span> <span class="va">fixture_candidates</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.exists</a></span><span class="op">(</span><span class="va">candidate</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">fixture_path</span> <span class="op">&lt;-</span> <span class="va">candidate</span></span>
-<span>    <span class="kw">break</span></span>
-<span>  <span class="op">}</span></span>
-<span><span class="op">}</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">fixture_path</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span></span>
-<span>    <span class="st">"Unable to locate `fake_gene_expression.Rds`. "</span>,</span>
-<span>    <span class="st">"Regenerate it via `data-raw/simulate_gene_expression.R` if needed."</span>,</span>
-<span>    call. <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span><span class="va">cohorts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span><span class="va">fixture_path</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">cohorts</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/simulate_expression_data.html">simulate_expression_data</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">250</span>, n <span class="op">=</span> <span class="fl">100</span>, k <span class="op">=</span> <span class="fl">4</span>, seed <span class="op">=</span> <span class="fl">20240220</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">cohorts</span><span class="op">$</span><span class="va">x_list</span>, <span class="va">dim</span><span class="op">)</span></span>
 <span><span class="co">#&gt; $x1</span></span>
-<span><span class="co">#&gt; [1]  100 5000</span></span>
+<span><span class="co">#&gt; [1] 100 250</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $x2</span></span>
-<span><span class="co">#&gt; [1]  100 5000</span></span>
+<span><span class="co">#&gt; [1] 100 250</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $x3</span></span>
-<span><span class="co">#&gt; [1]  100 5000</span></span>
+<span><span class="co">#&gt; [1] 100 250</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $x4</span></span>
-<span><span class="co">#&gt; [1]  100 5000</span></span>
+<span><span class="co">#&gt; [1] 100 250</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">cohorts</span><span class="op">$</span><span class="va">x_list</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span><span class="op">]</span></span>
 <span><span class="co">#&gt; [1] "gene_0001" "gene_0002" "gene_0003" "gene_0004" "gene_0005" "gene_0006"</span></span></code></pre></div>
 <p>Each element of <code>x_list</code> is a log-scale expression matrix
