@@ -43,7 +43,6 @@ Suggests:
 LinkingTo:
     Rcpp
 biocViews: Software, Classification, FeatureExtraction, ROC, Biomarker
-LazyData: true
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
@@ -56,7 +55,6 @@ Collate:
     'biomarkerPanels-package.R'
     'cohort_inputs.R'
     'cv_scoring.R'
-    'data.R'
     'data_partitioning.R'
     'de_features.R'
     'discriminative_features.R'

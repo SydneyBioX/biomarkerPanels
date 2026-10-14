@@ -31,3 +31,8 @@ docs/
 *.Rproj
 check.sh
 check_output.txt
+
+# Development-only files (kept locally, not part of the package)
+.agents/
+DEVELOPER.md
+data-raw/

@@ -1,15 +1,14 @@
 # Tests for optimizing biomarker panels across multiple independent validation cohorts (multi-objective settings).
 test_that("optimize_panel handles multiple cohorts", {
   skip_slow_tests()
-  skip_if_not(file.exists(fixture_path("fake_gene_expression.Rds")))
-  fixture <- readRDS(fixture_path("fake_gene_expression.Rds"))
+  sim <- simulate_expression_data(p = 12, n = 100, k = 4, seed = 20240220)
 
   res <- optimize_panel(
-    x = fixture$x_list,
-    y = fixture$y_list,
+    x = sim$x_list,
+    y = sim$y_list,
     objectives = define_objectives(metrics = c("sensitivity", "specificity", "num_features")),
     max_features = 4,
-    feature_pool = colnames(fixture$x_list[[1]])[seq_len(12)],
+    feature_pool = colnames(sim$x_list[[1]]),
     feature_transform = "none",
     nsga_control = list(popSize = 16, maxiter = 15)
   )

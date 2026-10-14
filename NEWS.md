@@ -44,6 +44,8 @@
   for `fitness_mode = "cv"` (formerly `fitness_cv = TRUE`) are now drawn from
   the seeded RNG stream, which also makes them reproducible for a given
   `seed` (they previously were not).
+* The `fake_gene_expression` dataset has been removed. Generate the same data
+  with `simulate_expression_data(p = 250, n = 100, k = 4, seed = 20240220)`.
 
 ## Bug fixes
 

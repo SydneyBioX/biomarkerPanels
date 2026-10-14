@@ -46,35 +46,13 @@ This vignette walks through three steps:
 2. Assemble objectives from the metric registry.
 3. Run `optimize_panel()` to discover candidate panels and inspect the results.
 
-## 1. Load a Multi-cohort Dataset
+## 1. Simulate a Multi-cohort Dataset
 
-For demonstration we ship a small synthetic dataset in the test fixtures. In a
-package build, these files would live in `inst/extdata/`; here we reuse the
-fixture directly.
+For demonstration we simulate four cohorts with `simulate_expression_data()`.
+The `metadata` element records which genes carry the planted signal.
 
-```{r load-fixture}
-fixture_candidates <- c(
-  system.file("extdata", "fake_gene_expression.Rds", package = "biomarkerPanels"),
-  system.file("test-data", "fake_gene_expression.Rds", package = "biomarkerPanels"),
-  file.path("..", "tests", "data", "fake_gene_expression.Rds"),
-  file.path("..", "..", "tests", "data", "fake_gene_expression.Rds")
-)
-fixture_candidates <- fixture_candidates[nzchar(fixture_candidates)]
-fixture_path <- NULL
-for (candidate in fixture_candidates) {
-  if (file.exists(candidate)) {
-    fixture_path <- candidate
-    break
-  }
-}
-if (is.null(fixture_path)) {
-  stop(
-    "Unable to locate `fake_gene_expression.Rds`. ",
-    "Regenerate it via `data-raw/simulate_gene_expression.R` if needed.",
-    call. = FALSE
-  )
-}
-cohorts <- readRDS(fixture_path)
+```{r load-data}
+cohorts <- simulate_expression_data(p = 250, n = 100, k = 4, seed = 20240220)
 
 lapply(cohorts$x_list, dim)
 colnames(cohorts$x_list[[1]])[1:6]

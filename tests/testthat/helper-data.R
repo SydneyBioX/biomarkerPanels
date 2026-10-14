@@ -84,8 +84,3 @@ skip_extended_tests <- function() {
   }
   testthat::skip("Skipping extended tests: set EXTENDED_TESTS=true to run")
 }
-
-# Helper to get path to test fixture data
-fixture_path <- function(filename) {
-  testthat::test_path("..", "data", filename)
-}
