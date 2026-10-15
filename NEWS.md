@@ -1,4 +1,16 @@
-# biomarkerPanels 0.2.0.9000
+# MOBID 0.2.0.9000
+
+## Package renamed
+
+* The package has been renamed from `biomarkerPanels` to `MOBID`, ahead of
+  Bioconductor submission. Replace `library(biomarkerPanels)` and
+  `biomarkerPanels::` / `biomarkerPanels:::` with `library(MOBID)` and
+  `MOBID::` / `MOBID:::`. Exported functions and S4 classes keep their names.
+  Fitted models now store their prediction metadata under `MOBID_meta`;
+  prediction falls back to the old `biomarkerPanels_meta`, so panels saved by
+  `biomarkerPanels` still evaluate identically. Their S4 classes are recorded
+  as belonging to `biomarkerPanels`, so reading them back with `readRDS()`
+  still needs that package installed.
 
 ## New features
 
@@ -57,7 +69,7 @@
   likewise rejects a bare data.frame instead of splitting its columns into
   cohorts.
 
-# biomarkerPanels 0.2.0
+# MOBID 0.2.0
 
 Executes the 11 resolved cleanup decisions
 (`dev/cleanup-decisions-2026-08-RESOLVED.md`). Unlike 0.1.0, several of these
@@ -105,7 +117,7 @@ are deliberate behaviour changes.
 * Documented that `require_sign_consistency = FALSE` is equivalent to
   `sign_consistency_threshold = 0` in `select_transferable_features()`.
 
-# biomarkerPanels 0.1.0
+# MOBID 0.1.0
 
 First versioned milestone: a behaviour-preserving cleanup of the package
 surface and internals.

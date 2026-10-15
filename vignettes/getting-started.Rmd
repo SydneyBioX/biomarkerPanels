@@ -1,11 +1,11 @@
 ---
-title: "Getting Started with biomarkerPanels"
+title: "Getting Started with MOBID"
 author: "Package Authors"
 output:
   BiocStyle::html_document:
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Getting Started with biomarkerPanels}
+  %\VignetteIndexEntry{Getting Started with MOBID}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -17,23 +17,24 @@ knitr::opts_chunk$set(
   fig.width = 7,
   fig.height = 5
 )
-if (!requireNamespace("biomarkerPanels", quietly = TRUE)) {
+if (!requireNamespace("MOBID", quietly = TRUE)) {
   if (requireNamespace("pkgload", quietly = TRUE)) {
     pkgload::load_all("..", quiet = TRUE)
   } else {
     stop(
-      "`biomarkerPanels` is not installed. Install the package or run this vignette ",
+      "`MOBID` is not installed. Install the package or run this vignette ",
       "from within the source tree with pkgload available.",
       call. = FALSE
     )
   }
 }
-library(biomarkerPanels)
+library(MOBID)
 ```
 
 ## Introduction
 
-`biomarkerPanels` helps researchers build compact biomarker signatures when
+`MOBID` (Multi-Objective Biomarker Identification and Discovery) helps
+researchers build compact biomarker signatures when
 multiple cohorts are available and the number of measured features greatly
 exceeds the number of samples. The package delegates the heavy lift of
 multi-objective search to `rmoo` (NSGA-II/NSGA-III) while exposing a friendly

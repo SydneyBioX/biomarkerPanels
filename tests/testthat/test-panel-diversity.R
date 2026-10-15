@@ -1,8 +1,8 @@
 # Tests for compute_diversity() — annotation-free co-expression diversity.
 
-.coexpr_modules       <- biomarkerPanels:::.coexpr_modules
-.coexpr_diversity     <- biomarkerPanels:::.coexpr_diversity
-.center_within_cohort <- biomarkerPanels:::.center_within_cohort
+.coexpr_modules       <- MOBID:::.coexpr_modules
+.coexpr_diversity     <- MOBID:::.coexpr_diversity
+.center_within_cohort <- MOBID:::.center_within_cohort
 
 # Build a small OptimizationResult with two internally-correlated, mutually
 # independent feature groups (A1..A4 and B1..B4) plus some noise features.

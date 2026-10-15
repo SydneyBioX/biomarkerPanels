@@ -197,7 +197,7 @@ NULL
     fit <- .fit_binomial_glmnet(x_mat, y_vec, alpha)
 
     # Store additional metadata for prediction
-    fit$biomarkerPanels_meta <- list(
+    fit$MOBID_meta <- list(
       feature_names = colnames(x_selected),
       cohort_info = cohort_info,
       alpha = alpha

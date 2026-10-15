@@ -29,7 +29,7 @@ test_that("metric registry allows addition and query of custom metrics", {
   expect_equal(objs$mean_score$fun(truth, scores), 0.6)
 
   # Clean up registry
-  rm("mean_score", envir = biomarkerPanels:::.metric_registry)
+  rm("mean_score", envir = MOBID:::.metric_registry)
 })
 
 test_that("define_objectives constructs proper objective functions", {

@@ -1,16 +1,16 @@
 # Tests for underlying NSGA-III algorithm internals, such as reference point generation and partition parameters.
 test_that(".compute_nsga3_partitions returns appropriate values", {
   # 2-3 objectives: 12 partitions
-  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(2), 12L)
-  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(3), 12L)
+  expect_equal(MOBID:::.compute_nsga3_partitions(2), 12L)
+  expect_equal(MOBID:::.compute_nsga3_partitions(3), 12L)
 
   # 4-5 objectives: 6 partitions
-  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(4), 6L)
-  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(5), 6L)
+  expect_equal(MOBID:::.compute_nsga3_partitions(4), 6L)
+  expect_equal(MOBID:::.compute_nsga3_partitions(5), 6L)
 
   # 6+ objectives: 4 partitions
-  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(6), 4L)
-  expect_equal(biomarkerPanels:::.compute_nsga3_partitions(10), 4L)
+  expect_equal(MOBID:::.compute_nsga3_partitions(6), 4L)
+  expect_equal(MOBID:::.compute_nsga3_partitions(10), 4L)
 })
 
 test_that("optimize_panel uses adaptive defaults without explicit nsga_control", {

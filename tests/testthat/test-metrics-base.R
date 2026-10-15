@@ -42,7 +42,7 @@ test_that("metric_sensitivity uses cutoff_strategy correctly", {
   expect_equal(sens_prev, 1.0)
 
   # Verify prevalence cutoff is computed correctly
-  cutoff_val <- biomarkerPanels:::.compute_cutoff(truth, scores, 0.5, "prevalence", "Yes")
+  cutoff_val <- MOBID:::.compute_cutoff(truth, scores, 0.5, "prevalence", "Yes")
   expect_equal(cutoff_val, 0.3) # 3/10 positive
 })
 

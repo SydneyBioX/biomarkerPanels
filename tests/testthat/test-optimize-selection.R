@@ -80,7 +80,7 @@ test_that("all Pareto solutions have consistent feature counts", {
 
 test_that(".generate_sparse_suggestions creates diverse panel sizes", {
   set.seed(123)
-  suggestions <- biomarkerPanels:::.generate_sparse_suggestions(
+  suggestions <- MOBID:::.generate_sparse_suggestions(
     n_features = 20,
     n_suggestions = 10,
     min_features = 2,

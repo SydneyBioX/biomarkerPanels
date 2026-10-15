@@ -94,7 +94,7 @@ optimize_panel_transferable <- function(
 ) {
   .Deprecated(
     "optimize_panel",
-    package = "biomarkerPanels",
+    package = "MOBID",
     msg = paste(
       "optimize_panel_transferable() is deprecated; call optimize_panel()",
       "with fitness_mode, train_ratio, and val_ratio instead (a held-out",

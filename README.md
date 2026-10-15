@@ -1,12 +1,12 @@
-# biomarkerPanels <img src="man/figures/moo_hexsticker.png" alt="biomarkerPanels hex sticker" align="right" width="150"/>
+# MOBID <img src="man/figures/moo_hexsticker.png" alt="MOBID hex sticker" align="right" width="150"/>
 
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/SydneyBioX/biomarkerPanels/actions/workflows/R-CMD-check.yaml/badge.svg?branch=main)](https://github.com/SydneyBioX/biomarkerPanels/actions/workflows/R-CMD-check.yaml)
+[![R-CMD-check](https://github.com/SydneyBioX/MOBID/actions/workflows/R-CMD-check.yaml/badge.svg?branch=main)](https://github.com/SydneyBioX/MOBID/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-[Documentation](https://sydneybiox.github.io/biomarkerPanels/) | [Issues](https://github.com/SydneyBioX/biomarkerPanels/issues) | [License](LICENSE)
+[Documentation](https://sydneybiox.github.io/MOBID/) | [Issues](https://github.com/SydneyBioX/MOBID/issues) | [License](LICENSE)
 
-Multi-objective optimization for discovering compact biomarker panels from high-dimensional data.
+**MOBID** (Multi-Objective Biomarker Identification and Discovery) uses multi-objective optimization to discover compact biomarker panels from high-dimensional data.
 
 > **Note**
 > Contributions are welcome! Please report any issues. You may also contribute by opening a pull request.
@@ -26,7 +26,7 @@ Multi-objective optimization for discovering compact biomarker panels from high-
 ```r
 # Install from GitHub
 # install.packages("remotes")
-remotes::install_github("SydneyBioX/biomarkerPanels")
+remotes::install_github("SydneyBioX/MOBID")
 ```
 
 **Requirements**: R >= 4.4, plus dependencies (rmoo, glmnet, limma, pROC, SummarizedExperiment)
@@ -36,7 +36,7 @@ remotes::install_github("SydneyBioX/biomarkerPanels")
 ### Single cohort optimization
 
 ```r
-library(biomarkerPanels)
+library(MOBID)
 
 # Define objectives to optimize
 objectives <- define_objectives(
@@ -192,16 +192,16 @@ GPL-3
 
 ## Issues
 
-Please report bugs and feature requests via [GitHub Issues](https://github.com/SydneyBioX/biomarkerPanels/issues).
+Please report bugs and feature requests via [GitHub Issues](https://github.com/SydneyBioX/MOBID/issues).
 
 ## How to Cite
 
-If you use biomarkerPanels in your research, please cite:
+If you use MOBID in your research, please cite:
 
 ```bibtex
-@software{biomarkerPanels,
+@software{MOBID,
   author = {Robertson, Harry},
-  title = {biomarkerPanels: Multi-objective Optimization for Biomarker Panel Discovery},
-  url = {https://github.com/SydneyBioX/biomarkerPanels}
+  title = {MOBID: Multi-Objective Biomarker Identification and Discovery},
+  url = {https://github.com/SydneyBioX/MOBID}
 }
 ```

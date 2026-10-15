@@ -56,10 +56,31 @@ test_that(".predict_panel_model handles cv.glmnet and errors on unknown models",
   set.seed(3)
   gm <- glmnet::cv.glmnet(d$x, as.integer(d$y) - 1L,
                           family = "binomial", nfolds = 5)
-  gm$biomarkerPanels_meta <- list(cohort_info = NULL)
+  gm$MOBID_meta <- list(cohort_info = NULL)
   new_d <- make_xy(2, c("gA", "gB", "gC"))
 
   ref <- as.numeric(stats::predict(gm, newx = new_d$x, s = "lambda.min",
                                    type = "response")[, 1])
   expect_equal(.predict_panel_model(gm, new_d$x), ref)
 })
+
+test_that(".predict_panel_model reads metadata saved under the pre-rename name", {
+  skip_if_not_installed("glmnet")
+  # Models saved by biomarkerPanels store cohort_info under
+  # `biomarkerPanels_meta`; ignoring it drops the cohort dummy columns.
+  d <- make_xy(1, c("gA", "gB", "gC"), n = 80L)
+  x_fit <- cbind(d$x, .cohort_1 = rep(0:1, length.out = nrow(d$x)))
+  set.seed(3)
+  gm <- glmnet::cv.glmnet(x_fit, as.integer(d$y) - 1L,
+                          family = "binomial", nfolds = 5)
+  meta <- list(cohort_info = list(n_dummies = 1L))
+  current <- gm
+  current$MOBID_meta <- meta
+  legacy <- gm
+  legacy$biomarkerPanels_meta <- meta
+  new_d <- make_xy(2, c("gA", "gB", "gC"))
+
+  expect_equal(.predict_panel_model(legacy, new_d$x),
+               .predict_panel_model(current, new_d$x))
+})
+

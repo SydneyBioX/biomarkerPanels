@@ -264,7 +264,7 @@ test_that("select_ruleout_features ranks by tail specificity rather than AUC", {
   fx <- make_ruleout_fixture()
 
   # Sanity: auc_high really has the higher AUC.
-  auc <- biomarkerPanels:::.compute_rank_auc(fx$x, as.integer(fx$y) - 1L)
+  auc <- MOBID:::.compute_rank_auc(fx$x, as.integer(fx$y) - 1L)
   expect_gt(auc[["auc_high"]], auc[["tail_clean"]])
 
   selected <- select_ruleout_features(fx$x, fx$y, n_features = 5)
@@ -275,7 +275,7 @@ test_that("select_ruleout_features ranks by tail specificity rather than AUC", {
 
 test_that("select_ruleout_features is direction-agnostic", {
   fx <- make_ruleout_fixture()
-  spec <- biomarkerPanels:::.spec_at_sensitivity_by_feature(
+  spec <- MOBID:::.spec_at_sensitivity_by_feature(
     fx$x, as.integer(fx$y) - 1L, 0.90
   )
   expect_equal(spec[["down", "down"]], spec[["tail_clean", "up"]])
@@ -306,7 +306,7 @@ test_that("select_ruleout_features threshold always captures >= target sensitivi
   x_pos <- fx$x[y == 1L, ]
   n <- nrow(x_pos)
   for (target in c(0.8, 0.9, 0.95, 1)) {
-    thr <- apply(x_pos, 2, biomarkerPanels:::.ruleout_thresholds, target = target)
+    thr <- apply(x_pos, 2, MOBID:::.ruleout_thresholds, target = target)
     captured_up <- colMeans(sweep(x_pos, 2, thr[1L, ], ">="))
     captured_down <- colMeans(sweep(x_pos, 2, thr[2L, ], "<="))
     expect_true(all(captured_up >= target), info = paste("up", target))
@@ -352,7 +352,7 @@ test_that("select_ruleout_features handles NA values and rejects single-class co
   x_na[41:43, "auc_high"] <- NA
   x_na[, "noise"] <- NA
 
-  spec <- biomarkerPanels:::.spec_at_sensitivity_by_feature(
+  spec <- MOBID:::.spec_at_sensitivity_by_feature(
     x_na, as.integer(fx$y) - 1L, 0.90
   )
   expect_equal(max(spec["tail_clean", ]), 0)

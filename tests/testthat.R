@@ -1,4 +1,4 @@
 library(testthat)
-library(biomarkerPanels)
+library(MOBID)
 
-test_check("biomarkerPanels")
+test_check("MOBID")

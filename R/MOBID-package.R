@@ -1,6 +1,6 @@
-#' biomarkerPanels: Multi-objective Optimization for Compact Biomarker Panels
+#' MOBID: Multi-Objective Biomarker Identification and Discovery
 #'
-#' The biomarkerPanels package helps researchers derive small, interpretable
+#' The MOBID package helps researchers derive small, interpretable
 #' biomarker panels that satisfy competing performance criteria such as high
 #' sensitivity at fixed specificity, low assay cost, and transferability across
 #' cohorts. The package integrates with common Bioconductor data structures

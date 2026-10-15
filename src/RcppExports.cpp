@@ -12,7 +12,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 
 // select_stable_genes_cpp
 NumericVector select_stable_genes_cpp(NumericMatrix abs_t, NumericMatrix se_matrix, std::string method);
-RcppExport SEXP _biomarkerPanels_select_stable_genes_cpp(SEXP abs_tSEXP, SEXP se_matrixSEXP, SEXP methodSEXP) {
+RcppExport SEXP _MOBID_select_stable_genes_cpp(SEXP abs_tSEXP, SEXP se_matrixSEXP, SEXP methodSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -25,7 +25,7 @@ END_RCPP
 }
 // score_transferable_features_cpp
 List score_transferable_features_cpp(NumericMatrix coefficient_matrix);
-RcppExport SEXP _biomarkerPanels_score_transferable_features_cpp(SEXP coefficient_matrixSEXP) {
+RcppExport SEXP _MOBID_score_transferable_features_cpp(SEXP coefficient_matrixSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -36,7 +36,7 @@ END_RCPP
 }
 // aggregate_de_pvalues_cpp
 NumericVector aggregate_de_pvalues_cpp(NumericMatrix t_matrix, std::string method);
-RcppExport SEXP _biomarkerPanels_aggregate_de_pvalues_cpp(SEXP t_matrixSEXP, SEXP methodSEXP) {
+RcppExport SEXP _MOBID_aggregate_de_pvalues_cpp(SEXP t_matrixSEXP, SEXP methodSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -48,7 +48,7 @@ END_RCPP
 }
 // pairwise_col_diff_cpp
 NumericMatrix pairwise_col_diff_cpp(NumericMatrix x, CharacterVector col_names);
-RcppExport SEXP _biomarkerPanels_pairwise_col_diff_cpp(SEXP xSEXP, SEXP col_namesSEXP) {
+RcppExport SEXP _MOBID_pairwise_col_diff_cpp(SEXP xSEXP, SEXP col_namesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -60,7 +60,7 @@ END_RCPP
 }
 // reference_diff_cpp
 NumericMatrix reference_diff_cpp(NumericMatrix x, NumericVector ref_col, String ref_name, CharacterVector other_names);
-RcppExport SEXP _biomarkerPanels_reference_diff_cpp(SEXP xSEXP, SEXP ref_colSEXP, SEXP ref_nameSEXP, SEXP other_namesSEXP) {
+RcppExport SEXP _MOBID_reference_diff_cpp(SEXP xSEXP, SEXP ref_colSEXP, SEXP ref_nameSEXP, SEXP other_namesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -74,7 +74,7 @@ END_RCPP
 }
 // compute_roc_curve_cpp
 DataFrame compute_roc_curve_cpp(NumericVector scores, LogicalVector is_positive);
-RcppExport SEXP _biomarkerPanels_compute_roc_curve_cpp(SEXP scoresSEXP, SEXP is_positiveSEXP) {
+RcppExport SEXP _MOBID_compute_roc_curve_cpp(SEXP scoresSEXP, SEXP is_positiveSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -86,16 +86,16 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_biomarkerPanels_select_stable_genes_cpp", (DL_FUNC) &_biomarkerPanels_select_stable_genes_cpp, 3},
-    {"_biomarkerPanels_score_transferable_features_cpp", (DL_FUNC) &_biomarkerPanels_score_transferable_features_cpp, 1},
-    {"_biomarkerPanels_aggregate_de_pvalues_cpp", (DL_FUNC) &_biomarkerPanels_aggregate_de_pvalues_cpp, 2},
-    {"_biomarkerPanels_pairwise_col_diff_cpp", (DL_FUNC) &_biomarkerPanels_pairwise_col_diff_cpp, 2},
-    {"_biomarkerPanels_reference_diff_cpp", (DL_FUNC) &_biomarkerPanels_reference_diff_cpp, 4},
-    {"_biomarkerPanels_compute_roc_curve_cpp", (DL_FUNC) &_biomarkerPanels_compute_roc_curve_cpp, 2},
+    {"_MOBID_select_stable_genes_cpp", (DL_FUNC) &_MOBID_select_stable_genes_cpp, 3},
+    {"_MOBID_score_transferable_features_cpp", (DL_FUNC) &_MOBID_score_transferable_features_cpp, 1},
+    {"_MOBID_aggregate_de_pvalues_cpp", (DL_FUNC) &_MOBID_aggregate_de_pvalues_cpp, 2},
+    {"_MOBID_pairwise_col_diff_cpp", (DL_FUNC) &_MOBID_pairwise_col_diff_cpp, 2},
+    {"_MOBID_reference_diff_cpp", (DL_FUNC) &_MOBID_reference_diff_cpp, 4},
+    {"_MOBID_compute_roc_curve_cpp", (DL_FUNC) &_MOBID_compute_roc_curve_cpp, 2},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_biomarkerPanels(DllInfo *dll) {
+RcppExport void R_init_MOBID(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }

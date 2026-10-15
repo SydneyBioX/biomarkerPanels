@@ -1,13 +1,13 @@
 # Tests for feature transform registry and implementations
 
 # Access internal functions via :::
-.apply_feature_transform <- biomarkerPanels:::.apply_feature_transform
-.apply_feature_transform_single <- biomarkerPanels:::.apply_feature_transform_single
-.transform_registry <- biomarkerPanels:::.transform_registry
-transform_none <- biomarkerPanels:::transform_none
-transform_pairwise_ratios <- biomarkerPanels:::transform_pairwise_ratios
-transform_pairwise_log_ratios <- biomarkerPanels:::transform_pairwise_log_ratios
-transform_reference_norm <- biomarkerPanels:::transform_reference_norm
+.apply_feature_transform <- MOBID:::.apply_feature_transform
+.apply_feature_transform_single <- MOBID:::.apply_feature_transform_single
+.transform_registry <- MOBID:::.transform_registry
+transform_none <- MOBID:::transform_none
+transform_pairwise_ratios <- MOBID:::transform_pairwise_ratios
+transform_pairwise_log_ratios <- MOBID:::transform_pairwise_log_ratios
+transform_reference_norm <- MOBID:::transform_reference_norm
 
 test_that("register_feature_transform adds new transforms", {
   custom_transform <- function(x) x * 2

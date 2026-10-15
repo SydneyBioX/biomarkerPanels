@@ -7,14 +7,14 @@ test_that(".compute_roc_curve handles edge cases correctly", {
   # TPR should range from 0 to 1 as threshold decreases
   truth_all_pos <- factor(rep("Yes", 50), levels = c("No", "Yes"))
   scores <- runif(50)
-  roc <- biomarkerPanels:::.compute_roc_curve(truth_all_pos, scores, "Yes")
+  roc <- MOBID:::.compute_roc_curve(truth_all_pos, scores, "Yes")
   expect_true(all(is.na(roc$fpr)))
   # Last row (lowest threshold) should have TPR = 1
   expect_equal(max(roc$tpr), 1)
 
   # All negative - TPR should be NA (no positives to compute TPR)
   truth_all_neg <- factor(rep("No", 50), levels = c("No", "Yes"))
-  roc <- biomarkerPanels:::.compute_roc_curve(truth_all_neg, scores, "Yes")
+  roc <- MOBID:::.compute_roc_curve(truth_all_neg, scores, "Yes")
   expect_true(all(is.na(roc$tpr)))
 })
 
@@ -30,7 +30,7 @@ test_that(".compute_roc_curve_cpp matches pROC", {
   roc_proc <- pROC::roc(truth, scores, levels = c("No", "Yes"), direction = "<", quiet = TRUE)
 
   # Our implementation
-  roc_ours <- biomarkerPanels:::.compute_roc_curve(truth, scores, "Yes")
+  roc_ours <- MOBID:::.compute_roc_curve(truth, scores, "Yes")
 
   # Compare key operating points
   # pROC sensitivities should be present (or very close) in our curve

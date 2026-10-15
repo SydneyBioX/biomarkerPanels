@@ -8,7 +8,7 @@
 #' @return Numeric vector of scores (one per gene)
 #' @noRd
 .select_stable_genes_cpp <- function(abs_t, se_matrix, method) {
-    .Call(`_biomarkerPanels_select_stable_genes_cpp`, abs_t, se_matrix, method)
+    .Call(`_MOBID_select_stable_genes_cpp`, abs_t, se_matrix, method)
 }
 
 #' @title Score transferable features (C++)
@@ -16,7 +16,7 @@
 #' @return List with mean_abs, sd, min_abs, sign_agreement vectors
 #' @noRd
 .score_transferable_features_cpp <- function(coefficient_matrix) {
-    .Call(`_biomarkerPanels_score_transferable_features_cpp`, coefficient_matrix)
+    .Call(`_MOBID_score_transferable_features_cpp`, coefficient_matrix)
 }
 
 #' @title Aggregate DE p-values across cohorts (C++)
@@ -25,7 +25,7 @@
 #' @return Numeric vector of combined two-sided p-values (sorted ascending)
 #' @noRd
 .aggregate_de_pvalues_cpp <- function(t_matrix, method) {
-    .Call(`_biomarkerPanels_aggregate_de_pvalues_cpp`, t_matrix, method)
+    .Call(`_MOBID_aggregate_de_pvalues_cpp`, t_matrix, method)
 }
 
 #' @title Compute pairwise difference between matrix columns (C++)
@@ -34,7 +34,7 @@
 #' @return A matrix of pairwise differences
 #' @noRd
 .pairwise_col_diff_cpp <- function(x, col_names) {
-    .Call(`_biomarkerPanels_pairwise_col_diff_cpp`, x, col_names)
+    .Call(`_MOBID_pairwise_col_diff_cpp`, x, col_names)
 }
 
 #' @title Compute differences relative to a reference column (C++)
@@ -45,7 +45,7 @@
 #' @return A matrix of differences (other - ref)
 #' @noRd
 .reference_diff_cpp <- function(x, ref_col, ref_name, other_names) {
-    .Call(`_biomarkerPanels_reference_diff_cpp`, x, ref_col, ref_name, other_names)
+    .Call(`_MOBID_reference_diff_cpp`, x, ref_col, ref_name, other_names)
 }
 
 #' @title Compute ROC curve efficiently (C++)
@@ -54,6 +54,6 @@
 #' @return DataFrame with columns: threshold, tpr, fpr
 #' @noRd
 .compute_roc_curve_cpp <- function(scores, is_positive) {
-    .Call(`_biomarkerPanels_compute_roc_curve_cpp`, scores, is_positive)
+    .Call(`_MOBID_compute_roc_curve_cpp`, scores, is_positive)
 }
 

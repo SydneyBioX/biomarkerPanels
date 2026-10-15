@@ -247,7 +247,7 @@ metric_specificity_at_sensitivity <- function(truth, scores = NULL, selected = N
 #'
 #' # Sensitivity when specificity is fixed at 90% (internal function; users
 #' # normally reach it via define_objectives(metrics = "sensitivity_at_specificity"))
-#' biomarkerPanels:::metric_sensitivity_at_specificity(
+#' MOBID:::metric_sensitivity_at_specificity(
 #'   truth, scores, target_specificity = 0.90
 #' )
 metric_sensitivity_at_specificity <- function(truth, scores = NULL, selected = NULL,

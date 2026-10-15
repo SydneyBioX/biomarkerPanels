@@ -35,7 +35,7 @@ NULL
 
     # Add cohort dummies if the model was trained with them, zeroed so that
     # prediction is cohort-agnostic.
-    meta <- model$biomarkerPanels_meta
+    meta <- .panel_model_meta(model)
     if (!is.null(meta$cohort_info)) {
       n_dummies <- meta$cohort_info$n_dummies
       dummy_cols <- matrix(0, nrow = nrow(x_mat), ncol = n_dummies)
@@ -92,6 +92,20 @@ NULL
   as.numeric(preds)
 }
 
+#' Prediction Metadata Stored on a Fitted Panel Model
+#'
+#' Models fitted before the package was renamed from biomarkerPanels to MOBID
+#' carry the same list under `biomarkerPanels_meta`. Falling back to it keeps
+#' saved panels predicting correctly: without it, cohort dummies would be
+#' dropped and NP rule-out scores would silently lose their label flip.
+#'
+#' @param model A fitted model from `.fit_panel_model()` or `.fit_np_panel()`.
+#' @return The metadata list, or `NULL` if the model has none.
+#' @noRd
+.panel_model_meta <- function(model) {
+  model$MOBID_meta %||% model$biomarkerPanels_meta
+}
+
 #' Predict from NP Classifier
 #'
 #' Extracts continuous probability scores from an npc model object.
@@ -106,7 +120,7 @@ NULL
 
   x_mat <- as.matrix(x_selected)
 
-  labels_flipped <- isTRUE(model$biomarkerPanels_meta$labels_flipped)
+  labels_flipped <- isTRUE(.panel_model_meta(model)$labels_flipped)
 
   # Get predictions from nproc - use predict method for npc objects
   np_pred <- stats::predict(model, newx = x_mat)

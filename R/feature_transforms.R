@@ -4,7 +4,7 @@
 #' used to transform feature matrices during optimization.
 #'
 #' @name transform-registry
-#' @useDynLib biomarkerPanels, .registration = TRUE
+#' @useDynLib MOBID, .registration = TRUE
 #' @importFrom Rcpp sourceCpp
 NULL
 

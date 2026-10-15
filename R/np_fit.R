@@ -127,7 +127,7 @@ fit_np_panel <- function(optimization_result,
   )
 
   # Store metadata for prediction
-  np_model$biomarkerPanels_meta <- list(
+  np_model$MOBID_meta <- list(
     feature_names = selected_features,
     labels_flipped = labels_flipped,
     minimize_FPR = minimize_FPR,
